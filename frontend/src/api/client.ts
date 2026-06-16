@@ -20,6 +20,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 }
 
 export function imageUrl(filePath: string): string {
+  if (filePath.startsWith("http")) return filePath;
   return `${UPLOADS_ORIGIN}/uploads/${filePath}`;
 }
 
