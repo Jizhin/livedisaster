@@ -8930,15 +8930,27 @@ button, input, textarea, select { font: inherit; cursor: pointer; }
   .hp-chart-pair  { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
-  .hp-main-title  { font-size: 28px; }
-  .hp-page        { padding: 0 16px 32px; }
+  .hp-main-title  { font-size: 24px; letter-spacing: -0.02em; }
+  .hp-main-sub    { font-size: 13px; }
+  .hp-topbar      { padding: 20px 0 12px; }
+  .hp-page        { padding: 0 14px 32px; }
   .hp-action-pair { grid-template-columns: 1fr; }
   .hp-dcard-grid  { grid-template-columns: 1fr 1fr; }
-  .hp-slider-img-area { flex: 0 0 180px; }
-  .hp-ticker      { height: auto; padding: 8px 0; }
-  .hp-ticker-content { animation: none; padding-left: 0; white-space: normal; }
-  .hp-ticker-sep  { display: none; }
-  .hp-ticker-track { overflow-y: auto; max-height: 120px; padding: 4px 10px; }
+  .hp-slider-img-area { flex: 0 0 160px; }
+  /* ticker stays as horizontal scroll on mobile — no overrides */
+  .hp-ticker      { height: 34px; }
+  .hp-ticker-label { font-size: 9px; padding: 0 10px; }
+  .hp-ticker-item { font-size: 11px; }
+  /* left card sections tighter on mobile */
+  .hp-ls          { padding: 8px 12px; }
+  .hp-ls-title    { font-size: 9px; }
+  .hp-action-card { padding: 10px 12px; gap: 8px; }
+  .hp-action-label { font-size: 11px; }
+  .hp-action-sub  { font-size: 10px; }
+  /* district cards */
+  .hp-dcard       { padding: 12px; }
+  .hp-dcard-name  { font-size: 13px; }
+  .hp-dcard-meta  { font-size: 10px; }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -9822,11 +9834,42 @@ button, input, textarea, select { font: inherit; cursor: pointer; }
   .dpc-stat { padding-right: 28px; }
 }
 @media (max-width: 600px) {
-  .dpc-grid { grid-template-columns: 1fr; gap: 12px; }
-  .dpc-card-title { font-size: 14px; }
-  .dpc-load-btn { width: 100%; }
+  /* Nav */
+  .dpc-nav { padding: 0 16px; height: 46px; }
+  .dpc-nav-back { font-size: 13px; }
+
+  /* Header */
+  .dpc-header { padding: 14px 16px 12px; }
+  .dpc-header-inner { flex-direction: column; gap: 10px; }
+  .dpc-weather { display: none; }
+  .dpc-district-name { font-size: 28px; margin-bottom: 10px; }
+
+  /* Stats — wrap into 2 columns */
+  .dpc-stats-row { flex-wrap: wrap; gap: 10px 0; }
+  .dpc-stat { padding-right: 20px; gap: 6px; }
   .dpc-stat-num { font-size: 20px; }
-  .dpc-stat { padding-right: 20px; gap: 8px; }
+  .dpc-stat-lbl { font-size: 11px; }
+  .dpc-activity { margin-left: 0; font-size: 11px; width: 100%; margin-top: 2px; }
+
+  /* Search */
+  .dpc-search-bar { margin: 10px 16px 0; height: 46px; font-size: 13px; }
+
+  /* Filters */
+  .dpc-filter-block { padding: 10px 16px; gap: 10px; }
+  .dpc-flabel { font-size: 9px; }
+  .dpc-chips { gap: 6px; flex-wrap: wrap; }
+  .dpc-chip { font-size: 11px; padding: 4px 10px; height: 28px; }
+
+  /* Grid */
+  .dpc-grid { grid-template-columns: 1fr; gap: 10px; padding: 12px 16px 16px; }
+  .dpc-card-title { font-size: 13px; }
+  .dpc-card-loc { font-size: 10px; }
+
+  /* Load more / footer */
+  .dpc-load-wrap { padding: 0 16px 16px; }
+  .dpc-load-btn { width: 100%; font-size: 13px; }
+  .dpc-footer { padding: 14px 16px; font-size: 12px; }
+  .dpc-footer-links { gap: 16px; }
 }
 
 /* ══ Compose-Report Modal (cr-*) ════════════════════════════ */
@@ -10086,6 +10129,12 @@ button, input, textarea, select { font: inherit; cursor: pointer; }
 }
 @keyframes cr-spinning {
   to { transform: rotate(360deg); }
+}
+
+/* ── Compose modal responsive ───────────────────────────── */
+@media (max-width: 540px) {
+  .cr-backdrop   { align-items: flex-end; padding: 0; }
+  .cr-modal      { width: 100vw; max-width: 100vw; max-height: 92vh; border-radius: 0; }
 }
 
 /* ── Responsive ─────────────────────────────────────────── */
