@@ -1,0 +1,42 @@
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Node / Frontend ───────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ── Environment / Secrets ─────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Uploaded files (keep folder via .gitkeep) ─────────────────
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# ── Database ──────────────────────────────────────────────────
+*.sqlite
+*.db
+
+# ── OS / Editor ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── Project-specific dumps / temp ─────────────────────────────
+project_dump.txt
