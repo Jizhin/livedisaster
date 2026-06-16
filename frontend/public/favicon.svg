@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- dark background -->
+  <rect width="32" height="32" rx="6" fill="#05080D"/>
+  <!-- alert triangle -->
+  <path d="M16 6L4 26h24L16 6z" fill="#F59E0B"/>
+  <!-- wave cutout at base suggesting water/flood -->
+  <path d="M7 26 Q9 22 11 26 Q13 30 15 26 Q17 22 19 26 Q21 30 23 26 Q25 22 25 26H7z" fill="#05080D"/>
+  <!-- exclamation mark -->
+  <rect x="14.8" y="13" width="2.4" height="7" rx="1" fill="#05080D"/>
+  <circle cx="16" cy="23" r="1.3" fill="#05080D"/>
+</svg>
