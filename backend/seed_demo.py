@@ -389,10 +389,18 @@ REPORTS = [
 from app.db.base import Base
 import app.models  # noqa — register all models
 
-from app.models.report import Report, ReportImage
+from app.models.report import Report, ReportImage, ReportStatus
 from app.models.comment import Comment
 from app.models.district import District
 from app.models.verification import Verification, VerificationKind
+
+STATUS_MAP = {
+    "active":   ReportStatus.new,
+    "new":      ReportStatus.new,
+    "verified": ReportStatus.verified,
+    "resolved": ReportStatus.resolved,
+    "disputed": ReportStatus.disputed,
+}
 
 inserted = 0
 with Session(engine) as db:
@@ -412,7 +420,7 @@ with Session(engine) as db:
             latitude=r.get("lat"),
             longitude=r.get("lon"),
             location_attached=bool(r.get("lat")),
-            status=r["status"],
+            status=STATUS_MAP.get(r["status"], ReportStatus.new),
             source_type="community",
             is_approved=True,
             views_count=random.randint(10, 80),
