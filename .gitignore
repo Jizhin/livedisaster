@@ -25,6 +25,8 @@ frontend/.vite/
 # ── Uploaded files (keep folder via .gitkeep) ─────────────────
 backend/uploads/*
 !backend/uploads/.gitkeep
+foodspot-backend/uploads/*
+!foodspot-backend/uploads/.gitkeep
 
 # ── Database ──────────────────────────────────────────────────
 *.sqlite

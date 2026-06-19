@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: #FAF7F2;
+    font-family: 'Manrope', 'Inter', sans-serif;
+    color: #18181B;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  .text-gradient-orange {
+    background: linear-gradient(135deg, #D97706, #C2410C);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-gradient-orange {
+    background: linear-gradient(160deg, #D97706 0%, #C2410C 100%);
+  }
+
+  .circle-glow {
+    box-shadow:
+      0 0 0 0 rgba(194, 65, 12, 0.3),
+      0 20px 60px rgba(194, 65, 12, 0.35),
+      0 8px 24px rgba(194, 65, 12, 0.2);
+  }
+
+  .card-shadow {
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #FAF7F2; }
+::-webkit-scrollbar-thumb { background: #E7E5E4; border-radius: 3px; }
+
+/* Modal card — hide scrollbar, keep scroll */
+.fs-modal-card::-webkit-scrollbar { display: none; }
+.fs-modal-card { scrollbar-width: none; -ms-overflow-style: none; }
+
+/* Masonry grid — Pinterest-style */
+.masonry-grid { columns: 3; column-gap: 20px; }
+.masonry-item { break-inside: avoid; margin-bottom: 20px; }
+@media (max-width: 1100px) { .masonry-grid { columns: 2; } }
+@media (max-width: 640px)  { .masonry-grid { columns: 1; } }
+
+/* Hide chips horizontal scrollbar */
+.chips-row::-webkit-scrollbar { display: none; }
+.chips-row { scrollbar-width: none; }

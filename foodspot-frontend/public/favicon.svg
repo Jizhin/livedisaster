@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <radialGradient id="pin" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#D97706"/>
+      <stop offset="100%" stop-color="#C2410C"/>
+    </radialGradient>
+  </defs>
+  <path d="M16 2C10.477 2 6 6.477 6 12c0 5.385 6.5 13 10 16.5 3.5-3.5 10-11.115 10-16.5C26 6.477 21.523 2 16 2z" fill="url(#pin)"/>
+  <circle cx="16" cy="12" r="5" fill="#FAF7F2"/>
+  <text x="16" y="15.5" text-anchor="middle" font-size="6" font-family="sans-serif" fill="#C2410C" font-weight="bold">🍛</text>
+</svg>

@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+
+  foodspot-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: foodspot
+      POSTGRES_USER: foodspot_user
+      POSTGRES_PASSWORD: foodspot_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - foodspot_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U foodspot_user -d foodspot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  foodspot-backend:
+    build: ./foodspot-backend
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://foodspot_user:foodspot_pass@foodspot-db:5432/foodspot
+      CORS_ORIGINS: '["http://localhost:5174", "http://localhost:80"]'
+    depends_on:
+      foodspot-db:
+        condition: service_healthy
+    volumes:
+      - foodspot_uploads:/app/uploads
+
+  foodspot-frontend:
+    build:
+      context: ./foodspot-frontend
+      args:
+        VITE_API_BASE_URL: ""
+    ports:
+      - "5174:80"
+    depends_on:
+      - foodspot-backend
+
+volumes:
+  foodspot_db_data:
+  foodspot_uploads:
