@@ -1032,7 +1032,7 @@ function DistrictModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-3xl bg-background border border-surface max-h-[85vh] flex flex-col overflow-hidden"
+        className="relative w-full max-w-3xl bg-background border border-foreground/25 max-h-[85vh] flex flex-col overflow-hidden"
       >
         <header className={`relative border-b-2 ${severityBorder(sev)} bg-surface px-4 py-3`}>
           <div className="flex items-center justify-between gap-3 mb-1.5">
@@ -1196,90 +1196,117 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
     : report.image_url;
 
   return (
-    <div className="absolute inset-0 bg-background z-10 flex flex-col overflow-hidden">
+    <div className="absolute inset-0 bg-background z-10 flex flex-col overflow-hidden border-t-2 border-primary/60">
       {/* Header */}
-      <header className="flex items-center gap-3 px-4 py-2 border-b border-surface shrink-0">
+      <header className="flex items-center gap-3 px-4 py-2.5 border-b border-foreground/15 bg-surface shrink-0">
         <button type="button" onClick={onBack}
-          className="font-display text-[10px] uppercase tracking-widest text-primary hover:text-foreground">
+          className="font-display text-[10px] uppercase tracking-widest font-bold text-primary hover:text-foreground transition-colors">
           ← {t.backToList}
         </button>
-        <span className="text-muted-foreground/30 text-xs">|</span>
-        <span className={`font-display text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 ${
-          report.severity === "critical" ? "bg-critical/20 text-critical"
-            : report.severity === "warn" ? "bg-warn/20 text-warn"
-            : "bg-primary/20 text-primary"
+        <span className="text-foreground/20 text-xs">|</span>
+        <span className={`font-display text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 border ${
+          report.severity === "critical" ? "border-critical bg-critical/20 text-critical"
+            : report.severity === "warn" ? "border-warn bg-warn/20 text-warn"
+            : "border-primary bg-primary/20 text-primary"
         }`}>{report.severity}</span>
         {report.category && (
-          <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">{report.category}</span>
+          <span className="font-display text-[10px] uppercase tracking-widest text-foreground/60">{report.category}</span>
         )}
-        <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground ml-auto">
+        <span className="font-display text-[10px] uppercase tracking-widest text-foreground/50 ml-auto">
           {formatReportTime(report.created_at)}
         </span>
       </header>
 
-      <div className="flex-1 overflow-y-auto divide-y divide-surface">
+      <div className="flex-1 overflow-y-auto divide-y divide-foreground/10">
         {/* Location + message */}
-        <div className="px-4 py-3 space-y-1.5">
-          <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
+        <div className="px-4 py-3 space-y-2">
+          <div className="font-display text-[10px] uppercase tracking-widest text-foreground/50">
             📍 {report.place ? `${report.place}, ` : ""}{report.district}
           </div>
-          <p className="text-sm leading-snug">{report.message}</p>
+          <p className="text-sm leading-relaxed text-foreground">{report.message}</p>
           {imgUrl && (
-            <img src={imgUrl} alt="" className="w-full max-h-40 object-cover border border-surface mt-2" />
+            <img src={imgUrl} alt="" className="w-full max-h-40 object-cover border border-foreground/15 mt-1" />
           )}
         </div>
 
         {/* Vote buttons */}
         <div className="px-4 py-3">
-          <div className="font-display text-[10px] uppercase tracking-widest text-foreground/70 font-bold mb-2">
+          <div className="font-display text-[10px] uppercase tracking-widest text-foreground font-bold mb-2.5">
             {t.communityVotesLabel}
           </div>
           {loading ? (
-            <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground/50 animate-pulse">{t.loadingDetail}</div>
+            <div className="font-display text-[10px] uppercase tracking-widest text-foreground/40 animate-pulse">{t.loadingDetail}</div>
           ) : (
             <div className="grid grid-cols-3 gap-2">
-              {(["confirm", "incorrect", "resolved"] as const).map((kind) => {
-                const label = kind === "confirm" ? t.confirm : kind === "incorrect" ? t.incorrect : t.resolvedV;
-                const count = localCounts
-                  ? kind === "confirm" ? localCounts.confirmed : kind === "incorrect" ? localCounts.incorrect : localCounts.resolved
-                  : 0;
-                const active = voted === kind;
-                const colorClass = kind === "confirm"
-                  ? "border-primary text-primary bg-primary/10"
-                  : kind === "incorrect"
-                  ? "border-warn text-warn bg-warn/10"
-                  : "border-foreground/30 text-foreground/60 bg-foreground/5";
-                return (
-                  <button
-                    key={kind}
-                    type="button"
-                    disabled={!!voted}
-                    onClick={() => vote(kind)}
-                    className={`font-display text-[10px] uppercase tracking-widest font-bold py-2 border transition-all disabled:cursor-default ${
-                      active ? colorClass : voted ? "border-surface text-muted-foreground/40" : `border-surface text-muted-foreground hover:${colorClass}`
-                    }`}
-                  >
-                    <span className="block text-base tabular-nums leading-none mb-0.5">{count}</span>
-                    {label}
-                    {active && " ✓"}
-                  </button>
-                );
-              })}
+              {/* Confirm */}
+              <button
+                type="button"
+                disabled={!!voted}
+                onClick={() => vote("confirm")}
+                className={`font-display text-[10px] uppercase tracking-widest font-bold py-3 border transition-all disabled:cursor-default ${
+                  voted === "confirm"
+                    ? "border-primary bg-primary/25 text-primary"
+                    : voted
+                    ? "border-foreground/10 text-foreground/25 bg-foreground/3"
+                    : "border-primary/50 text-primary bg-primary/8 hover:bg-primary/20 hover:border-primary"
+                }`}
+              >
+                <span className="block text-lg tabular-nums leading-none mb-0.5 font-extrabold">
+                  {localCounts?.confirmed ?? 0}
+                </span>
+                {t.confirm}{voted === "confirm" && " ✓"}
+              </button>
+              {/* Incorrect */}
+              <button
+                type="button"
+                disabled={!!voted}
+                onClick={() => vote("incorrect")}
+                className={`font-display text-[10px] uppercase tracking-widest font-bold py-3 border transition-all disabled:cursor-default ${
+                  voted === "incorrect"
+                    ? "border-warn bg-warn/25 text-warn"
+                    : voted
+                    ? "border-foreground/10 text-foreground/25 bg-foreground/3"
+                    : "border-warn/50 text-warn bg-warn/8 hover:bg-warn/20 hover:border-warn"
+                }`}
+              >
+                <span className="block text-lg tabular-nums leading-none mb-0.5 font-extrabold">
+                  {localCounts?.incorrect ?? 0}
+                </span>
+                {t.incorrect}{voted === "incorrect" && " ✓"}
+              </button>
+              {/* Resolved */}
+              <button
+                type="button"
+                disabled={!!voted}
+                onClick={() => vote("resolved")}
+                className={`font-display text-[10px] uppercase tracking-widest font-bold py-3 border transition-all disabled:cursor-default ${
+                  voted === "resolved"
+                    ? "border-foreground/60 bg-foreground/15 text-foreground"
+                    : voted
+                    ? "border-foreground/10 text-foreground/25 bg-foreground/3"
+                    : "border-foreground/35 text-foreground/70 bg-foreground/5 hover:bg-foreground/12 hover:border-foreground/60"
+                }`}
+              >
+                <span className="block text-lg tabular-nums leading-none mb-0.5 font-extrabold">
+                  {localCounts?.resolved ?? 0}
+                </span>
+                {t.resolvedV}{voted === "resolved" && " ✓"}
+              </button>
             </div>
           )}
         </div>
 
         {/* Comments */}
         <div className="px-4 py-3 space-y-2">
-          <div className="font-display text-[10px] uppercase tracking-widest text-foreground/70 font-bold">
+          <div className="font-display text-[10px] uppercase tracking-widest text-foreground font-bold">
             {t.discussionHd}
           </div>
           {comments.length === 0 ? (
-            <div className="font-display text-[10px] italic text-muted-foreground/50">{t.noCommentsYet}</div>
+            <div className="font-display text-[10px] italic text-foreground/40">{t.noCommentsYet}</div>
           ) : (
             comments.map((c) => (
-              <div key={c.id} className="bg-surface/60 px-3 py-2">
-                <div className="font-display text-[9px] uppercase tracking-widest text-foreground/50 mb-1">
+              <div key={c.id} className="bg-surface border border-foreground/10 px-3 py-2">
+                <div className="font-display text-[9px] uppercase tracking-widest text-foreground/45 mb-1">
                   {c.author_name} · {formatReportTime(c.created_at)}
                 </div>
                 <p className="text-sm text-foreground leading-snug">{c.content}</p>
@@ -1288,13 +1315,13 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
           )}
 
           {/* Comment form */}
-          <form onSubmit={submitComment} className="pt-2 space-y-1.5">
+          <form onSubmit={submitComment} className="pt-1.5 space-y-1.5">
             <input
               type="text"
               value={commentName}
               onChange={(e) => setCommentName(e.target.value)}
               placeholder={t.namePlaceholder}
-              className="w-full bg-background border border-surface focus:border-primary px-3 py-1.5 text-xs outline-none placeholder:text-muted-foreground/50"
+              className="w-full bg-surface border border-foreground/20 focus:border-primary px-3 py-2 text-xs outline-none placeholder:text-foreground/35 text-foreground"
             />
             <div className="flex gap-2">
               <textarea
@@ -1302,12 +1329,12 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
                 onChange={(e) => setCommentText(e.target.value)}
                 rows={2}
                 placeholder={t.commentPlaceholder}
-                className="flex-1 bg-background border border-surface focus:border-primary px-3 py-1.5 text-xs outline-none resize-none placeholder:text-muted-foreground/50"
+                className="flex-1 bg-surface border border-foreground/20 focus:border-primary px-3 py-2 text-xs outline-none resize-none placeholder:text-foreground/35 text-foreground"
               />
               <button
                 type="submit"
                 disabled={posting || !commentText.trim()}
-                className="font-display text-[10px] uppercase tracking-widest font-bold px-3 bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                className="font-display text-[10px] uppercase tracking-widest font-bold px-4 bg-primary text-background hover:bg-primary/80 disabled:opacity-35 disabled:cursor-not-allowed shrink-0 transition-colors"
               >
                 {posting ? "…" : t.postComment}
               </button>
