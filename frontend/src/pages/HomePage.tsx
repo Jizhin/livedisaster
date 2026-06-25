@@ -1032,23 +1032,23 @@ function DistrictModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-5xl bg-background border border-surface max-h-[92vh] flex flex-col overflow-hidden"
+        className="relative w-full max-w-3xl bg-background border border-surface max-h-[85vh] flex flex-col overflow-hidden"
       >
-        <header className={`relative border-b-4 ${severityBorder(sev)} bg-surface p-6`}>
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div className="font-display text-[10px] uppercase tracking-[0.3em] text-muted-foreground font-bold">
+        <header className={`relative border-b-2 ${severityBorder(sev)} bg-surface px-4 py-3`}>
+          <div className="flex items-center justify-between gap-3 mb-1.5">
+            <div className="font-display text-[9px] uppercase tracking-[0.3em] text-muted-foreground font-bold">
               {t.dossierLabel}
             </div>
-            <button type="button" onClick={onClose} className="font-display text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground">
+            <button type="button" onClick={onClose} className="font-display text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground">
               {t.close} ✕
             </button>
           </div>
-          <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="font-display text-3xl md:text-5xl font-extrabold uppercase tracking-tight leading-none">{district}</h2>
-              <div className="font-display text-sm md:text-base text-foreground/80 mt-2">{headline}</div>
+              <h2 className="font-display text-xl md:text-2xl font-extrabold uppercase tracking-tight leading-none">{district}</h2>
+              <div className="font-display text-[10px] text-foreground/60 mt-0.5 uppercase tracking-widest">{headline}</div>
             </div>
-            <div className="flex gap-6">
+            <div className="flex gap-4">
               <DossierMetric value={alerts.length} label={t.officialLabel} tone={sev} />
               <DossierMetric value={reports.length} label={t.crowdLabel} tone="primary" />
               <DossierMetric value={places.length} label={t.placesMetricLabel} tone="muted" />
@@ -1058,31 +1058,31 @@ function DistrictModal({
 
         <div className="flex-1 overflow-y-auto">
           <section className="border-b border-surface">
-            <div className="px-6 pt-5 pb-3 flex items-center justify-between">
-              <h3 className="font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">{t.officialAdvisories}</h3>
-              <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground/70">NDMA Sachet · IMD · KSDMA</span>
+            <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+              <h3 className="font-display text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t.officialAdvisories}</h3>
+              <span className="font-display text-[9px] uppercase tracking-widest text-muted-foreground/50">NDMA · IMD · KSDMA</span>
             </div>
             {alerts.length === 0 ? (
-              <div className="px-6 pb-6 text-sm text-muted-foreground/70 italic">{t.noOfficialAdvisory} {district}.</div>
+              <div className="px-4 pb-3 text-xs text-muted-foreground/70 italic">{t.noOfficialAdvisory} {district}.</div>
             ) : (
-              <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="px-4 pb-3 grid grid-cols-1 md:grid-cols-2 gap-2">
                 {alerts.map((a) => <OfficialAlertCard key={a.id} alert={a} />)}
               </div>
             )}
           </section>
 
           <section>
-            <div className="px-6 pt-5 pb-3">
-              <h3 className="font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+              <h3 className="font-display text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                 {t.crowdBriefs} ({visibleReports.length})
               </h3>
             </div>
             {places.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto px-6 pb-3">
+              <div className="flex gap-1.5 overflow-x-auto px-4 pb-2">
                 <button
                   type="button"
                   onClick={() => setActivePlace(null)}
-                  className={`shrink-0 font-display text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 border transition-colors ${
+                  className={`shrink-0 font-display text-[9px] uppercase tracking-widest font-bold px-2.5 py-1 border transition-colors ${
                     activePlace === null ? "border-primary bg-primary/20 text-primary" : "border-surface text-muted-foreground hover:border-foreground/40"
                   }`}
                 >
@@ -1093,7 +1093,7 @@ function DistrictModal({
                     key={p}
                     type="button"
                     onClick={() => setActivePlace(p)}
-                    className={`shrink-0 font-display text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 border transition-colors ${
+                    className={`shrink-0 font-display text-[9px] uppercase tracking-widest font-bold px-2.5 py-1 border transition-colors ${
                       activePlace === p ? "border-primary bg-primary/20 text-primary" : "border-surface text-muted-foreground hover:border-foreground/40"
                     }`}
                   >
@@ -1102,9 +1102,9 @@ function DistrictModal({
                 ))}
               </div>
             )}
-            <div className="px-6 pb-6 space-y-3">
+            <div className="px-4 pb-4 space-y-1.5">
               {visibleReports.length === 0 ? (
-                <div className="text-center py-10 text-muted-foreground/60 italic text-xs font-display uppercase tracking-widest">
+                <div className="text-center py-6 text-muted-foreground/60 italic text-xs font-display uppercase tracking-widest">
                   {t.noCrowdReportsYet}{activePlace ? ` ${t.forLabel} ${activePlace}` : ""}.
                 </div>
               ) : (
@@ -1332,29 +1332,28 @@ function DossierMetric({ value, label, tone }: {
       : "text-foreground/50";
   return (
     <div className="text-right">
-      <div className={`font-display text-3xl font-bold tabular-nums ${color}`}>{value}</div>
-      <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{label}</div>
+      <div className={`font-display text-xl font-bold tabular-nums leading-none ${color}`}>{value}</div>
+      <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground font-bold mt-0.5">{label}</div>
     </div>
   );
 }
 
 function OfficialAlertCard({ alert }: { alert: OfficialAlert }) {
   return (
-    <article className={`bg-surface border-l-4 ${severityBorder(alert.severity)} p-4 space-y-2`}>
-      <div className="flex items-start justify-between gap-3">
+    <article className={`bg-surface border-l-2 ${severityBorder(alert.severity)} px-3 py-2 space-y-1`}>
+      <div className="flex items-start justify-between gap-2">
         <div>
-          <div className={`font-display text-[10px] uppercase tracking-widest font-bold ${severityText(alert.severity)}`}>
+          <div className={`font-display text-[9px] uppercase tracking-widest font-bold ${severityText(alert.severity)}`}>
             {alert.severityLabel} · {alert.disasterType}
           </div>
-          <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">{alert.source}</div>
+          <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground/70">{alert.source}</div>
         </div>
-        <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground text-right shrink-0">
+        <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground text-right shrink-0">
           {formatAlertWindow(alert.effectiveStart)}
-          {alert.effectiveEnd ? ` → ${formatAlertWindow(alert.effectiveEnd)}` : ""}
         </div>
       </div>
-      {alert.message && <p className="text-sm text-foreground/90">{alert.message}</p>}
-      <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground/80">Area: {alert.areaDescription}</div>
+      {alert.message && <p className="text-xs text-foreground/80 leading-snug">{alert.message}</p>}
+      <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground/60">Area: {alert.areaDescription}</div>
     </article>
   );
 }
@@ -1380,30 +1379,25 @@ function FeedRow({ report, flash }: { report: Report; flash: boolean }) {
 function ReportCard({ report, onClick }: { report: Report; onClick?: () => void }) {
   return (
     <article
-      className={`bg-background border-l-4 ${severityBorder(report.severity)} p-4 ${onClick ? "cursor-pointer hover:bg-surface/50 transition-colors" : ""}`}
+      className={`bg-background border-l-2 ${severityBorder(report.severity)} px-3 py-2 ${onClick ? "cursor-pointer hover:bg-surface/50 transition-colors" : ""}`}
       onClick={onClick}
     >
-      <div className="flex justify-between items-start gap-3 mb-2">
-        <div>
-          <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
-            {report.place ?? report.district} · {report.category ?? "General"}
-          </div>
-          <div className={`font-display text-[10px] uppercase tracking-widest font-bold ${severityText(report.severity)}`}>
+      <div className="flex justify-between items-center gap-2 mb-0.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`font-display text-[9px] uppercase tracking-widest font-bold shrink-0 ${severityText(report.severity)}`}>
             {report.severity}
-          </div>
+          </span>
+          <span className="font-display text-[9px] uppercase tracking-widest text-muted-foreground truncate">
+            {report.place ?? report.district}{report.category ? ` · ${report.category}` : ""}
+          </span>
         </div>
-        <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
+        <span className="font-display text-[9px] uppercase tracking-widest text-muted-foreground/70 shrink-0">
           {formatReportTime(report.created_at)}
         </span>
       </div>
-      <p className="text-sm">{report.message}</p>
+      <p className="text-xs leading-snug text-foreground/90">{report.message}</p>
       {report.image_url && (
-        <img src={report.image_url} alt="" className="mt-3 w-full max-h-64 object-cover border border-surface" />
-      )}
-      {onClick && (
-        <div className="mt-2 font-display text-[9px] uppercase tracking-widest text-primary/60">
-          → tap for details
-        </div>
+        <img src={report.image_url} alt="" className="mt-1.5 w-full max-h-20 object-cover border border-surface/60" />
       )}
     </article>
   );
