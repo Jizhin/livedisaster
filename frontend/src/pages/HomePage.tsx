@@ -1041,34 +1041,37 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
   const imgUrl = data?.images?.[0]?.file_path
     ? `${UPLOADS_ORIGIN}/uploads/${data.images[0].file_path}`
     : report.image_url;
+  const comments = data?.comments ?? [];
 
   return (
     <div className="absolute inset-0 bg-background z-10 flex flex-col overflow-hidden">
-      <header className="flex items-center gap-4 p-6 border-b border-surface shrink-0">
+      {/* Compact header */}
+      <header className="flex items-center gap-3 px-4 py-2.5 border-b border-surface shrink-0">
         <button
           type="button"
           onClick={onBack}
-          className="font-display text-xs uppercase tracking-widest text-primary hover:text-foreground"
+          className="font-display text-[10px] uppercase tracking-widest text-primary hover:text-foreground"
         >
           ← {t.backToList}
         </button>
-        <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+        <span className="text-muted-foreground/30">|</span>
+        <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
           {t.reportDetail}
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {/* Severity + category badge */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className={`font-display text-xs uppercase tracking-widest font-bold px-3 py-1 border ${
-            report.severity === "critical" ? "border-critical text-critical bg-critical/10"
-              : report.severity === "warn" ? "border-warn text-warn bg-warn/10"
-              : "border-primary text-primary bg-primary/10"
+      <div className="flex-1 overflow-y-auto">
+        {/* Top strip: severity + category + time in one row */}
+        <div className={`flex items-center gap-2 px-4 py-2 border-b-2 ${severityBorder(report.severity)} flex-wrap`}>
+          <span className={`font-display text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 ${
+            report.severity === "critical" ? "bg-critical/20 text-critical"
+              : report.severity === "warn" ? "bg-warn/20 text-warn"
+              : "bg-primary/20 text-primary"
           }`}>
             {report.severity}
           </span>
           {report.category && (
-            <span className="font-display text-xs uppercase tracking-widest text-muted-foreground border border-surface px-3 py-1">
+            <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
               {report.category}
             </span>
           )}
@@ -1077,84 +1080,73 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
           </span>
         </div>
 
-        {/* Location */}
-        <div>
-          <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-1">
-            📍 {report.place ?? report.district}
+        <div className="px-4 py-3 space-y-3">
+          {/* Location */}
+          <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
+            📍 {report.place ? `${report.place}, ` : ""}{report.district}
           </div>
-          <div className="font-display text-xs text-muted-foreground">{report.district} District</div>
-        </div>
 
-        {/* Message */}
-        <p className="text-base leading-relaxed">{report.message}</p>
+          {/* Message */}
+          <p className="text-sm leading-relaxed">{report.message}</p>
 
-        {/* Image */}
-        {imgUrl && (
-          <img
-            src={imgUrl}
-            alt="Report evidence"
-            className="w-full max-h-72 object-cover border border-surface"
-          />
-        )}
+          {/* Image */}
+          {imgUrl && (
+            <img src={imgUrl} alt="Report evidence" className="w-full max-h-48 object-cover border border-surface" />
+          )}
 
-        {/* Community votes */}
-        {loading ? (
-          <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground animate-pulse">
-            {t.loadingDetail}
-          </div>
-        ) : data && (
-          <div className="border border-surface p-4 space-y-3">
-            <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-3">
-              {t.communityVotesLabel}
+          {/* Community votes + comments */}
+          {loading ? (
+            <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground animate-pulse py-2">
+              {t.loadingDetail}
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="text-center">
-                <div className="font-display text-2xl font-bold text-primary tabular-nums">
-                  {data.confirmed_count ?? 0}
-                </div>
-                <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground mt-1">
-                  {t.confirmed}
+          ) : data && (
+            <>
+              {/* Votes row */}
+              <div className="flex items-center gap-4 py-2 border-y border-surface">
+                <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold shrink-0">
+                  {t.communityVotesLabel}
+                </span>
+                <div className="flex gap-4 ml-auto">
+                  <span className="font-display text-xs font-bold tabular-nums text-primary">
+                    {data.confirmed_count ?? 0} <span className="text-muted-foreground font-normal">{t.confirmed}</span>
+                  </span>
+                  <span className="font-display text-xs font-bold tabular-nums text-warn">
+                    {data.incorrect_count ?? 0} <span className="text-muted-foreground font-normal">{t.incorrect}</span>
+                  </span>
+                  <span className="font-display text-xs font-bold tabular-nums text-foreground/50">
+                    {data.resolved_count ?? 0} <span className="text-muted-foreground font-normal">{t.resolvedV}</span>
+                  </span>
+                  {(data.views_count ?? 0) > 0 && (
+                    <span className="font-display text-xs text-muted-foreground/60">
+                      {data.views_count} {t.viewsLabel}
+                    </span>
+                  )}
                 </div>
               </div>
-              <div className="text-center">
-                <div className="font-display text-2xl font-bold text-warn tabular-nums">
-                  {data.incorrect_count ?? 0}
-                </div>
-                <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground mt-1">
-                  {t.incorrect}
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="font-display text-2xl font-bold text-foreground/50 tabular-nums">
-                  {data.resolved_count ?? 0}
-                </div>
-                <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground mt-1">
-                  {t.resolvedV}
-                </div>
-              </div>
-            </div>
-            {(data.views_count ?? 0) > 0 && (
-              <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground pt-2 border-t border-surface">
-                {t.viewsLabel}: {data.views_count}
-              </div>
-            )}
-            {(data.comments ?? []).length > 0 && (
-              <div className="pt-2 border-t border-surface space-y-3">
+
+              {/* Comments — always shown */}
+              <div className="space-y-2">
                 <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
                   {t.discussionHd}
                 </div>
-                {(data.comments ?? []).map((c) => (
-                  <div key={c.id} className="bg-surface/50 p-3">
-                    <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
-                      {c.author_name} · {formatReportTime(c.created_at)}
-                    </div>
-                    <p className="text-sm">{c.content}</p>
+                {comments.length === 0 ? (
+                  <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground/50 italic py-2">
+                    {t.noCommentsYet}
                   </div>
-                ))}
+                ) : (
+                  comments.map((c) => (
+                    <div key={c.id} className="bg-surface/50 px-3 py-2">
+                      <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground mb-0.5">
+                        {c.author_name} · {formatReportTime(c.created_at)}
+                      </div>
+                      <p className="text-xs">{c.content}</p>
+                    </div>
+                  ))
+                )}
               </div>
-            )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
