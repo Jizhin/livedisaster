@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLanguage } from "../i18n/LanguageContext";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 
@@ -95,6 +96,7 @@ const DISTRICTS: District[] = [
 const KERALA_CENTER = { lat: 10.5, lon: 76.3 };
 const SEVERITY_RANK: Record<Severity, number> = { safe: 0, warn: 1, critical: 2 };
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8000/api";
+const UPLOADS_ORIGIN = API_BASE.replace(/\/api$/, "");
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 
@@ -165,7 +167,7 @@ function mapApiReport(r: ApiReport): Report {
     message: r.content,
     severity: (r.severity as Severity) ?? "warn",
     category: r.category ?? null,
-    image_url: firstImage ? `/uploads/${firstImage}` : null,
+    image_url: firstImage ? `${UPLOADS_ORIGIN}/uploads/${firstImage}` : null,
   };
 }
 
@@ -232,6 +234,31 @@ async function reverseGeocode(lat: number, lon: number): Promise<Place | null> {
     if (!f) return null;
     return toPlace(f);
   } catch { return null; }
+}
+
+type ApiComment = { id: number; author_name: string; content: string; created_at: string };
+type ApiReportDetail = ApiReport & {
+  confirmed_count?: number;
+  incorrect_count?: number;
+  resolved_count?: number;
+  comment_count?: number;
+  views_count?: number;
+  status?: string;
+  comments?: ApiComment[];
+};
+
+function useReportDetail(reportId: string | null) {
+  const [data, setData] = useState<ApiReportDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!reportId) { setData(null); return; }
+    setLoading(true);
+    fetch(`${API_BASE}/reports/${reportId}`)
+      .then((r) => r.json())
+      .then((d: ApiReportDetail) => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [reportId]);
+  return { data, loading };
 }
 
 function useLiveReports(limit = 40) {
@@ -316,6 +343,7 @@ function useLocalTime() {
 /* ─── Main page ─────────────────────────────────────────────── */
 
 export function HomePage() {
+  const { lang, t, toggle } = useLanguage();
   const time = useLocalTime();
   const { reports, status, flashId } = useLiveReports(40);
   const { alerts, status: alertStatus } = useKeralaAlerts();
@@ -337,15 +365,24 @@ export function HomePage() {
         <header className="flex justify-between items-end border-b border-surface pb-6 gap-4">
           <div className="space-y-1">
             <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-extrabold uppercase leading-none">
-              Anything Happened?
+              {t.mainTitle}
             </h1>
             <p className="font-display text-primary text-xs sm:text-sm uppercase tracking-widest font-bold">
-              Kerala Community Disaster Watch
+              {t.keralaDisasterWatch}
             </p>
           </div>
-          <div className="hidden md:block text-right">
-            <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">Local Time</div>
-            <div className="font-display text-base font-bold tabular-nums">{time || "—"}</div>
+          <div className="flex items-end gap-3">
+            <div className="hidden md:block text-right">
+              <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">{t.localTime}</div>
+              <div className="font-display text-base font-bold tabular-nums">{time || "—"}</div>
+            </div>
+            <button
+              type="button"
+              onClick={toggle}
+              className="font-display text-xs uppercase tracking-widest font-bold px-3 py-2 border border-surface hover:border-primary transition-colors"
+            >
+              {lang === "en" ? "ML" : "EN"}
+            </button>
           </div>
         </header>
 
@@ -354,10 +391,10 @@ export function HomePage() {
           {tickerItems.length === 0 ? (
             <div className="font-display text-xs uppercase font-bold tracking-wider text-muted-foreground px-4">
               {alertStatus === "loading"
-                ? "Fetching official advisories from NDMA Sachet…"
+                ? t.fetchingAdvisories
                 : alertStatus === "error"
-                  ? "Official advisory feed unavailable right now."
-                  : "No active official advisories for Kerala right now."}
+                  ? t.advisoryFeedUnavail
+                  : t.noActiveAdvisories}
             </div>
           ) : (
             <div className="flex whitespace-nowrap gap-8 font-display text-xs uppercase font-bold tracking-wider animate-ticker w-max">
@@ -409,12 +446,12 @@ export function HomePage() {
               </article>
             ) : (
               <article className="relative bg-surface border-l-4 border-primary/40 p-6">
-                <div className="font-display text-[10px] uppercase tracking-widest text-primary font-bold mb-2">All Clear · Official Feed</div>
+                <div className="font-display text-[10px] uppercase tracking-widest text-primary font-bold mb-2">{t.allClearFeed}</div>
                 <h2 className="font-display text-2xl md:text-3xl font-bold mb-3 leading-tight">
-                  No active NDMA / IMD advisories for Kerala
+                  {t.noActiveSachet}
                 </h2>
                 <p className="text-base text-foreground/70">
-                  Community reports below are crowd-sourced. Official warnings appear here the moment they are issued.
+                  {t.crowdSourcedNote}
                 </p>
               </article>
             )}
@@ -422,7 +459,7 @@ export function HomePage() {
             <div className="bg-surface p-6 space-y-5">
               <div>
                 <label className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground mb-3 font-bold">
-                  Step 1 · Choose Your Location
+                  {t.step1Location}
                 </label>
                 <LocationPicker selected={selectedPlace} onSelect={setSelectedPlace} />
               </div>
@@ -436,13 +473,13 @@ export function HomePage() {
                   <div className="w-10 h-10 rounded-full bg-warn/20 flex items-center justify-center group-enabled:group-hover:scale-110 transition-transform">
                     <div className="w-4 h-4 bg-warn rotate-45" />
                   </div>
-                  <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">Step 2</span>
+                  <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">{t.step2Label}</span>
                 </div>
-                <span className="font-display text-xl font-bold mb-1 uppercase tracking-tight">Report Alert</span>
+                <span className="font-display text-xl font-bold mb-1 uppercase tracking-tight">{t.reportAlertLabel}</span>
                 <span className="text-sm text-muted-foreground">
                   {selectedPlace
-                    ? `Submit a report for ${selectedPlace.name}, ${selectedPlace.district}.`
-                    : "Pick a location above to enable reporting."}
+                    ? `${t.submitForLocation} ${selectedPlace.name}, ${selectedPlace.district}.`
+                    : t.searchLocHint}
                 </span>
               </button>
             </div>
@@ -451,16 +488,16 @@ export function HomePage() {
           {/* Right: Stats + Live Feed */}
           <div className="lg:col-span-4 space-y-6">
             <div className="bg-surface p-6">
-              <h3 className="font-display text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6">Kerala Overview</h3>
+              <h3 className="font-display text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6">{t.keralaOverview}</h3>
               <div className="grid grid-cols-2 gap-6">
-                <Stat value={String(alerts.filter((a) => a.severity !== "safe").length)} label="Official Alerts" tone="warn" />
-                <Stat value={String(reports.length)} label="Crowd Reports" tone="primary" />
+                <Stat value={String(alerts.filter((a) => a.severity !== "safe").length)} label={t.officialAlerts} tone="warn" />
+                <Stat value={String(reports.length)} label={t.crowdReports} tone="primary" />
                 <Stat
                   value={String(new Set([
                     ...alerts.map((a) => a.district).filter(Boolean),
                     ...reports.map((r) => r.district),
                   ]).size)}
-                  label="Districts Active"
+                  label={t.districtsActive}
                   tone="warn"
                 />
                 <Stat
@@ -468,7 +505,7 @@ export function HomePage() {
                     ...alerts.filter((a) => a.severity === "critical").map((a) => a.district),
                     ...reports.filter((r) => r.severity === "critical").map((r) => r.district),
                   ].filter(Boolean)).size)}
-                  label="Critical Zones"
+                  label={t.criticalZones}
                   tone="muted"
                 />
               </div>
@@ -476,9 +513,9 @@ export function HomePage() {
 
             <div className="bg-surface flex flex-col h-[400px]">
               <div className="p-4 border-b border-background/40 flex justify-between items-center gap-2">
-                <h3 className="font-display text-xs font-bold uppercase tracking-widest">Live Reports</h3>
+                <h3 className="font-display text-xs font-bold uppercase tracking-widest">{t.liveReports}</h3>
                 <div className="flex items-center gap-2 font-display text-[10px] uppercase tracking-widest text-muted-foreground">
-                  <span>{status === "live" ? "Live" : status === "connecting" ? "Connecting" : "Offline"}</span>
+                  <span>{status === "live" ? t.statusLive : status === "connecting" ? t.statusConnecting : t.statusOffline}</span>
                   <span className={`w-2 h-2 rounded-full ${
                     status === "live" ? "bg-primary animate-pulse"
                       : status === "connecting" ? "bg-warn animate-pulse"
@@ -488,7 +525,7 @@ export function HomePage() {
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {reports.length === 0 && status !== "connecting" && (
-                  <div className="text-center py-8 text-muted-foreground/60 italic text-xs">No recent reports</div>
+                  <div className="text-center py-8 text-muted-foreground/60 italic text-xs">{t.noRecentAlerts}</div>
                 )}
                 {reports.slice(0, 20).map((r) => (
                   <FeedRow key={r.id} report={r} flash={flashId === r.id} />
@@ -501,7 +538,7 @@ export function HomePage() {
         {/* District Grid */}
         <section className="space-y-4 pt-8 border-t border-surface">
           <h3 className="font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            All Districts · Tap to inspect
+            {t.allDistricts} · {t.tapToInspect}
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-px bg-surface border border-surface">
             {DISTRICTS.map((d) => {
@@ -540,7 +577,7 @@ export function HomePage() {
         </section>
 
         <footer className="pt-8 pb-4 text-center font-display text-[10px] uppercase tracking-widest text-muted-foreground/60">
-          Community-powered + Official feeds (NDMA Sachet · IMD · KSDMA) · Kerala Live Disaster Watch
+          {t.communityPowered}
         </footer>
       </div>
 
@@ -690,6 +727,7 @@ function ReportAlertModal({
   onClose: () => void;
   onSubmitted: () => void;
 }) {
+  const { t } = useLanguage();
   const [severity, setSeverity] = useState<Severity>("warn");
   const [category, setCategory] = useState("Flood");
   const [message, setMessage] = useState("");
@@ -761,19 +799,19 @@ function ReportAlertModal({
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="font-display text-[10px] uppercase tracking-widest text-warn font-bold mb-1">New Report</div>
+            <div className="font-display text-[10px] uppercase tracking-widest text-warn font-bold mb-1">{t.newReportTag}</div>
             <h2 className="font-display text-xl font-bold uppercase tracking-tight">{place.name}</h2>
             <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
               {place.district} District · {place.context}
             </div>
           </div>
           <button type="button" onClick={onClose} className="font-display text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground">
-            Close ✕
+            {t.close} ✕
           </button>
         </div>
 
         <label className="block space-y-2">
-          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Category</span>
+          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t.categoryLabel}</span>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -786,7 +824,7 @@ function ReportAlertModal({
         </label>
 
         <div className="space-y-2">
-          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Severity</span>
+          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t.severityTagLabel}</span>
           <div className="grid grid-cols-3 gap-2">
             {(["safe", "warn", "critical"] as Severity[]).map((s) => (
               <button
@@ -808,23 +846,23 @@ function ReportAlertModal({
         </div>
 
         <label className="block space-y-2">
-          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">What happened?</span>
+          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t.whatHappened}</span>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={4}
             maxLength={500}
-            placeholder="Brief description (what you saw, road blocked, risk level...)..."
+            placeholder={t.describePlaceholder}
             className="w-full bg-background border border-surface focus:border-primary px-3 py-2 text-sm outline-none resize-none placeholder:text-muted-foreground/60"
           />
           <div className="flex justify-between text-[10px] font-display uppercase tracking-widest text-muted-foreground">
-            <span className={error ? "text-critical" : ""}>{error ?? "Visible publicly on the live feed"}</span>
+            <span className={error ? "text-critical" : ""}>{error ?? t.visiblePublicly}</span>
             <span>{message.length}/500</span>
           </div>
         </label>
 
         <div className="space-y-2">
-          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Photo (optional, max 5 MB)</span>
+          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t.photoOptionalLabel}</span>
           {imagePreview ? (
             <div className="relative">
               <img src={imagePreview} alt="preview" className="w-full max-h-56 object-cover border border-surface" />
@@ -833,27 +871,27 @@ function ReportAlertModal({
                 onClick={() => pickImage(null)}
                 className="absolute top-2 right-2 font-display text-[10px] uppercase tracking-widest font-bold px-2 py-1 bg-background/80 border border-surface hover:border-critical"
               >
-                Remove
+                {t.removePhoto}
               </button>
             </div>
           ) : (
             <label className="flex items-center justify-center w-full border border-dashed border-surface hover:border-primary py-6 cursor-pointer text-center">
               <input type="file" accept="image/*" className="hidden" onChange={(e) => pickImage(e.target.files?.[0] ?? null)} />
-              <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">+ Attach photo</span>
+              <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">{t.attachPhotoBtn}</span>
             </label>
           )}
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
           <button type="button" onClick={onClose} className="font-display text-xs uppercase tracking-widest px-4 py-2 border border-surface hover:border-foreground/40">
-            Cancel
+            {t.cancel}
           </button>
           <button
             type="submit"
             disabled={submitting}
             className="font-display text-xs uppercase tracking-widest font-bold px-4 py-2 bg-warn text-background hover:bg-warn/90 disabled:opacity-50"
           >
-            {submitting ? "Submitting..." : "Submit Report"}
+            {submitting ? t.submitting : t.submitReportBtn}
           </button>
         </div>
       </form>
@@ -874,12 +912,14 @@ function DistrictModal({
   alerts: OfficialAlert[];
   onClose: () => void;
 }) {
+  const { t } = useLanguage();
   const places = useMemo(() => {
     const set = new Set<string>();
     reports.forEach((r) => r.place && set.add(r.place));
     return Array.from(set);
   }, [reports]);
   const [activePlace, setActivePlace] = useState<string | null>(null);
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const visibleReports = activePlace ? reports.filter((r) => r.place === activePlace) : reports;
 
   const sev = maxSeverity([
@@ -898,15 +938,15 @@ function DistrictModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-5xl bg-background border border-surface max-h-[92vh] flex flex-col overflow-hidden"
+        className="relative w-full max-w-5xl bg-background border border-surface max-h-[92vh] flex flex-col overflow-hidden"
       >
         <header className={`relative border-b-4 ${severityBorder(sev)} bg-surface p-6`}>
           <div className="flex items-start justify-between gap-4 mb-4">
             <div className="font-display text-[10px] uppercase tracking-[0.3em] text-muted-foreground font-bold">
-              Dossier · Kerala Disaster Watch
+              {t.dossierLabel}
             </div>
             <button type="button" onClick={onClose} className="font-display text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground">
-              Close ✕
+              {t.close} ✕
             </button>
           </div>
           <div className="flex flex-wrap items-end justify-between gap-4">
@@ -915,9 +955,9 @@ function DistrictModal({
               <div className="font-display text-sm md:text-base text-foreground/80 mt-2">{headline}</div>
             </div>
             <div className="flex gap-6">
-              <DossierMetric value={alerts.length} label="Official" tone={sev} />
-              <DossierMetric value={reports.length} label="Crowd" tone="primary" />
-              <DossierMetric value={places.length} label="Places" tone="muted" />
+              <DossierMetric value={alerts.length} label={t.officialLabel} tone={sev} />
+              <DossierMetric value={reports.length} label={t.crowdLabel} tone="primary" />
+              <DossierMetric value={places.length} label={t.placesMetricLabel} tone="muted" />
             </div>
           </div>
         </header>
@@ -925,11 +965,11 @@ function DistrictModal({
         <div className="flex-1 overflow-y-auto">
           <section className="border-b border-surface">
             <div className="px-6 pt-5 pb-3 flex items-center justify-between">
-              <h3 className="font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">Official Advisories</h3>
+              <h3 className="font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">{t.officialAdvisories}</h3>
               <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground/70">NDMA Sachet · IMD · KSDMA</span>
             </div>
             {alerts.length === 0 ? (
-              <div className="px-6 pb-6 text-sm text-muted-foreground/70 italic">No official advisories are active for {district} right now.</div>
+              <div className="px-6 pb-6 text-sm text-muted-foreground/70 italic">{t.noOfficialAdvisory} {district}.</div>
             ) : (
               <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-2 gap-3">
                 {alerts.map((a) => <OfficialAlertCard key={a.id} alert={a} />)}
@@ -940,7 +980,7 @@ function DistrictModal({
           <section>
             <div className="px-6 pt-5 pb-3">
               <h3 className="font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                Crowd Briefs ({visibleReports.length})
+                {t.crowdBriefs} ({visibleReports.length})
               </h3>
             </div>
             {places.length > 0 && (
@@ -952,7 +992,7 @@ function DistrictModal({
                     activePlace === null ? "border-primary bg-primary/20 text-primary" : "border-surface text-muted-foreground hover:border-foreground/40"
                   }`}
                 >
-                  All places
+                  {t.allPlaces}
                 </button>
                 {places.map((p) => (
                   <button
@@ -971,14 +1011,150 @@ function DistrictModal({
             <div className="px-6 pb-6 space-y-3">
               {visibleReports.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground/60 italic text-xs font-display uppercase tracking-widest">
-                  No crowd reports yet{activePlace ? ` for ${activePlace}` : ""}.
+                  {t.noCrowdReportsYet}{activePlace ? ` ${t.forLabel} ${activePlace}` : ""}.
                 </div>
               ) : (
-                visibleReports.map((r) => <ReportCard key={r.id} report={r} />)
+                visibleReports.map((r) => (
+                  <ReportCard key={r.id} report={r} onClick={() => setSelectedReport(r)} />
+                ))
               )}
             </div>
           </section>
         </div>
+
+        {selectedReport && (
+          <ReportDetailPanel
+            report={selectedReport}
+            onBack={() => setSelectedReport(null)}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Report Detail Panel ───────────────────────────────────── */
+
+function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => void }) {
+  const { t } = useLanguage();
+  const { data, loading } = useReportDetail(report.id);
+  const imgUrl = data?.images?.[0]?.file_path
+    ? `${UPLOADS_ORIGIN}/uploads/${data.images[0].file_path}`
+    : report.image_url;
+
+  return (
+    <div className="absolute inset-0 bg-background z-10 flex flex-col overflow-hidden">
+      <header className="flex items-center gap-4 p-6 border-b border-surface shrink-0">
+        <button
+          type="button"
+          onClick={onBack}
+          className="font-display text-xs uppercase tracking-widest text-primary hover:text-foreground"
+        >
+          ← {t.backToList}
+        </button>
+        <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+          {t.reportDetail}
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Severity + category badge */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className={`font-display text-xs uppercase tracking-widest font-bold px-3 py-1 border ${
+            report.severity === "critical" ? "border-critical text-critical bg-critical/10"
+              : report.severity === "warn" ? "border-warn text-warn bg-warn/10"
+              : "border-primary text-primary bg-primary/10"
+          }`}>
+            {report.severity}
+          </span>
+          {report.category && (
+            <span className="font-display text-xs uppercase tracking-widest text-muted-foreground border border-surface px-3 py-1">
+              {report.category}
+            </span>
+          )}
+          <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground ml-auto">
+            {formatReportTime(report.created_at)}
+          </span>
+        </div>
+
+        {/* Location */}
+        <div>
+          <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-1">
+            📍 {report.place ?? report.district}
+          </div>
+          <div className="font-display text-xs text-muted-foreground">{report.district} District</div>
+        </div>
+
+        {/* Message */}
+        <p className="text-base leading-relaxed">{report.message}</p>
+
+        {/* Image */}
+        {imgUrl && (
+          <img
+            src={imgUrl}
+            alt="Report evidence"
+            className="w-full max-h-72 object-cover border border-surface"
+          />
+        )}
+
+        {/* Community votes */}
+        {loading ? (
+          <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground animate-pulse">
+            {t.loadingDetail}
+          </div>
+        ) : data && (
+          <div className="border border-surface p-4 space-y-3">
+            <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-3">
+              {t.communityVotesLabel}
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center">
+                <div className="font-display text-2xl font-bold text-primary tabular-nums">
+                  {data.confirmed_count ?? 0}
+                </div>
+                <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground mt-1">
+                  {t.confirmed}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="font-display text-2xl font-bold text-warn tabular-nums">
+                  {data.incorrect_count ?? 0}
+                </div>
+                <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground mt-1">
+                  {t.incorrect}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="font-display text-2xl font-bold text-foreground/50 tabular-nums">
+                  {data.resolved_count ?? 0}
+                </div>
+                <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground mt-1">
+                  {t.resolvedV}
+                </div>
+              </div>
+            </div>
+            {(data.views_count ?? 0) > 0 && (
+              <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground pt-2 border-t border-surface">
+                {t.viewsLabel}: {data.views_count}
+              </div>
+            )}
+            {(data.comments ?? []).length > 0 && (
+              <div className="pt-2 border-t border-surface space-y-3">
+                <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+                  {t.discussionHd}
+                </div>
+                {(data.comments ?? []).map((c) => (
+                  <div key={c.id} className="bg-surface/50 p-3">
+                    <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                      {c.author_name} · {formatReportTime(c.created_at)}
+                    </div>
+                    <p className="text-sm">{c.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1042,9 +1218,12 @@ function FeedRow({ report, flash }: { report: Report; flash: boolean }) {
   );
 }
 
-function ReportCard({ report }: { report: Report }) {
+function ReportCard({ report, onClick }: { report: Report; onClick?: () => void }) {
   return (
-    <article className={`bg-background border-l-4 ${severityBorder(report.severity)} p-4`}>
+    <article
+      className={`bg-background border-l-4 ${severityBorder(report.severity)} p-4 ${onClick ? "cursor-pointer hover:bg-surface/50 transition-colors" : ""}`}
+      onClick={onClick}
+    >
       <div className="flex justify-between items-start gap-3 mb-2">
         <div>
           <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -1061,6 +1240,11 @@ function ReportCard({ report }: { report: Report }) {
       <p className="text-sm">{report.message}</p>
       {report.image_url && (
         <img src={report.image_url} alt="" className="mt-3 w-full max-h-64 object-cover border border-surface" />
+      )}
+      {onClick && (
+        <div className="mt-2 font-display text-[9px] uppercase tracking-widest text-primary/60">
+          → tap for details
+        </div>
       )}
     </article>
   );
