@@ -1,8 +1,12 @@
 import math
 import re
+import time
 from typing import Any
 
 import httpx
+
+_ndma_cache: tuple[float, list[dict[str, Any]]] | None = None
+_NDMA_TTL = 300  # 5 minutes
 from fastapi import APIRouter
 from app.api.deps import DbSession
 from app.core.errors import AppError
@@ -126,6 +130,11 @@ def all_active_alerts(db: DbSession, limit: int = 20) -> list[AlertRead]:
 @router.get("/ndma-alerts")
 async def ndma_kerala_alerts() -> list[dict[str, Any]]:
     """Proxy NDMA Sachet alerts filtered to Kerala. Bypasses browser CORS restriction."""
+    global _ndma_cache
+    now = time.monotonic()
+    if _ndma_cache is not None and now - _ndma_cache[0] < _NDMA_TTL:
+        return _ndma_cache[1]
+
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.get(
@@ -172,4 +181,6 @@ async def ndma_kerala_alerts() -> list[dict[str, Any]]:
         })
 
     result.sort(key=lambda x: x.get("effectiveStart") or "", reverse=True)
-    return result[:80]
+    final = result[:80]
+    _ndma_cache = (time.monotonic(), final)
+    return final
