@@ -361,16 +361,6 @@ export function HomePage() {
   const [welcomeOpen, setWelcomeOpen] = useState(!alreadySeen);
   const dataReady = status === "live" && alertStatus !== "loading";
 
-  useEffect(() => {
-    if (dataReady && welcomeOpen) {
-      const id = setTimeout(() => {
-        setWelcomeOpen(false);
-        sessionStorage.setItem("kl_welcomed", "1");
-      }, 800);
-      return () => clearTimeout(id);
-    }
-  }, [dataReady, welcomeOpen]);
-
   return (
     <div className="min-h-screen w-full bg-background text-foreground p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
