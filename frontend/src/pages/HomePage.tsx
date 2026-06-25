@@ -1215,7 +1215,8 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
         </span>
       </header>
 
-      <div className="flex-1 overflow-y-auto divide-y divide-foreground/10">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto divide-y divide-foreground/10 min-h-0">
         {/* Location + message */}
         <div className="px-4 py-3 space-y-2">
           <div className="font-display text-[10px] uppercase tracking-widest text-foreground/50">
@@ -1236,7 +1237,6 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
             <div className="font-display text-[10px] uppercase tracking-widest text-foreground/40 animate-pulse">{t.loadingDetail}</div>
           ) : (
             <div className="grid grid-cols-3 gap-2">
-              {/* Confirm */}
               <button
                 type="button"
                 disabled={!!voted}
@@ -1254,7 +1254,6 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
                 </span>
                 {t.confirm}{voted === "confirm" && " ✓"}
               </button>
-              {/* Incorrect */}
               <button
                 type="button"
                 disabled={!!voted}
@@ -1272,7 +1271,6 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
                 </span>
                 {t.incorrect}{voted === "incorrect" && " ✓"}
               </button>
-              {/* Resolved */}
               <button
                 type="button"
                 disabled={!!voted}
@@ -1294,7 +1292,7 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
           )}
         </div>
 
-        {/* Comments */}
+        {/* Comments list */}
         <div className="px-4 py-3 space-y-2">
           <div className="font-display text-[10px] uppercase tracking-widest text-foreground font-bold">
             {t.discussionHd}
@@ -1311,27 +1309,27 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
               </div>
             ))
           )}
-
-          {/* Comment form */}
-          <form onSubmit={submitComment} className="pt-1.5 space-y-1.5">
-            <div className="flex gap-2">
-              <textarea
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                rows={2}
-                placeholder={t.commentPlaceholder}
-                className="flex-1 bg-surface border border-foreground/20 focus:border-primary px-3 py-2 text-xs outline-none resize-none placeholder:text-foreground/35 text-foreground"
-              />
-              <button
-                type="submit"
-                disabled={posting || !commentText.trim()}
-                className="font-display text-[10px] uppercase tracking-widest font-bold px-4 bg-primary text-background hover:bg-primary/80 disabled:opacity-35 disabled:cursor-not-allowed shrink-0 transition-colors"
-              >
-                {posting ? "…" : t.postComment}
-              </button>
-            </div>
-          </form>
         </div>
+      </div>
+
+      {/* Comment form — pinned to bottom, always visible */}
+      <div className="shrink-0 border-t border-foreground/15 bg-surface px-4 py-3">
+        <form onSubmit={submitComment} className="flex gap-2">
+          <textarea
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            rows={2}
+            placeholder={t.commentPlaceholder}
+            className="flex-1 bg-background border border-foreground/20 focus:border-primary px-3 py-2 text-xs outline-none resize-none placeholder:text-foreground/35 text-foreground"
+          />
+          <button
+            type="submit"
+            disabled={posting || !commentText.trim()}
+            className="font-display text-[10px] uppercase tracking-widest font-bold px-4 bg-primary text-background hover:bg-primary/80 disabled:opacity-35 disabled:cursor-not-allowed shrink-0 transition-colors"
+          >
+            {posting ? "…" : t.postComment}
+          </button>
+        </form>
       </div>
     </div>
   );
