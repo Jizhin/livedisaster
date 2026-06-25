@@ -94,6 +94,7 @@ const DISTRICTS: District[] = [
 
 const KERALA_CENTER = { lat: 10.5, lon: 76.3 };
 const SEVERITY_RANK: Record<Severity, number> = { safe: 0, warn: 1, critical: 2 };
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8000/api";
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 
@@ -244,7 +245,7 @@ function useLiveReports(limit = 40) {
 
     async function fetchReports() {
       try {
-        const res = await fetch(`/api/reports/feed?limit=${limit}`);
+        const res = await fetch(`${API_BASE}/reports/feed?limit=${limit}`);
         if (!res.ok) throw new Error(`${res.status}`);
         const raw: ApiReport[] = await res.json();
         if (!active) return;
@@ -277,7 +278,7 @@ function useKeralaAlerts() {
   useEffect(() => {
     let active = true;
     const load = () => {
-      fetch("/api/ndma-alerts")
+      fetch(`${API_BASE}/ndma-alerts`)
         .then((r) => r.json())
         .then((data: OfficialAlert[]) => {
           if (!active) return;
@@ -711,7 +712,7 @@ function ReportAlertModal({
     setError(null);
 
     try {
-      const res = await fetch(`/api/districts/${place.slug}/reports`, {
+      const res = await fetch(`${API_BASE}/districts/${place.slug}/reports`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -738,7 +739,7 @@ function ReportAlertModal({
       if (imageFile) {
         const formData = new FormData();
         formData.append("file", imageFile);
-        await fetch(`/api/reports/${created.id}/images`, { method: "POST", body: formData });
+        await fetch(`${API_BASE}/reports/${created.id}/images`, { method: "POST", body: formData });
       }
 
       onSubmitted();
