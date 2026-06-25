@@ -357,6 +357,20 @@ export function HomePage() {
   const [reportOpen, setReportOpen] = useState(false);
   const [districtFocus, setDistrictFocus] = useState<string | null>(null);
 
+  const alreadySeen = typeof sessionStorage !== "undefined" && sessionStorage.getItem("kl_welcomed");
+  const [welcomeOpen, setWelcomeOpen] = useState(!alreadySeen);
+  const dataReady = status === "live" && alertStatus !== "loading";
+
+  useEffect(() => {
+    if (dataReady && welcomeOpen) {
+      const id = setTimeout(() => {
+        setWelcomeOpen(false);
+        sessionStorage.setItem("kl_welcomed", "1");
+      }, 800);
+      return () => clearTimeout(id);
+    }
+  }, [dataReady, welcomeOpen]);
+
   return (
     <div className="min-h-screen w-full bg-background text-foreground p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -581,6 +595,18 @@ export function HomePage() {
         </footer>
       </div>
 
+      {welcomeOpen && (
+        <WelcomeModal
+          dataReady={dataReady}
+          lang={lang}
+          t={t}
+          onDismiss={() => {
+            setWelcomeOpen(false);
+            sessionStorage.setItem("kl_welcomed", "1");
+          }}
+        />
+      )}
+
       {reportOpen && selectedPlace && (
         <ReportAlertModal
           place={selectedPlace}
@@ -597,6 +623,80 @@ export function HomePage() {
           onClose={() => setDistrictFocus(null)}
         />
       )}
+    </div>
+  );
+}
+
+/* ─── Welcome Modal ─────────────────────────────────────────── */
+
+type TShape = typeof import("../i18n/translations").T["en"];
+
+function WelcomeModal({
+  dataReady,
+  lang,
+  t,
+  onDismiss,
+}: {
+  dataReady: boolean;
+  lang: string;
+  t: TShape;
+  onDismiss: () => void;
+}) {
+  const steps = [
+    { icon: "📍", title: t.welcomeStep1Title, desc: t.welcomeStep1Desc },
+    { icon: "⚠️", title: t.welcomeStep2Title, desc: t.welcomeStep2Desc },
+    { icon: "🗺️", title: t.welcomeStep3Title, desc: t.welcomeStep3Desc },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/90 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md bg-surface border border-primary/30 flex flex-col overflow-hidden">
+        {/* Title bar */}
+        <div className={`h-1 w-full transition-all duration-700 ${dataReady ? "bg-primary" : "bg-warn/60 animate-pulse"}`} />
+        <div className="p-6 space-y-5">
+          <div className="space-y-1">
+            <div className="font-display text-[10px] uppercase tracking-[0.3em] text-primary font-bold">
+              {t.welcomeTag}
+            </div>
+            <h2 className="font-display text-2xl font-extrabold uppercase leading-tight">
+              {t.welcomeHeadline}
+            </h2>
+            <p className="text-sm text-foreground/70">{t.welcomeSub}</p>
+          </div>
+
+          <div className="space-y-3">
+            {steps.map((s, i) => (
+              <div key={i} className="flex items-start gap-3 bg-background/60 px-4 py-3">
+                <span className="text-xl shrink-0 mt-0.5">{s.icon}</span>
+                <div>
+                  <div className="font-display text-xs font-bold uppercase tracking-widest mb-0.5">{s.title}</div>
+                  <div className="text-xs text-foreground/60">{s.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Loading / ready state */}
+          <div className="flex items-center gap-3">
+            {dataReady ? (
+              <span className="font-display text-[10px] uppercase tracking-widest text-primary font-bold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-primary" /> {t.welcomeReady}
+              </span>
+            ) : (
+              <span className="font-display text-[10px] uppercase tracking-widest text-warn/80 flex items-center gap-1.5 animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-warn" /> {t.welcomeLoading}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={onDismiss}
+              className="ml-auto font-display text-xs uppercase tracking-widest font-bold px-5 py-2.5 bg-primary text-background hover:bg-primary/90 transition-colors"
+            >
+              {t.welcomeBtn}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

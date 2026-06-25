@@ -308,6 +308,20 @@ export const T = {
     communityVotesLabel: "Community Votes",
     loadingDetail:       "Loading…",
 
+    /* Welcome modal */
+    welcomeTag:          "Kerala Live Disaster Watch",
+    welcomeHeadline:     "Stay Safe. Stay Informed.",
+    welcomeSub:          "A real-time community platform for reporting floods, landslides, road damage, power outages and other incidents across Kerala.",
+    welcomeStep1Title:   "Search your location",
+    welcomeStep1Desc:    "Type your area or tap Auto to detect your current position.",
+    welcomeStep2Title:   "Report an incident",
+    welcomeStep2Desc:    "Submit what you see — flooding, road blocks, power cuts. Photos welcome.",
+    welcomeStep3Title:   "Browse district updates",
+    welcomeStep3Desc:    "Tap any district to see official advisories and crowd reports for that area.",
+    welcomeLoading:      "Loading live data…",
+    welcomeReady:        "Live data ready",
+    welcomeBtn:          "Get Started",
+
     /* District names */
     districts: {
       thiruvananthapuram: "Thiruvananthapuram",
@@ -633,6 +647,20 @@ export const T = {
     reportDetail:        "റിപ്പോർട്ട് വിശദാംശം",
     communityVotesLabel: "കമ്മ്യൂണിറ്റി വോട്ടുകൾ",
     loadingDetail:       "ലോഡ് ചെയ്യുന്നു…",
+
+    /* Welcome modal */
+    welcomeTag:          "കേരള ലൈവ് ദുരന്ത നിരീക്ഷണം",
+    welcomeHeadline:     "സുരക്ഷിതരായിരിക്കൂ. അറിഞ്ഞിരിക്കൂ.",
+    welcomeSub:          "കേരളത്തിലുടനീളം വെള്ളപ്പൊക്കം, ഉരുൾപൊട്ടൽ, റോഡ് നാശം, വൈദ്യുതി തടസം തുടങ്ങിയ സംഭവങ്ങൾ റിപ്പോർട്ട് ചെയ്യാനുള്ള കമ്മ്യൂണിറ്റി പ്ലാറ്റ്ഫോം.",
+    welcomeStep1Title:   "നിങ്ങളുടെ സ്ഥലം തിരയുക",
+    welcomeStep1Desc:    "നിങ്ങളുടെ പ്രദേശം ടൈപ്പ് ചെയ്യുക അല്ലെങ്കിൽ Auto ടാപ്പ് ചെയ്ത് സ്ഥലം കണ്ടെത്തുക.",
+    welcomeStep2Title:   "സംഭവം റിപ്പോർട്ട് ചെയ്യുക",
+    welcomeStep2Desc:    "വെള്ളപ്പൊക്കം, റോഡ് തടസം, വൈദ്യുതി തകരാർ — നിങ്ങൾ കാണുന്നത് റിപ്പോർട്ട് ചെയ്യൂ. ഫോട്ടോ ഉൾപ്പെടുത്താം.",
+    welcomeStep3Title:   "ജില്ലാ അപ്‌ഡേറ്റുകൾ കാണുക",
+    welcomeStep3Desc:    "ഏതെങ്കിലും ജില്ല ടാപ്പ് ചെയ്ത് ഔദ്യോഗിക ഉപദേശകങ്ങളും ജനകീയ റിപ്പോർട്ടുകളും കാണുക.",
+    welcomeLoading:      "ലൈവ് ഡേറ്റ ലോഡ് ചെയ്യുന്നു…",
+    welcomeReady:        "ലൈവ് ഡേറ്റ തയ്യാർ",
+    welcomeBtn:          "ആരംഭിക്കുക",
 
     /* District names */
     districts: {
