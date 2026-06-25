@@ -1038,114 +1038,183 @@ function DistrictModal({
 function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => void }) {
   const { t } = useLanguage();
   const { data, loading } = useReportDetail(report.id);
+  const [localCounts, setLocalCounts] = useState<{ confirmed: number; incorrect: number; resolved: number } | null>(null);
+  const [voted, setVoted] = useState<string | null>(null);
+  const [comments, setComments] = useState<ApiComment[]>([]);
+  const [commentText, setCommentText] = useState("");
+  const [commentName, setCommentName] = useState("");
+  const [posting, setPosting] = useState(false);
+
+  useEffect(() => {
+    if (data) {
+      setLocalCounts({
+        confirmed: data.confirmed_count ?? 0,
+        incorrect: data.incorrect_count ?? 0,
+        resolved: data.resolved_count ?? 0,
+      });
+      setComments(data.comments ?? []);
+    }
+  }, [data]);
+
+  async function vote(kind: "confirm" | "incorrect" | "resolved") {
+    if (voted) return;
+    setVoted(kind);
+    if (localCounts) {
+      setLocalCounts((c) => c ? ({ ...c, [kind === "confirm" ? "confirmed" : kind]: c[kind === "confirm" ? "confirmed" : kind as "incorrect" | "resolved"] + 1 }) : c);
+    }
+    await fetch(`${API_BASE}/reports/${report.id}/verifications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, voter_name: null }),
+    }).catch(() => {});
+  }
+
+  async function submitComment(e: React.FormEvent) {
+    e.preventDefault();
+    const text = commentText.trim();
+    if (!text) return;
+    setPosting(true);
+    try {
+      const res = await fetch(`${API_BASE}/reports/${report.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ author_name: commentName.trim() || "Anonymous", content: text }),
+      });
+      if (res.ok) {
+        const newComment: ApiComment = await res.json().catch(() => ({
+          id: Date.now(), author_name: commentName.trim() || "Anonymous",
+          content: text, created_at: new Date().toISOString(),
+        }));
+        setComments((prev) => [...prev, newComment]);
+        setCommentText("");
+      }
+    } finally {
+      setPosting(false);
+    }
+  }
+
   const imgUrl = data?.images?.[0]?.file_path
     ? `${UPLOADS_ORIGIN}/uploads/${data.images[0].file_path}`
     : report.image_url;
-  const comments = data?.comments ?? [];
 
   return (
     <div className="absolute inset-0 bg-background z-10 flex flex-col overflow-hidden">
-      {/* Compact header */}
-      <header className="flex items-center gap-3 px-4 py-2.5 border-b border-surface shrink-0">
-        <button
-          type="button"
-          onClick={onBack}
-          className="font-display text-[10px] uppercase tracking-widest text-primary hover:text-foreground"
-        >
+      {/* Header */}
+      <header className="flex items-center gap-3 px-4 py-2 border-b border-surface shrink-0">
+        <button type="button" onClick={onBack}
+          className="font-display text-[10px] uppercase tracking-widest text-primary hover:text-foreground">
           ← {t.backToList}
         </button>
-        <span className="text-muted-foreground/30">|</span>
-        <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
-          {t.reportDetail}
-        </div>
+        <span className="text-muted-foreground/30 text-xs">|</span>
+        <span className={`font-display text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 ${
+          report.severity === "critical" ? "bg-critical/20 text-critical"
+            : report.severity === "warn" ? "bg-warn/20 text-warn"
+            : "bg-primary/20 text-primary"
+        }`}>{report.severity}</span>
+        {report.category && (
+          <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">{report.category}</span>
+        )}
+        <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground ml-auto">
+          {formatReportTime(report.created_at)}
+        </span>
       </header>
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Top strip: severity + category + time in one row */}
-        <div className={`flex items-center gap-2 px-4 py-2 border-b-2 ${severityBorder(report.severity)} flex-wrap`}>
-          <span className={`font-display text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 ${
-            report.severity === "critical" ? "bg-critical/20 text-critical"
-              : report.severity === "warn" ? "bg-warn/20 text-warn"
-              : "bg-primary/20 text-primary"
-          }`}>
-            {report.severity}
-          </span>
-          {report.category && (
-            <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
-              {report.category}
-            </span>
-          )}
-          <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground ml-auto">
-            {formatReportTime(report.created_at)}
-          </span>
-        </div>
-
-        <div className="px-4 py-3 space-y-3">
-          {/* Location */}
+      <div className="flex-1 overflow-y-auto divide-y divide-surface">
+        {/* Location + message */}
+        <div className="px-4 py-3 space-y-1.5">
           <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
             📍 {report.place ? `${report.place}, ` : ""}{report.district}
           </div>
-
-          {/* Message */}
-          <p className="text-sm leading-relaxed">{report.message}</p>
-
-          {/* Image */}
+          <p className="text-sm leading-snug">{report.message}</p>
           {imgUrl && (
-            <img src={imgUrl} alt="Report evidence" className="w-full max-h-48 object-cover border border-surface" />
+            <img src={imgUrl} alt="" className="w-full max-h-40 object-cover border border-surface mt-2" />
           )}
+        </div>
 
-          {/* Community votes + comments */}
+        {/* Vote buttons */}
+        <div className="px-4 py-3">
+          <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-2">
+            {t.communityVotesLabel}
+          </div>
           {loading ? (
-            <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground animate-pulse py-2">
-              {t.loadingDetail}
+            <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground/50 animate-pulse">{t.loadingDetail}</div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {(["confirm", "incorrect", "resolved"] as const).map((kind) => {
+                const label = kind === "confirm" ? t.confirm : kind === "incorrect" ? t.incorrect : t.resolvedV;
+                const count = localCounts
+                  ? kind === "confirm" ? localCounts.confirmed : kind === "incorrect" ? localCounts.incorrect : localCounts.resolved
+                  : 0;
+                const active = voted === kind;
+                const colorClass = kind === "confirm"
+                  ? "border-primary text-primary bg-primary/10"
+                  : kind === "incorrect"
+                  ? "border-warn text-warn bg-warn/10"
+                  : "border-foreground/30 text-foreground/60 bg-foreground/5";
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    disabled={!!voted}
+                    onClick={() => vote(kind)}
+                    className={`font-display text-[10px] uppercase tracking-widest font-bold py-2 border transition-all disabled:cursor-default ${
+                      active ? colorClass : voted ? "border-surface text-muted-foreground/40" : `border-surface text-muted-foreground hover:${colorClass}`
+                    }`}
+                  >
+                    <span className="block text-base tabular-nums leading-none mb-0.5">{count}</span>
+                    {label}
+                    {active && " ✓"}
+                  </button>
+                );
+              })}
             </div>
-          ) : data && (
-            <>
-              {/* Votes row */}
-              <div className="flex items-center gap-4 py-2 border-y border-surface">
-                <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold shrink-0">
-                  {t.communityVotesLabel}
-                </span>
-                <div className="flex gap-4 ml-auto">
-                  <span className="font-display text-xs font-bold tabular-nums text-primary">
-                    {data.confirmed_count ?? 0} <span className="text-muted-foreground font-normal">{t.confirmed}</span>
-                  </span>
-                  <span className="font-display text-xs font-bold tabular-nums text-warn">
-                    {data.incorrect_count ?? 0} <span className="text-muted-foreground font-normal">{t.incorrect}</span>
-                  </span>
-                  <span className="font-display text-xs font-bold tabular-nums text-foreground/50">
-                    {data.resolved_count ?? 0} <span className="text-muted-foreground font-normal">{t.resolvedV}</span>
-                  </span>
-                  {(data.views_count ?? 0) > 0 && (
-                    <span className="font-display text-xs text-muted-foreground/60">
-                      {data.views_count} {t.viewsLabel}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Comments — always shown */}
-              <div className="space-y-2">
-                <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
-                  {t.discussionHd}
-                </div>
-                {comments.length === 0 ? (
-                  <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground/50 italic py-2">
-                    {t.noCommentsYet}
-                  </div>
-                ) : (
-                  comments.map((c) => (
-                    <div key={c.id} className="bg-surface/50 px-3 py-2">
-                      <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground mb-0.5">
-                        {c.author_name} · {formatReportTime(c.created_at)}
-                      </div>
-                      <p className="text-xs">{c.content}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
           )}
+        </div>
+
+        {/* Comments */}
+        <div className="px-4 py-3 space-y-2">
+          <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+            {t.discussionHd}
+          </div>
+          {comments.length === 0 ? (
+            <div className="font-display text-[10px] italic text-muted-foreground/50">{t.noCommentsYet}</div>
+          ) : (
+            comments.map((c) => (
+              <div key={c.id} className="bg-surface/60 px-3 py-2">
+                <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground mb-0.5">
+                  {c.author_name} · {formatReportTime(c.created_at)}
+                </div>
+                <p className="text-xs leading-snug">{c.content}</p>
+              </div>
+            ))
+          )}
+
+          {/* Comment form */}
+          <form onSubmit={submitComment} className="pt-2 space-y-1.5">
+            <input
+              type="text"
+              value={commentName}
+              onChange={(e) => setCommentName(e.target.value)}
+              placeholder={t.namePlaceholder}
+              className="w-full bg-background border border-surface focus:border-primary px-3 py-1.5 text-xs outline-none placeholder:text-muted-foreground/50"
+            />
+            <div className="flex gap-2">
+              <textarea
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                rows={2}
+                placeholder={t.commentPlaceholder}
+                className="flex-1 bg-background border border-surface focus:border-primary px-3 py-1.5 text-xs outline-none resize-none placeholder:text-muted-foreground/50"
+              />
+              <button
+                type="submit"
+                disabled={posting || !commentText.trim()}
+                className="font-display text-[10px] uppercase tracking-widest font-bold px-3 bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              >
+                {posting ? "…" : t.postComment}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
