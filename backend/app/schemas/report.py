@@ -6,8 +6,10 @@ from app.schemas.comment import CommentRead
 
 
 class ReportCreate(ORMModel):
-    reporter_name: str = Field(min_length=1, max_length=80)
-    content: str = Field(min_length=3, max_length=500)
+    reporter_name: str = Field(default="Anonymous", min_length=1, max_length=80)
+    content: str = Field(min_length=1, max_length=500)
+    severity: str = Field(default="warn", pattern=r"^(safe|warn|critical)$")
+    category: str | None = Field(default=None, max_length=40)
     location_attached: bool = False
     latitude: float | None = None
     longitude: float | None = None
@@ -24,6 +26,8 @@ class ReportRead(ORMModel):
     district_name: str | None = None
     reporter_name: str
     content: str
+    severity: str = "warn"
+    category: str | None = None
     status: ReportStatus
     location_attached: bool
     latitude: float | None = None

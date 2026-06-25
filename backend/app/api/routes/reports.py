@@ -7,8 +7,14 @@ router = APIRouter()
 
 
 @router.get("/reports/recent", response_model=list[ReportRead])
-def recent_reports(db: DbSession, limit: int = Query(default=6, le=20)) -> list[ReportRead]:
+def recent_reports(db: DbSession, limit: int = Query(default=6, le=50)) -> list[ReportRead]:
     return report_service.recent_reports(db, limit)
+
+
+@router.get("/reports/feed", response_model=list[ReportRead])
+def reports_feed(db: DbSession, limit: int = Query(default=40, le=50)) -> list[ReportRead]:
+    """Live feed of most recent community reports across all districts."""
+    return report_service.feed_all_reports(db, limit)
 
 
 @router.post("/districts/{district_slug}/reports", response_model=ReportRead, status_code=201)

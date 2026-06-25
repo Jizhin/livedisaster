@@ -67,7 +67,7 @@ export const T = {
 
     /* Homepage UI */
     mainTitle:           "ANYTHING HAPPENED?",
-    mainSub:             "Real-time community reporting platform for floods, landslides, road damage, power failures and public safety incidents across Kerala.",
+    mainSub:             "Report floods, fallen trees, power cuts, road blocks and accidents. Real-time community incident stream.",
     keralaOverview:      "KERALA OVERVIEW",
     reportToCommunity:   "REPORT TO YOUR COMMUNITY",
     reportAlertLabel:    "REPORT ALERT",
@@ -348,7 +348,7 @@ export const T = {
 
     /* Homepage UI */
     mainTitle:           "എന്തെങ്കിലും സംഭവിച്ചോ?",
-    mainSub:             "കേരളത്തിലെ വെള്ളപ്പൊക്കം, ഉരുൾപൊട്ടൽ, റോഡ് നാശം, വൈദ്യുതി തകരാർ, പൊതു സുരക്ഷ സംഭവങ്ങൾക്കുള്ള തത്സമയ കമ്മ്യൂണിറ്റി റിപ്പോർട്ടിംഗ് പ്ലാറ്റ്ഫോം.",
+    mainSub:             "വെള്ളപ്പൊക്കം, മരം വീഴൽ, വൈദ്യുതി തടസം, റോഡ് തടസം, അപകടങ്ങൾ തുടങ്ങിയ വിവരങ്ങൾ ഇവിടെ റിപ്പോർട്ട് ചെയ്യുക.",
     keralaOverview:      "കേരള അവലോകനം",
     reportToCommunity:   "നിങ്ങളുടെ കമ്മ്യൂണിറ്റിക്ക് റിപ്പോർട്ട് ചെയ്യുക",
     reportAlertLabel:    "അലേർട്ട് റിപ്പോർട്ട്",
