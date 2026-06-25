@@ -264,7 +264,7 @@ function useLiveReports(limit = 40) {
     }
 
     fetchReports();
-    const interval = setInterval(fetchReports, 5000);
+    const interval = setInterval(fetchReports, 20000);
     return () => { active = false; clearInterval(interval); };
   }, [limit]);
 

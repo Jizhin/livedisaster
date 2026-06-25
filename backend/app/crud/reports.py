@@ -77,3 +77,33 @@ def counts(db: Session, report_id: int) -> dict[str, int]:
         "comment_count": comments or 0,
     }
 
+
+def batch_counts(db: Session, report_ids: list[int]) -> dict[int, dict[str, int]]:
+    """Single-query replacement for calling counts() in a loop (avoids N+1)."""
+    if not report_ids:
+        return {}
+
+    verification_rows = db.execute(
+        select(Verification.report_id, Verification.kind, func.count(Verification.id))
+        .where(Verification.report_id.in_(report_ids))
+        .group_by(Verification.report_id, Verification.kind)
+    ).all()
+
+    comment_rows = db.execute(
+        select(Comment.report_id, func.count(Comment.id))
+        .where(Comment.report_id.in_(report_ids), Comment.is_approved.is_(True))
+        .group_by(Comment.report_id)
+    ).all()
+
+    result: dict[int, dict[str, int]] = {
+        rid: {"confirmed_count": 0, "incorrect_count": 0, "resolved_count": 0, "comment_count": 0}
+        for rid in report_ids
+    }
+    for rid, kind, cnt in verification_rows:
+        key = f"{kind.value}_count" if hasattr(kind, "value") else f"{kind}_count"
+        if key in result[rid]:
+            result[rid][key] = cnt
+    for rid, cnt in comment_rows:
+        result[rid]["comment_count"] = cnt
+    return result
+
