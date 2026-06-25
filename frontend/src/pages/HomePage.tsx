@@ -342,6 +342,9 @@ function useLocalTime() {
 
 /* ─── Main page ─────────────────────────────────────────────── */
 
+// Module-level flag: survives re-renders, resets only on full page reload
+let _welcomeDismissed = false;
+
 export function HomePage() {
   const { lang, t, toggle } = useLanguage();
   const time = useLocalTime();
@@ -357,9 +360,13 @@ export function HomePage() {
   const [reportOpen, setReportOpen] = useState(false);
   const [districtFocus, setDistrictFocus] = useState<string | null>(null);
 
-  const alreadySeen = typeof sessionStorage !== "undefined" && sessionStorage.getItem("kl_welcomed");
-  const [welcomeOpen, setWelcomeOpen] = useState(!alreadySeen);
+  const [welcomeOpen, setWelcomeOpen] = useState(() => !_welcomeDismissed);
   const dataReady = status === "live" && alertStatus !== "loading";
+
+  function dismissWelcome() {
+    _welcomeDismissed = true;
+    setWelcomeOpen(false);
+  }
 
   return (
     <div className="min-h-screen w-full bg-background text-foreground p-4 md:p-8">
@@ -590,10 +597,7 @@ export function HomePage() {
           dataReady={dataReady}
           lang={lang}
           t={t}
-          onDismiss={() => {
-            setWelcomeOpen(false);
-            sessionStorage.setItem("kl_welcomed", "1");
-          }}
+          onDismiss={dismissWelcome}
         />
       )}
 
