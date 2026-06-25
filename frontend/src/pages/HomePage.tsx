@@ -1,949 +1,1080 @@
-import {
-  ArrowRight, BadgeCheck, Check, CheckCircle, ChevronDown,
-  Clock, Eye, MapPin, MessageSquare, RefreshCw,
-  Search, Share2, ShieldCheck, TriangleAlert,
-  X, XCircle,
-} from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { api, imageUrl } from "../api/client";
-import { ReportDetailModal } from "../components/ReportDetailModal";
-import { useLanguage } from "../i18n/LanguageContext";
-import type { District, Report, StatsResult } from "../types";
-import { timeAgo } from "../utils/time";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-/* ── Modal types ────────────────────────────────────────────── */
-const MODAL_TYPES = [
-  { key: "flood",     emoji: "🌊", label: "Flooding",     prefix: "Flood"      },
-  { key: "roaddmg",  emoji: "🛣️", label: "Road Damage",  prefix: "Road Block" },
-  { key: "treefall", emoji: "🌳", label: "Fallen Tree",  prefix: "Other"      },
-  { key: "weather",  emoji: "⛈️", label: "Weather",      prefix: "Other"      },
-  { key: "powerout", emoji: "⚡", label: "Power Outage", prefix: "Power Cut"  },
-  { key: "traffic",  emoji: "🚧", label: "Traffic",      prefix: "Road Block" },
-  { key: "landslide",emoji: "⛰️", label: "Landslide",    prefix: "Landslide"  },
-  { key: "other",    emoji: "❓", label: "Other",        prefix: ""           },
-] as const;
-type ModalTypeKey = typeof MODAL_TYPES[number]["key"];
+/* ─── Types ─────────────────────────────────────────────────── */
 
-/* ── Safe cooldown ─────────────────────────────────────────── */
-const SAFE_COOLDOWN_MS = 30 * 60 * 1000;
-function safeKey(slug: string, loc: string | null) { return `kl_safe_${slug}_${loc || ""}`; }
-function canMarkSafe(slug: string, loc: string | null) {
-  try { const ts = localStorage.getItem(safeKey(slug, loc)); return !ts || Date.now() - parseInt(ts) > SAFE_COOLDOWN_MS; }
-  catch { return true; }
-}
-function recordSafe(slug: string, loc: string | null) {
-  try { localStorage.setItem(safeKey(slug, loc), String(Date.now())); } catch { /**/ }
-}
+type Severity = "safe" | "warn" | "critical";
 
-/* ── Location ──────────────────────────────────────────────── */
-const KERALA_DISTRICTS = [
-  { slug: "kasaragod",          name: "Kasaragod",          lat: 12.4996, lon: 74.9869 },
-  { slug: "kannur",             name: "Kannur",             lat: 11.8745, lon: 75.3704 },
-  { slug: "wayanad",            name: "Wayanad",            lat: 11.6854, lon: 76.1320 },
-  { slug: "kozhikode",          name: "Kozhikode",          lat: 11.2588, lon: 75.7804 },
-  { slug: "malappuram",         name: "Malappuram",         lat: 11.0510, lon: 76.0711 },
-  { slug: "palakkad",           name: "Palakkad",           lat: 10.7867, lon: 76.6548 },
-  { slug: "thrissur",           name: "Thrissur",           lat: 10.5276, lon: 76.2144 },
-  { slug: "ernakulam",          name: "Ernakulam",          lat:  9.9312, lon: 76.2673 },
-  { slug: "idukki",             name: "Idukki",             lat:  9.9189, lon: 76.9705 },
-  { slug: "kottayam",           name: "Kottayam",           lat:  9.5916, lon: 76.5222 },
-  { slug: "alappuzha",          name: "Alappuzha",          lat:  9.4981, lon: 76.3388 },
-  { slug: "pathanamthitta",     name: "Pathanamthitta",     lat:  9.2648, lon: 76.7870 },
-  { slug: "kollam",             name: "Kollam",             lat:  8.8932, lon: 76.6141 },
-  { slug: "thiruvananthapuram", name: "Thiruvananthapuram", lat:  8.5241, lon: 76.9366 },
+type District = {
+  code: string;
+  name: string;
+  slug: string;
+  lat: number;
+  lon: number;
+};
+
+type Report = {
+  id: string;
+  district: string;
+  place: string | null;
+  lat: number | null;
+  lon: number | null;
+  created_at: string;
+  message: string;
+  severity: Severity;
+  category: string | null;
+  image_url: string | null;
+};
+
+type OfficialAlert = {
+  id: string;
+  source: string;
+  disasterType: string;
+  severity: Severity;
+  severityLabel: string;
+  areaDescription: string;
+  message: string;
+  effectiveStart: string | null;
+  effectiveEnd: string | null;
+  district: string | null;
+};
+
+type PhotonFeature = {
+  geometry: { coordinates: [number, number] };
+  properties: {
+    name?: string;
+    city?: string;
+    county?: string;
+    state?: string;
+    country?: string;
+    district?: string;
+  };
+};
+
+type Place = {
+  name: string;
+  context: string;
+  lat: number;
+  lon: number;
+  district: string;
+  slug: string;
+};
+
+type ApiReport = {
+  id: number;
+  district_name: string | null;
+  district_slug: string | null;
+  locality: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  created_at: string;
+  content: string;
+  severity: string;
+  category: string | null;
+  images: Array<{ file_path: string }>;
+};
+
+/* ─── District constants ─────────────────────────────────────── */
+
+const DISTRICTS: District[] = [
+  { code: "KL-01", name: "Trivandrum",     slug: "trivandrum",     lat: 8.5241,  lon: 76.9366 },
+  { code: "KL-02", name: "Kollam",          slug: "kollam",          lat: 8.8932,  lon: 76.6141 },
+  { code: "KL-03", name: "Pathanamthitta", slug: "pathanamthitta", lat: 9.2648,  lon: 76.787  },
+  { code: "KL-04", name: "Alappuzha",      slug: "alappuzha",      lat: 9.4981,  lon: 76.3388 },
+  { code: "KL-05", name: "Kottayam",       slug: "kottayam",       lat: 9.5916,  lon: 76.5222 },
+  { code: "KL-06", name: "Idukki",         slug: "idukki",         lat: 9.85,    lon: 76.97   },
+  { code: "KL-07", name: "Ernakulam",      slug: "ernakulam",      lat: 9.9816,  lon: 76.2999 },
+  { code: "KL-08", name: "Thrissur",       slug: "thrissur",       lat: 10.5276, lon: 76.2144 },
+  { code: "KL-09", name: "Palakkad",       slug: "palakkad",       lat: 10.7867, lon: 76.6548 },
+  { code: "KL-10", name: "Malappuram",     slug: "malappuram",     lat: 11.041,  lon: 76.0788 },
+  { code: "KL-11", name: "Kozhikode",      slug: "kozhikode",      lat: 11.2588, lon: 75.7804 },
+  { code: "KL-12", name: "Wayanad",        slug: "wayanad",        lat: 11.6854, lon: 76.132  },
+  { code: "KL-13", name: "Kannur",         slug: "kannur",         lat: 11.8745, lon: 75.3704 },
+  { code: "KL-14", name: "Kasaragod",      slug: "kasaragod",      lat: 12.4996, lon: 74.9869 },
 ];
-type GpsResult = { place: string; districtName: string; districtSlug: string; lat: number; lon: number; locality: string | null; state: string | null; country: string | null; pincode: string | null; } | null;
-function nearestDistrict(lat: number, lon: number) {
-  let best = KERALA_DISTRICTS[0]; let bestSq = Infinity;
-  for (const d of KERALA_DISTRICTS) { const sq = (d.lat - lat) ** 2 + (d.lon - lon) ** 2; if (sq < bestSq) { bestSq = sq; best = d; } }
+
+const KERALA_CENTER = { lat: 10.5, lon: 76.3 };
+const SEVERITY_RANK: Record<Severity, number> = { safe: 0, warn: 1, critical: 2 };
+
+/* ─── Helpers ───────────────────────────────────────────────── */
+
+function maxSeverity(items: Array<{ severity: Severity }>): Severity {
+  let best: Severity = "safe";
+  for (const it of items) {
+    if (SEVERITY_RANK[it.severity] > SEVERITY_RANK[best]) best = it.severity;
+  }
   return best;
 }
-function findDistrictFromAddress(a: Record<string, string>) {
-  const raw = (a.state_district || a.county || "").replace(/\s*district\s*/i, "").trim().toLowerCase();
-  if (!raw) return null;
-  return KERALA_DISTRICTS.find(d => d.name.toLowerCase() === raw || d.slug === raw.replace(/\s+/g, "")) ?? null;
+
+function haversine(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLon = ((b.lon - a.lon) * Math.PI) / 180;
+  const la1 = (a.lat * Math.PI) / 180;
+  const la2 = (b.lat * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-/* ── Helpers ───────────────────────────────────────────────── */
-const isSafeReport  = (r: Report) => r.content.toLowerCase().includes("[safe now]");
-const reportStatusKey = (r: Report) => r.status === "resolved" ? "resolved" : isSafeReport(r) ? "safe" : "active";
-const reportText    = (r: Report) => r.content.replace(/^\[.*?\]\s*/, "").trim() || r.content;
-function reportShortType(r: Report): string {
-  const text = reportText(r); // strips [prefix]
-  const words = text.trim().split(" ").slice(0, 4).join(" ");
-  return words || r.content.split(" ").slice(0, 4).join(" ");
+function resolveDistrict(f: PhotonFeature): District {
+  const p = f.properties;
+  const candidates = [p.district, p.county, p.city, p.state].filter(Boolean) as string[];
+  for (const c of candidates) {
+    const hit = DISTRICTS.find(
+      (d) =>
+        c.toLowerCase().includes(d.name.toLowerCase()) ||
+        d.name.toLowerCase().includes(c.toLowerCase()),
+    );
+    if (hit) return hit;
+  }
+  const [lon, lat] = f.geometry.coordinates;
+  let best = DISTRICTS[0];
+  let bestDist = Infinity;
+  for (const d of DISTRICTS) {
+    const dist = haversine({ lat, lon }, d);
+    if (dist < bestDist) { bestDist = dist; best = d; }
+  }
+  return best;
 }
 
-/* ── Weather ticker ────────────────────────────────────────── */
-type TickerItem = { name: string; code: number; prob: number; temp: number };
-
-function tickerCondition(code: number, prob: number): { text: string; cls: string } {
-  if (code >= 95) return { text: "⛈ Thunderstorm warning",       cls: "hp-ticker-item--danger" };
-  if (code >= 80) return { text: `🌧 Rain showers (${prob}%)`,    cls: prob >= 60 ? "hp-ticker-item--warn" : "" };
-  if (code >= 61) return { text: `🌧 Rain expected (${prob}%)`,   cls: prob >= 60 ? "hp-ticker-item--warn" : "" };
-  if (code >= 51) return { text: `🌦 Drizzle likely (${prob}%)`,  cls: "" };
-  if (code >= 45) return { text: "🌫 Foggy conditions",           cls: "" };
-  if (code >= 3)  return { text: "☁ Overcast",                   cls: "" };
-  if (code >= 1)  return { text: "⛅ Partly cloudy",              cls: "" };
-  return           { text: "☀ Clear skies",                      cls: "" };
+function toPlace(f: PhotonFeature): Place {
+  const p = f.properties;
+  const [lon, lat] = f.geometry.coordinates;
+  const district = resolveDistrict(f);
+  const ctxParts = [p.city, p.county, p.state].filter(Boolean) as string[];
+  const context = Array.from(new Set(ctxParts)).join(" · ");
+  return {
+    name: p.name ?? "Unknown",
+    context: context || "Kerala, India",
+    lat,
+    lon,
+    district: district.name,
+    slug: district.slug,
+  };
 }
 
-/* ── Chart data generators ─────────────────────────────────── */
-function genHourly(peak: number, seed: number, n = 25): number[] {
-  if (peak <= 0) return Array(n).fill(0);
-  return Array.from({ length: n }, (_, i) => {
-    const t = i / (n - 1);
-    const base = peak * t * t * (3 - 2 * t); // smoothstep: clean S-curve
-    const noise = peak > 2 ? Math.sin(i * 2.1 + seed) * peak * 0.10 : 0;
-    return Math.max(0, base + noise);
-  });
-}
-function genMonthly(total: number, seed: number, months = 7): number[] {
-  if (total <= 0) return Array(months).fill(0);
-  return Array.from({ length: months }, (_, i) => {
-    const t = i / (months - 1);
-    const base = total * t * t * (3 - 2 * t);
-    const noise = total > 2 ? Math.sin(i * 1.5 + seed) * total * 0.07 : 0;
-    return Math.max(0, Math.min(total, base + noise));
-  });
+function mapApiReport(r: ApiReport): Report {
+  const firstImage = r.images?.[0]?.file_path ?? null;
+  return {
+    id: String(r.id),
+    district: r.district_name ?? "",
+    place: r.locality ?? null,
+    lat: r.latitude ?? null,
+    lon: r.longitude ?? null,
+    created_at: r.created_at,
+    message: r.content,
+    severity: (r.severity as Severity) ?? "warn",
+    category: r.category ?? null,
+    image_url: firstImage ? `/uploads/${firstImage}` : null,
+  };
 }
 
-/* ── Dual Area Chart (Kerala trend: alerts + safe overlay) ─── */
-function DualAreaChart({ alertValues, safeValues }: { alertValues: number[]; safeValues: number[] }) {
-  const W = 300; const H = 100;
-  const maxVal = Math.max(...alertValues, ...safeValues, 1);
-  const mkLine = (vals: number[]) =>
-    vals.map((v, i) => `${i === 0 ? "M" : "L"} ${((i / (vals.length - 1)) * W).toFixed(1)} ${(H - 4 - ((v / maxVal) * (H - 8))).toFixed(1)}`).join(" ");
-  const aLine = mkLine(alertValues);
-  const sLine = mkLine(safeValues);
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
-      <defs>
-        <linearGradient id="dag-a" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#EF4444" stopOpacity="0.28" /><stop offset="100%" stopColor="#EF4444" stopOpacity="0.02" /></linearGradient>
-        <linearGradient id="dag-s" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#22C55E" stopOpacity="0.28" /><stop offset="100%" stopColor="#22C55E" stopOpacity="0.02" /></linearGradient>
-      </defs>
-      <path d={`${aLine} L ${W} ${H} L 0 ${H} Z`} fill="url(#dag-a)" />
-      <path d={aLine} stroke="#EF4444" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-      <path d={`${sLine} L ${W} ${H} L 0 ${H} Z`} fill="url(#dag-s)" />
-      <path d={sLine} stroke="#22C55E" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-    </svg>
-  );
+function formatReportTime(iso: string) {
+  const diffSec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (diffSec < 60) return "just now";
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  const d = new Date(iso);
+  return d.toLocaleString("en-IN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" });
 }
 
-/* ── Area Chart ────────────────────────────────────────────── */
-function AreaChart({ values, color }: { values: number[]; color: string }) {
-  const W = 300; const H = 78;
-  const max = Math.max(...values, 1);
-  const pts = values.map((v, i) => [
-    (i / (values.length - 1)) * W,
-    H - 4 - ((v / max) * (H - 8)),
-  ]);
-  const lineD = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
-  const areaD = `${lineD} L ${W} ${H} L 0 ${H} Z`;
-  const uid = `ac${color.replace(/[^0-9a-f]/gi, "").slice(0, 6)}`;
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block" }}>
-      <defs>
-        <linearGradient id={uid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.38" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.03" />
-        </linearGradient>
-      </defs>
-      <path d={areaD} fill={`url(#${uid})`} />
-      <path d={lineD} stroke={color} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="3" fill={color} />)}
-    </svg>
-  );
+function formatAlertWindow(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-IN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" });
 }
 
-const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+const severityColor = (s: Severity) =>
+  s === "critical" ? "bg-critical" : s === "warn" ? "bg-warn" : "bg-primary";
+const severityText = (s: Severity) =>
+  s === "critical" ? "text-critical" : s === "warn" ? "text-warn" : "text-primary";
+const severityBorder = (s: Severity) =>
+  s === "critical" ? "border-critical" : s === "warn" ? "border-warn" : "border-primary";
 
-/* ── District Flip Card ─────────────────────────────────────── */
-function DistrictFlipCard({ district, reports, safeCount, cardIdx, lang }: {
-  district: District; reports: Report[]; safeCount: number; cardIdx: number; lang: "en" | "ml";
-}) {
-  const { t } = useLanguage();
-  const recent = useMemo(
-    () => reports.filter(r => Date.now() - new Date(r.created_at).getTime() < THREE_DAYS_MS),
-    [reports]
-  );
+/* ─── Hooks ─────────────────────────────────────────────────── */
 
-  const [flipIdx, setFlipIdx] = useState(0);
-  const [show, setShow] = useState(true);
+function usePhotonSearch(query: string) {
+  const [results, setResults] = useState<Place[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (recent.length <= 1) return;
-    const id = setInterval(() => {
-      setShow(false);
-      setTimeout(() => { setFlipIdx(i => (i + 1) % recent.length); setShow(true); }, 220);
-    }, 3500 + cardIdx * 320);
+    const q = query.trim();
+    if (q.length < 2) { setResults([]); setLoading(false); return; }
+    setLoading(true);
+    const ctrl = new AbortController();
+    const id = setTimeout(() => {
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${KERALA_CENTER.lat}&lon=${KERALA_CENTER.lon}&limit=8`;
+      fetch(url, { signal: ctrl.signal })
+        .then((r) => r.json())
+        .then((data: { features: PhotonFeature[] }) => {
+          const features = (data.features ?? []).filter((f) => {
+            const s = (f.properties.state ?? "").toLowerCase();
+            const c = (f.properties.country ?? "").toLowerCase();
+            return s.includes("kerala") || (c.includes("india") && s === "");
+          });
+          setResults(features.map(toPlace));
+        })
+        .catch((e) => { if (e.name !== "AbortError") console.error(e); })
+        .finally(() => setLoading(false));
+    }, 250);
+    return () => { ctrl.abort(); clearTimeout(id); };
+  }, [query]);
+
+  return { results, loading };
+}
+
+async function reverseGeocode(lat: number, lon: number): Promise<Place | null> {
+  try {
+    const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&limit=1`);
+    const data: { features: PhotonFeature[] } = await res.json();
+    const f = data.features?.[0];
+    if (!f) return null;
+    return toPlace(f);
+  } catch { return null; }
+}
+
+function useLiveReports(limit = 40) {
+  const [reports, setReports] = useState<Report[]>([]);
+  const [status, setStatus] = useState<"connecting" | "live" | "offline">("connecting");
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const prevIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    let active = true;
+
+    async function fetchReports() {
+      try {
+        const res = await fetch(`/api/reports/feed?limit=${limit}`);
+        if (!res.ok) throw new Error(`${res.status}`);
+        const raw: ApiReport[] = await res.json();
+        if (!active) return;
+        const mapped = raw.map(mapApiReport);
+        const newOnes = mapped.filter((r) => !prevIdsRef.current.has(r.id));
+        if (newOnes.length > 0 && prevIdsRef.current.size > 0) {
+          setFlashId(newOnes[0].id);
+          setTimeout(() => setFlashId((id) => (id === newOnes[0].id ? null : id)), 4000);
+        }
+        prevIdsRef.current = new Set(mapped.map((r) => r.id));
+        setReports(mapped);
+        setStatus("live");
+      } catch {
+        if (active) setStatus("offline");
+      }
+    }
+
+    fetchReports();
+    const interval = setInterval(fetchReports, 5000);
+    return () => { active = false; clearInterval(interval); };
+  }, [limit]);
+
+  return { reports, status, flashId };
+}
+
+function useKeralaAlerts() {
+  const [alerts, setAlerts] = useState<OfficialAlert[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      fetch("/api/ndma-alerts")
+        .then((r) => r.json())
+        .then((data: OfficialAlert[]) => {
+          if (!active) return;
+          setAlerts(data);
+          setStatus("ready");
+        })
+        .catch((err) => {
+          console.error("[alerts]", err);
+          if (active) setStatus("error");
+        });
+    };
+    load();
+    const id = setInterval(load, 5 * 60 * 1000);
+    return () => { active = false; clearInterval(id); };
+  }, []);
+
+  return { alerts, status };
+}
+
+function useLocalTime() {
+  const [time, setTime] = useState("");
+  useEffect(() => {
+    const fmt = () => {
+      const d = new Date();
+      const ist = new Date(d.getTime() + (5.5 * 60 + d.getTimezoneOffset()) * 60000);
+      setTime(`${ist.getHours().toString().padStart(2, "0")}:${ist.getMinutes().toString().padStart(2, "0")} IST`);
+    };
+    fmt();
+    const id = setInterval(fmt, 30000);
     return () => clearInterval(id);
-  }, [recent.length, cardIdx]);
+  }, []);
+  return time;
+}
 
-  const advance = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (recent.length <= 1) return;
-    setShow(false);
-    setTimeout(() => { setFlipIdx(i => (i + 1) % recent.length); setShow(true); }, 120);
-  };
+/* ─── Main page ─────────────────────────────────────────────── */
 
-  const rep          = recent[flipIdx] ?? null;
-  const sk           = rep ? reportStatusKey(rep) : "active";
-  const type         = rep ? reportShortType(rep) : null;
-  const hasNoRecent  = recent.length === 0;
+export function HomePage() {
+  const time = useLocalTime();
+  const { reports, status, flashId } = useLiveReports(40);
+  const { alerts, status: alertStatus } = useKeralaAlerts();
+  const tickerItems = useMemo(() => {
+    if (alerts.length === 0) return [];
+    return [...alerts, ...alerts];
+  }, [alerts]);
+  const topAlert = alerts[0] ?? null;
+
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [districtFocus, setDistrictFocus] = useState<string | null>(null);
 
   return (
-    <Link to={`/district/${district.slug}`} className="hp-dcard">
-      <div className="hp-dcard-top">
-        <div className="hp-dcard-info">
-          <span className="hp-dcard-name">{district.name.toUpperCase()}</span>
-          <span className="hp-dcard-cnt hp-dcard-cnt--alert">
-            <TriangleAlert size={11} /> {district.active_reports_count} {district.active_reports_count === 1 ? t.reportWord : t.reportsWord}
-          </span>
-          <span className="hp-dcard-cnt hp-dcard-cnt--safe">
-            <ShieldCheck size={11} /> {safeCount} {safeCount === 1 ? t.safeUpdateSingle : t.safeUpdatePlural}
-          </span>
-        </div>
-        <div className="hp-dcard-latest">
-          <span className="hp-dcard-latest-hd">
-            {t.latestReport}{" "}
-            <button className="hp-dcard-refresh" onClick={advance} tabIndex={-1}>
-              <RefreshCw size={10} />
-            </button>
-          </span>
-          {hasNoRecent ? (
-            <span className="hp-dcard-no-recent">{t.noNewReports}</span>
+    <div className="min-h-screen w-full bg-background text-foreground p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* Header */}
+        <header className="flex justify-between items-end border-b border-surface pb-6 gap-4">
+          <div className="space-y-1">
+            <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-extrabold uppercase leading-none">
+              Anything Happened?
+            </h1>
+            <p className="font-display text-primary text-xs sm:text-sm uppercase tracking-widest font-bold">
+              Kerala Community Disaster Watch
+            </p>
+          </div>
+          <div className="hidden md:block text-right">
+            <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">Local Time</div>
+            <div className="font-display text-base font-bold tabular-nums">{time || "—"}</div>
+          </div>
+        </header>
+
+        {/* Official Alerts Ticker */}
+        <div className="bg-surface border-y border-primary/20 overflow-hidden py-3">
+          {tickerItems.length === 0 ? (
+            <div className="font-display text-xs uppercase font-bold tracking-wider text-muted-foreground px-4">
+              {alertStatus === "loading"
+                ? "Fetching official advisories from NDMA Sachet…"
+                : alertStatus === "error"
+                  ? "Official advisory feed unavailable right now."
+                  : "No active official advisories for Kerala right now."}
+            </div>
           ) : (
-            <>
-              <span className={`hp-dcard-latest-type hp-dcard-latest-type--${sk}${show ? "" : " hp-dcard-fade"}`}>
-                {type ?? "—"}
-              </span>
-              <span className={`hp-dcard-latest-time${show ? "" : " hp-dcard-fade"}`}>
-                {rep ? timeAgo(rep.created_at, lang) : "—"}
-              </span>
-            </>
+            <div className="flex whitespace-nowrap gap-8 font-display text-xs uppercase font-bold tracking-wider animate-ticker w-max">
+              {tickerItems.map((a, i) => (
+                <span key={`${a.id}-${i}`} className="flex items-center gap-2">
+                  <span className={severityText(a.severity)}>●</span>
+                  <span className="text-foreground">{a.district ?? "Kerala"}:</span>
+                  <span className="text-muted-foreground">{a.disasterType} · {a.source}</span>
+                  <span className="text-muted-foreground/40 ml-4">|</span>
+                </span>
+              ))}
+            </div>
           )}
         </div>
+
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+          {/* Left: Featured alert + Report action */}
+          <div className="lg:col-span-8 space-y-6">
+
+            {topAlert ? (
+              <article className={`relative border-l-4 p-6 ${
+                topAlert.severity === "critical" ? "bg-critical/10 border-critical"
+                  : topAlert.severity === "warn" ? "bg-warn/10 border-warn"
+                  : "bg-primary/10 border-primary"
+              }`}>
+                <div className="flex justify-between items-start mb-4 gap-4 flex-wrap">
+                  <span className={`font-display px-3 py-1 text-xs font-bold uppercase tracking-widest ${
+                    topAlert.severity === "critical" ? "bg-critical text-critical-foreground"
+                      : topAlert.severity === "warn" ? "bg-warn text-background"
+                      : "bg-primary text-background"
+                  }`}>
+                    {topAlert.severityLabel} · {topAlert.source}
+                  </span>
+                  <span className="text-xs text-muted-foreground font-display">
+                    {formatAlertWindow(topAlert.effectiveStart)}
+                  </span>
+                </div>
+                <h2 className="font-display text-2xl md:text-3xl font-bold mb-3 leading-tight">
+                  {topAlert.district ?? "Kerala"}: {topAlert.disasterType}
+                </h2>
+                <p className="text-base md:text-lg text-foreground/80 mb-4">
+                  {topAlert.message || topAlert.areaDescription}
+                </p>
+                <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Area: {topAlert.areaDescription}
+                </div>
+              </article>
+            ) : (
+              <article className="relative bg-surface border-l-4 border-primary/40 p-6">
+                <div className="font-display text-[10px] uppercase tracking-widest text-primary font-bold mb-2">All Clear · Official Feed</div>
+                <h2 className="font-display text-2xl md:text-3xl font-bold mb-3 leading-tight">
+                  No active NDMA / IMD advisories for Kerala
+                </h2>
+                <p className="text-base text-foreground/70">
+                  Community reports below are crowd-sourced. Official warnings appear here the moment they are issued.
+                </p>
+              </article>
+            )}
+
+            <div className="bg-surface p-6 space-y-5">
+              <div>
+                <label className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground mb-3 font-bold">
+                  Step 1 · Choose Your Location
+                </label>
+                <LocationPicker selected={selectedPlace} onSelect={setSelectedPlace} />
+              </div>
+              <button
+                type="button"
+                disabled={!selectedPlace}
+                onClick={() => setReportOpen(true)}
+                className="w-full flex flex-col items-start p-6 bg-background border border-warn/30 enabled:hover:border-warn transition-all text-left group disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <div className="flex items-center justify-between w-full mb-4">
+                  <div className="w-10 h-10 rounded-full bg-warn/20 flex items-center justify-center group-enabled:group-hover:scale-110 transition-transform">
+                    <div className="w-4 h-4 bg-warn rotate-45" />
+                  </div>
+                  <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">Step 2</span>
+                </div>
+                <span className="font-display text-xl font-bold mb-1 uppercase tracking-tight">Report Alert</span>
+                <span className="text-sm text-muted-foreground">
+                  {selectedPlace
+                    ? `Submit a report for ${selectedPlace.name}, ${selectedPlace.district}.`
+                    : "Pick a location above to enable reporting."}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Right: Stats + Live Feed */}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="bg-surface p-6">
+              <h3 className="font-display text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6">Kerala Overview</h3>
+              <div className="grid grid-cols-2 gap-6">
+                <Stat value={String(alerts.filter((a) => a.severity !== "safe").length)} label="Official Alerts" tone="warn" />
+                <Stat value={String(reports.length)} label="Crowd Reports" tone="primary" />
+                <Stat
+                  value={String(new Set([
+                    ...alerts.map((a) => a.district).filter(Boolean),
+                    ...reports.map((r) => r.district),
+                  ]).size)}
+                  label="Districts Active"
+                  tone="warn"
+                />
+                <Stat
+                  value={String(new Set([
+                    ...alerts.filter((a) => a.severity === "critical").map((a) => a.district),
+                    ...reports.filter((r) => r.severity === "critical").map((r) => r.district),
+                  ].filter(Boolean)).size)}
+                  label="Critical Zones"
+                  tone="muted"
+                />
+              </div>
+            </div>
+
+            <div className="bg-surface flex flex-col h-[400px]">
+              <div className="p-4 border-b border-background/40 flex justify-between items-center gap-2">
+                <h3 className="font-display text-xs font-bold uppercase tracking-widest">Live Reports</h3>
+                <div className="flex items-center gap-2 font-display text-[10px] uppercase tracking-widest text-muted-foreground">
+                  <span>{status === "live" ? "Live" : status === "connecting" ? "Connecting" : "Offline"}</span>
+                  <span className={`w-2 h-2 rounded-full ${
+                    status === "live" ? "bg-primary animate-pulse"
+                      : status === "connecting" ? "bg-warn animate-pulse"
+                      : "bg-critical"
+                  }`} />
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {reports.length === 0 && status !== "connecting" && (
+                  <div className="text-center py-8 text-muted-foreground/60 italic text-xs">No recent reports</div>
+                )}
+                {reports.slice(0, 20).map((r) => (
+                  <FeedRow key={r.id} report={r} flash={flashId === r.id} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* District Grid */}
+        <section className="space-y-4 pt-8 border-t border-surface">
+          <h3 className="font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            All Districts · Tap to inspect
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-px bg-surface border border-surface">
+            {DISTRICTS.map((d) => {
+              const dReports = reports.filter((r) => r.district === d.name);
+              const dAlerts = alerts.filter((a) => a.district === d.name);
+              const total = dReports.length + dAlerts.length;
+              const sev: Severity = maxSeverity([
+                ...dReports.map((r) => ({ severity: r.severity })),
+                ...dAlerts.map((a) => ({ severity: a.severity })),
+              ]);
+              const load = total === 0 ? 0 : Math.min(1, total / 8);
+              return (
+                <button
+                  key={d.code}
+                  type="button"
+                  onClick={() => setDistrictFocus(d.name)}
+                  className="bg-background p-4 hover:bg-surface transition-colors text-left"
+                >
+                  <div className="font-display text-[10px] uppercase text-muted-foreground mb-2 font-bold flex justify-between">
+                    <span>{d.code}</span>
+                    {total > 0 && <span className={severityText(sev)}>{total}</span>}
+                  </div>
+                  <div className="font-display text-sm font-bold uppercase tracking-tight">{d.name}</div>
+                  <div className="mt-4 h-1 w-full bg-foreground/5 rounded-full overflow-hidden">
+                    {total > 0 && (
+                      <div
+                        className={`h-full ${severityColor(sev)} ${sev === "critical" ? "animate-pulse" : ""}`}
+                        style={{ width: `${Math.max(8, load * 100)}%` }}
+                      />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <footer className="pt-8 pb-4 text-center font-display text-[10px] uppercase tracking-widest text-muted-foreground/60">
+          Community-powered + Official feeds (NDMA Sachet · IMD · KSDMA) · Kerala Live Disaster Watch
+        </footer>
       </div>
-      <div className="hp-dcard-footer">
-        <span>{t.viewDistrict}</span>
-        <ArrowRight size={12} />
-      </div>
-    </Link>
+
+      {reportOpen && selectedPlace && (
+        <ReportAlertModal
+          place={selectedPlace}
+          onClose={() => setReportOpen(false)}
+          onSubmitted={() => setReportOpen(false)}
+        />
+      )}
+
+      {districtFocus && (
+        <DistrictModal
+          district={districtFocus}
+          reports={reports.filter((r) => r.district === districtFocus)}
+          alerts={alerts.filter((a) => a.district === districtFocus)}
+          onClose={() => setDistrictFocus(null)}
+        />
+      )}
+    </div>
   );
 }
 
-/* ══ HomePage ═══════════════════════════════════════════════ */
-export function HomePage() {
-  const { t, lang, toggle } = useLanguage();
-  const navigate = useNavigate();
+/* ─── Location Picker ───────────────────────────────────────── */
 
-  /* Data */
-  const [districts,       setDistricts]       = useState<District[]>([]);
-  const [recentReports,   setRecentReports]   = useState<Report[]>([]);  // all Kerala
-  const [locationReports, setLocationReports] = useState<Report[] | null>(null); // district when location set
-  const [liveStats,       setLiveStats]       = useState<StatsResult | null>(null);
-  const [loading,         setLoading]         = useState(true);
-  const [locRptLoading,   setLocRptLoading]   = useState(false);
+function LocationPicker({
+  selected,
+  onSelect,
+}: {
+  selected: Place | null;
+  onSelect: (p: Place | null) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const { results, loading } = usePhotonSearch(query);
+  const boxRef = useRef<HTMLDivElement>(null);
 
-  /* Report slider */
-  const [sliderIdx, setSliderIdx] = useState(0);
-
-  /* Weather ticker */
-  const [tickerItems, setTickerItems] = useState<TickerItem[]>([]);
   useEffect(() => {
-    Promise.allSettled(
-      KERALA_DISTRICTS.map(async d => {
-        const r = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${d.lat}&longitude=${d.lon}` +
-          `&daily=weather_code,precipitation_probability_max,temperature_2m_max` +
-          `&timezone=Asia%2FKolkata&forecast_days=2`
-        );
-        const j = await r.json();
-        return {
-          name: d.name,
-          code: j.daily.weather_code[1] as number,
-          prob: (j.daily.precipitation_probability_max[1] ?? 0) as number,
-          temp: Math.round(j.daily.temperature_2m_max[1] as number),
-        } as TickerItem;
-      })
-    ).then(results => {
-      setTickerItems(
-        results
-          .filter((r): r is PromiseFulfilledResult<TickerItem> => r.status === "fulfilled")
-          .map(r => r.value)
-      );
-    });
+    const onClick = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  /* Modal */
-  const [modalStep,   setModalStep]   = useState<"closed" | "open">("closed");
-  const [incType,     setIncType]     = useState<ModalTypeKey | null>(null);
-  const [content,     setContent]     = useState("");
-  const [imageFiles,  setImageFiles]  = useState<File[]>([]);
-  const [imgPreviews, setImgPreviews] = useState<string[]>([]);
-  const [formError,   setFormError]   = useState<string | null>(null);
-  const [btnState,    setBtnState]    = useState<"idle" | "posting" | "success">("idle");
-  const [safeState,   setSafeState]   = useState<"idle" | "posting" | "success">("idle");
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [locHint,     setLocHint]     = useState(false);
-  const fileRef     = useRef<HTMLInputElement>(null);
-  const resetTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const skipSearch  = useRef(false);
+  async function detectLocation() {
+    if (!navigator.geolocation) { setGeoError("Geolocation not supported."); return; }
+    setGeoLoading(true);
+    setGeoError(null);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const place = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+        setGeoLoading(false);
+        if (!place) { setGeoError("Couldn't resolve your location."); return; }
+        onSelect(place);
+        setQuery(place.name);
+      },
+      (err) => { setGeoLoading(false); setGeoError(err.message || "Location permission denied."); },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
 
-  /* Location search */
-  const [gpsResult,   setGpsResult]   = useState<GpsResult>(null);
-  const [locSearch,   setLocSearch]   = useState("");
-  const [suggestions, setSuggestions] = useState<{ name: string; display: string; lat: number; lon: number; rawAddress: Record<string, string> }[]>([]);
-  const [sugOpen,     setSugOpen]     = useState(false);
-  const [sugBusy,     setSugBusy]     = useState(false);
-
-  /* Report detail modal */
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
-
-  const reporterName = useMemo(() => `Anonymous #${Math.floor(Math.random() * 9000) + 1000}`, []);
-
-  useEffect(() => {
-    Promise.all([api.districts(), api.recentReports(20).catch(() => [] as Report[])])
-      .then(([d, r]) => { setDistricts(d); setRecentReports(r); })
-      .finally(() => setLoading(false));
-    api.stats({}).then(setLiveStats).catch(() => {});
-    /* Restore location selection after navigation away and back */
-    try {
-      const saved = sessionStorage.getItem("hp-loc");
-      if (saved) {
-        const gps = JSON.parse(saved);
-        setGpsResult(gps);
-        skipSearch.current = true;  // prevent search dropdown from opening on restore
-        setLocSearch(`${gps.locality}, ${gps.districtName}`);
-      }
-    } catch {}
-  }, []);
-
-  useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
-
-  /* Fetch district reports when location is selected; clear when deselected */
-  useEffect(() => {
-    if (!gpsResult) { setLocationReports(null); sessionStorage.removeItem("hp-loc"); return; }
-    sessionStorage.setItem("hp-loc", JSON.stringify(gpsResult));
-    setLocRptLoading(true);
-    setSliderIdx(0);
-    api.districtReports(gpsResult.districtSlug, "newest", "all")
-      .then(rs => setLocationReports(rs))
-      .catch(() => setLocationReports(null))
-      .finally(() => setLocRptLoading(false));
-  }, [gpsResult?.districtSlug]); // eslint-disable-line
-
-  /* Slider source: district reports when location set, else all-Kerala */
-  const sliderSource  = locationReports ?? recentReports;
-  const sliderReports = sliderSource.slice(0, 4);
-  useEffect(() => {
-    setSliderIdx(0);
-  }, [gpsResult?.districtSlug]);
-  useEffect(() => {
-    if (sliderReports.length <= 1) return;
-    const id = setInterval(() => setSliderIdx(i => (i + 1) % sliderReports.length), 5000);
-    return () => clearInterval(id);
-  }, [sliderReports.length]);
-
-  /* Location search debounce — skipped after a selection to prevent reopen */
-  useEffect(() => {
-    if (skipSearch.current) { skipSearch.current = false; return; }
-    const q = locSearch.trim();
-    if (q.length < 2) { setSuggestions([]); setSugOpen(false); return; }
-    setSugBusy(true);
-    const id = setTimeout(async () => {
-      try {
-        const searchQ = /kerala/i.test(q) ? q : `${q}, Kerala`;
-        const rows: any[] = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQ)}&countrycodes=in&bounded=0&limit=12&addressdetails=1&accept-language=en`,
-          { headers: { "User-Agent": "KeralaLive/1.0" } }
-        ).then(r => r.json());
-        const keralaRows = rows.filter((r: any) =>
-          /kerala/i.test(r.address?.state || "") || /kerala/i.test(r.display_name || "")
-        );
-        setSuggestions((keralaRows.length > 0 ? keralaRows : rows).slice(0, 8).map((r: any) => {
-          const a: Record<string, string> = r.address || {};
-          const name = a.hamlet || a.neighbourhood || a.suburb || a.village || a.town || String(r.display_name).split(",")[0].trim();
-          return { name, display: String(r.display_name).split(",").slice(0, 3).join(",").trim(), lat: parseFloat(r.lat), lon: parseFloat(r.lon), rawAddress: a };
-        }));
-        setSugOpen(true);
-      } catch { setSuggestions([]); }
-      finally { setSugBusy(false); }
-    }, 200);
-    return () => { clearTimeout(id); setSugBusy(false); };
-  }, [locSearch]);
-
-  /* Derived */
-  const safeByDistrict = useMemo(() => {
-    const c: Record<string, number> = {};
-    recentReports.forEach(r => { if (isSafeReport(r) && r.district_slug) c[r.district_slug] = (c[r.district_slug] || 0) + 1; });
-    return c;
-  }, [recentReports]);
-
-  const reportsByDistrict = useMemo(() => {
-    const m: Record<string, Report[]> = {};
-    recentReports.forEach(r => { if (r.district_slug) { m[r.district_slug] = m[r.district_slug] || []; m[r.district_slug].push(r); } });
-    return m;
-  }, [recentReports]);
-
-  const sortedDistricts = useMemo(() =>
-    [...districts].sort((a, b) => b.active_reports_count - a.active_reports_count), [districts]);
-
-  /* Kerala-wide chart data */
-  const s = liveStats;
-  const todayAlerts  = genHourly(s?.today_alerts  ?? 0, 1);
-  const todaySafe    = genHourly(s?.today_safe    ?? 0, 2);
-  const totalAlerts  = genMonthly(s?.active_alerts ?? 0, 3);
-  const totalSafe    = genMonthly(s?.safe_updates  ?? 0, 4);
-
-  /* Kerala overview stats */
-  const activeDistrictCount = districts.filter(d => d.active_reports_count > 0).length;
-  const contributorsCount   = useMemo(
-    () => new Set(recentReports.map(r => r.reporter_name).filter(Boolean)).size,
-    [recentReports]
-  );
-
-  /* Location-specific stats derived from locationReports */
-  const todayStr = new Date().toDateString();
-  const isToday  = (r: Report) => new Date(r.created_at).toDateString() === todayStr;
-  const locRpts  = locationReports ?? [];
-  const locTodayAlertCount = locRpts.filter(r => isToday(r) && !isSafeReport(r)).length;
-  const locTodaySafeCount  = locRpts.filter(r => isToday(r) &&  isSafeReport(r)).length;
-  const locTotalAlertCount = locRpts.filter(r => !isSafeReport(r)).length;
-  const locTotalSafeCount  = locRpts.filter(r =>  isSafeReport(r)).length;
-  const locTodayAlerts  = genHourly(locTodayAlertCount, 5);
-  const locTodaySafe    = genHourly(locTodaySafeCount,  6);
-  const locTotalAlerts  = genMonthly(locTotalAlertCount, 7);
-  const locTotalSafe    = genMonthly(locTotalSafeCount,  8);
-
-  /* Modal helpers */
-  const handleFileAdd = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const sel = Array.from(e.target.files || []);
-    if (!sel.length) return;
-    const add = sel.slice(0, 5 - imageFiles.length);
-    setImageFiles(p => [...p, ...add]);
-    setImgPreviews(p => [...p, ...add.map(f => URL.createObjectURL(f))]);
-    if (fileRef.current) fileRef.current.value = "";
-  }, [imageFiles]);
-
-  const removeFile = useCallback((i: number) => {
-    URL.revokeObjectURL(imgPreviews[i]);
-    setImageFiles(p => p.filter((_, j) => j !== i));
-    setImgPreviews(p => p.filter((_, j) => j !== i));
-  }, [imgPreviews]);
-
-  const resetForm = useCallback(() => {
-    setIncType(null); setContent("");
-    imgPreviews.forEach(p => URL.revokeObjectURL(p));
-    setImageFiles([]); setImgPreviews([]);
-    setFormError(null); setBtnState("idle");
-    if (fileRef.current) fileRef.current.value = "";
-  }, [imgPreviews]); // eslint-disable-line
-
-  const closeModal = useCallback(() => {
-    if (btnState === "posting") return;
-    setModalStep("closed"); resetForm();
-  }, [btnState, resetForm]); // eslint-disable-line
-
-  const handleSubmit = async () => {
-    if (btnState !== "idle") return;
-    if (!content.trim()) { setFormError("Please describe what happened."); return; }
-    if (!gpsResult)      { setFormError("Please set your location in the search bar above first."); return; }
-    setFormError(null); setBtnState("posting");
-    try {
-      const tp = MODAL_TYPES.find(x => x.key === incType);
-      const pfx = tp?.prefix ? `[${tp.prefix}] ` : "";
-      const rep = await api.createReport(gpsResult.districtSlug, {
-        reporter_name: reporterName, content: pfx + content.trim(),
-        location_attached: true, latitude: gpsResult.lat, longitude: gpsResult.lon,
-        locality: gpsResult.locality, state: gpsResult.state, country: gpsResult.country, pincode: gpsResult.pincode,
-      });
-      for (const f of imageFiles) { try { await api.uploadImage(rep.id, f); } catch {} }
-      setBtnState("success");
-      setRecentReports(p => [rep, ...p.filter(r => r.id !== rep.id).slice(0, 19)]);
-      setLocationReports(p => p !== null ? [rep, ...p.filter(r => r.id !== rep.id)] : null);
-      api.recentReports(20).then(setRecentReports).catch(() => {});
-      api.districts().then(setDistricts).catch(() => {});
-      api.stats({}).then(setLiveStats).catch(() => {});
-      if (gpsResult) api.districtReports(gpsResult.districtSlug, "newest", "all").then(setLocationReports).catch(() => {});
-      resetTimer.current = setTimeout(() => { resetForm(); setModalStep("closed"); }, 2600);
-    } catch { setFormError("Failed to post. Please try again."); setBtnState("idle"); }
-  };
-
-  const openAlert = () => { setContent(""); setModalStep("open"); };
-  const openSafe  = () => {
-    if (!gpsResult) { setActionError("Please set your location first."); setTimeout(() => setActionError(null), 3000); return; }
-    if (safeState !== "idle") return;
-    if (!canMarkSafe(gpsResult.districtSlug, gpsResult.locality)) {
-      setActionError("You marked this area safe recently."); setTimeout(() => setActionError(null), 4000); return;
-    }
-    setSafeState("posting");
-    api.createReport(gpsResult.districtSlug, {
-      reporter_name: reporterName, content: "[Safe Now] Area confirmed safe",
-      location_attached: true, latitude: gpsResult.lat, longitude: gpsResult.lon,
-      locality: gpsResult.locality, state: gpsResult.state, country: gpsResult.country, pincode: gpsResult.pincode,
-    }).then(() => {
-      recordSafe(gpsResult.districtSlug, gpsResult.locality);
-      setSafeState("success");
-      api.districts().then(setDistricts).catch(() => {});
-      api.recentReports(20).then(setRecentReports).catch(() => {});
-      api.stats({}).then(setLiveStats).catch(() => {});
-      if (gpsResult) api.districtReports(gpsResult.districtSlug, "newest", "all").then(setLocationReports).catch(() => {});
-      setTimeout(() => setSafeState("idle"), 2500);
-    }).catch(() => setSafeState("idle"));
-  };
-
-  const selectLoc = (sg: typeof suggestions[number]) => {
-    const district = findDistrictFromAddress(sg.rawAddress) ?? nearestDistrict(sg.lat, sg.lon);
-    const gps: GpsResult = { place: `${sg.name}, ${district.name}`, districtName: district.name, districtSlug: district.slug, lat: sg.lat, lon: sg.lon, locality: sg.name, state: "Kerala", country: "India", pincode: sg.rawAddress.postcode || null };
-    const label = `${sg.name}, ${district.name}`;
-    skipSearch.current = true;  // stop the effect from re-triggering a search
-    setGpsResult(gps);
-    setLocSearch(label);
-    setSugOpen(false);
-    setSuggestions([]);
-  };
-
-  const goDistrict = (slug: string, statusFilter: string) =>
-    navigate(`/district/${slug}`, { state: { statusFilter } });
-
-  const defaultSlug = (gpsResult?.districtSlug) || (sortedDistricts[0]?.slug) || "kannur";
-
-  const handleOpenReport = async (r: Report) => {
-    try { setSelectedReport(await api.reportDetail(r.id)); } catch { setSelectedReport(r); }
-  };
-
-  const sliderReport = sliderReports[sliderIdx] ?? null;
-
-  /* ── Render ──────────────────────────────────────────────── */
   return (
-    <div className="hp-page">
-
-      {/* ── Report Alert Modal (single step) ── */}
-      {modalStep === "open" && (
-        <div className="cr-backdrop" onClick={closeModal}>
-          <div className="cr-modal" onClick={e => e.stopPropagation()}>
-
-            {/* Header */}
-            <div className="cr-hdr">
-              <span className="cr-hdr-title">Report Alert</span>
-              <button className="cr-hdr-close" onClick={closeModal}><X size={16} /></button>
-            </div>
-
-            {/* Body */}
-            <div className="cr-body">
-
-              {/* Location */}
-              <div className="cr-modal-loc">
-                <MapPin size={13} />
-                <span>
-                  {gpsResult
-                    ? `${gpsResult.locality || gpsResult.districtName}, ${gpsResult.districtName}`
-                    : "No location set — close and search your location first"}
-                </span>
-              </div>
-
-              {/* Description */}
-              <div className="cr-field">
-                <label className="cr-field-label">Description</label>
-                <textarea
-                  className="cr-textarea"
-                  maxLength={500}
-                  placeholder="Describe what happened..."
-                  value={content}
-                  onChange={e => setContent(e.target.value)}
-                  autoFocus
-                />
-                <div className="cr-char">{content.length} / 500</div>
-              </div>
-
-              {/* Alert Type */}
-              <div className="cr-field">
-                <label className="cr-field-label">Alert Type</label>
-                <div className="cr-type-chips">
-                  {MODAL_TYPES.map(tp => (
-                    <button
-                      key={tp.key}
-                      className={`cr-type-chip${incType === tp.key ? " cr-type-chip--on" : ""}`}
-                      onClick={() => setIncType(incType === tp.key ? null : tp.key)}
-                    >
-                      {tp.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Photo */}
-              <div className="cr-field">
-                <label className="cr-field-label">
-                  Photo <span className="cr-field-label--opt">(optional)</span>
-                </label>
-                <div className="cr-photo-row">
-                  <label className="cr-photo-btn">
-                    <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleFileAdd} />
-                    📷 Add Photo
-                  </label>
-                  {imgPreviews.map((src, i) => (
-                    <div key={i} className="cr-thumb">
-                      <img src={src} alt="" />
-                      <button className="cr-thumb-rm" onClick={e => { e.preventDefault(); removeFile(i); }}><X size={8} /></button>
-                    </div>
-                  ))}
-                  {imageFiles.length > 0 && imageFiles.length < 5 && (
-                    <label className="cr-photo-btn">
-                      <input type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileAdd} />
-                      + More
-                    </label>
-                  )}
-                </div>
-              </div>
-
-              {formError && <p className="cr-error">{formError}</p>}
-            </div>
-
-            {/* Footer */}
-            <div className="cr-footer">
-              <button className="cr-btn-cancel" onClick={closeModal}>Cancel</button>
-              <button
-                className={`cr-btn-submit${btnState === "success" ? " cr-btn-submit--ok" : ""}`}
-                onClick={handleSubmit}
-                disabled={btnState !== "idle"}
-              >
-                {btnState === "posting" ? <><span className="cr-spin" /> Submitting…</> :
-                 btnState === "success" ? <><Check size={14} /> Alert Submitted!</> :
-                 <>Submit Alert <ArrowRight size={14} /></>}
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* ── Top bar ── */}
-      <div className="hp-topbar">
-        <div className="hp-topbar-hd">
-          <h1 className="hp-main-title">{t.mainTitle}</h1>
-          <button className="hp-lang-toggle" onClick={toggle}>{lang === "en" ? "EN" : "ML"}</button>
-        </div>
-        <p className="hp-main-sub">{t.mainSub}</p>
+    <div ref={boxRef} className="relative space-y-2">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={query}
+          onFocus={() => setOpen(true)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+            if (selected) onSelect(null);
+          }}
+          placeholder="Search your place (e.g. Payyannur, Kakkanad...)"
+          className="flex-1 bg-background border border-surface focus:border-primary px-4 py-3 text-sm outline-none transition-colors placeholder:text-muted-foreground/60"
+        />
+        <button
+          type="button"
+          onClick={detectLocation}
+          disabled={geoLoading}
+          className="font-display text-[10px] uppercase tracking-widest font-bold px-3 py-3 bg-background border border-primary/40 hover:border-primary text-primary disabled:opacity-50"
+        >
+          {geoLoading ? "..." : "📍 Auto"}
+        </button>
       </div>
 
-      {/* ── Weather ticker ── */}
-      {tickerItems.length > 0 && (
-        <div className="hp-ticker">
-          <div className="hp-ticker-label">
-            🌤 {lang === "ml" ? "നാളെ" : "TOMORROW"}
+      {selected && (
+        <div className="flex items-center justify-between bg-primary/10 border border-primary/30 px-3 py-2">
+          <div>
+            <div className="font-display text-sm font-bold">{selected.name}</div>
+            <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
+              {selected.district} District · {selected.context}
+            </div>
           </div>
-          <div className="hp-ticker-track">
-            <span className="hp-ticker-content">
-              {tickerItems.map((item, i) => {
-                const { text, cls } = tickerCondition(item.code, item.prob);
-                return (
-                  <span key={item.name}>
-                    <span className={`hp-ticker-item${cls ? " " + cls : ""}`}>
-                      <strong>{item.name}</strong>: {text} · {item.temp}°C
-                    </span>
-                    {i < tickerItems.length - 1 && (
-                      <span className="hp-ticker-sep">|</span>
-                    )}
-                  </span>
-                );
-              })}
-            </span>
-          </div>
+          <button
+            type="button"
+            onClick={() => { onSelect(null); setQuery(""); }}
+            className="font-display text-[10px] uppercase text-muted-foreground hover:text-foreground"
+          >
+            Clear ✕
+          </button>
         </div>
       )}
 
-      {/* ── Main 60/40 ── */}
-      <div className="hp-main">
+      {geoError && (
+        <div className="font-display text-[10px] uppercase tracking-widest text-critical">{geoError}</div>
+      )}
 
-        {/* ── Left column ── */}
-        <div className="hp-left-col">
-          <div className="hp-left-card">
-
-            {/* ── Location search — always at top of card ── */}
-            <div className="hp-ls hp-ls-loc">
-              <div className="hp-ls-title">{t.chooseLocation}</div>
-              <div className="hp-loc-wrap">
-                {gpsResult ? (
-                  <div className="hp-loc-selected">
-                    <MapPin size={15} className="hp-loc-sel-icon" />
-                    <div className="hp-loc-sel-text">
-                      <span className="hp-loc-sel-name">{gpsResult.locality || gpsResult.districtName}</span>
-                      <span className="hp-loc-sel-sub">{gpsResult.districtName} · Kerala</span>
-                    </div>
-                    <button className="hp-loc-change-btn" onClick={() => { setGpsResult(null); setLocSearch(""); setSuggestions([]); setLocationReports(null); }}>
-                      <Search size={12} /> {t.searchAnotherLoc}
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="hp-loc-box">
-                      <Search size={16} className="hp-loc-icon" />
-                      <input
-                        className="hp-loc-input"
-                        placeholder={t.searchPlaceholder}
-                        value={locSearch}
-                        onChange={e => setLocSearch(e.target.value)}
-                        onFocus={() => suggestions.length > 0 && setSugOpen(true)}
-                        onBlur={() => setTimeout(() => setSugOpen(false), 150)}
-                        autoFocus
-                      />
-                    </div>
-                    {sugOpen && suggestions.length > 0 && (
-                      <ul className="hp-loc-suggestions">
-                        {suggestions.map((sg, i) => (
-                          <li key={i} className="hp-loc-sug-item" onMouseDown={() => selectLoc(sg)}>
-                            <span className="hp-loc-sug-name">{sg.name}</span>
-                            <span className="hp-loc-sug-display">{sg.display}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </>
-                )}
+      {open && !selected && (query.trim().length >= 2 || loading) && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-background border border-surface max-h-72 overflow-y-auto shadow-xl">
+          {loading && (
+            <div className="px-3 py-2 font-display text-[10px] uppercase tracking-widest text-muted-foreground">Searching...</div>
+          )}
+          {!loading && results.length === 0 && (
+            <div className="px-3 py-2 font-display text-[10px] uppercase tracking-widest text-muted-foreground">No places found in Kerala</div>
+          )}
+          {results.map((p, i) => (
+            <button
+              key={`${p.lat}-${p.lon}-${i}`}
+              type="button"
+              onClick={() => { onSelect(p); setQuery(p.name); setOpen(false); }}
+              className="w-full text-left px-3 py-2 hover:bg-surface border-b border-surface/60 last:border-0"
+            >
+              <div className="text-sm font-semibold">{p.name}</div>
+              <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
+                {p.district} · {p.context}
               </div>
-              {actionError && <p className="hp-action-err">{actionError}</p>}
-            </div>
-
-            {!gpsResult ? (
-              /* ═══ STATE 1: Kerala Overview (no location selected) ═══ */
-              <>
-                {/* Overview info */}
-                <div className="hp-ls">
-                  <div className="hp-ls-title">{t.keralaOverview}</div>
-                  <div className="hp-info-line">
-                    {activeDistrictCount} {t.activeWord}
-                    &nbsp;•&nbsp;{s?.today_alerts ?? 0} {t.reportsWord}
-                    &nbsp;•&nbsp;{s?.today_safe ?? 0} {t.safeWord}
-                    &nbsp;•&nbsp;{contributorsCount} {t.contributorsShort}
-                  </div>
-                </div>
-
-                {/* Report actions */}
-                <div className="hp-ls">
-                  <div className="hp-ls-title">{t.reportToCommunity}</div>
-                  <div className="hp-action-pair">
-                    <button className="hp-action-btn" onClick={() => { setLocHint(true); setTimeout(() => setLocHint(false), 3500); }}>
-                      <div className="hp-action-icon-box hp-action-icon-box--alert"><TriangleAlert size={18} /></div>
-                      <div className="hp-action-text">
-                        <span className="hp-action-label">{t.reportAlertLabel}</span>
-                        <span className="hp-action-desc">{t.reportAlertDesc}</span>
-                      </div>
-                      <ArrowRight size={14} className="hp-action-arrow" />
-                    </button>
-                    <button className="hp-action-btn" onClick={() => { setLocHint(true); setTimeout(() => setLocHint(false), 3500); }}>
-                      <div className="hp-action-icon-box hp-action-icon-box--safe"><ShieldCheck size={18} /></div>
-                      <div className="hp-action-text">
-                        <span className="hp-action-label">{t.markSafeLabel}</span>
-                        <span className="hp-action-desc">{t.markSafeDesc}</span>
-                      </div>
-                      <ArrowRight size={14} className="hp-action-arrow" />
-                    </button>
-                  </div>
-                  {locHint && (
-                    <p className="hp-loc-hint">{t.searchLocHint}</p>
-                  )}
-                </div>
-              </>
-            ) : (
-              /* ═══ STATE 2: Location Overview (location selected) ═══ */
-              <>
-                {/* Report actions — FIRST so user reaches them without passing chips */}
-                <div className="hp-ls">
-                  <div className="hp-ls-title">{t.reportToCommunity}</div>
-                  <div className="hp-action-pair">
-                    <button className="hp-action-btn" onClick={openAlert}>
-                      <div className="hp-action-icon-box hp-action-icon-box--alert"><TriangleAlert size={18} /></div>
-                      <div className="hp-action-text">
-                        <span className="hp-action-label">{t.reportAlertLabel}</span>
-                        <span className="hp-action-desc">{t.reportAlertDesc}</span>
-                      </div>
-                      <ArrowRight size={14} className="hp-action-arrow" />
-                    </button>
-                    <button className="hp-action-btn" onClick={openSafe}>
-                      <div className="hp-action-icon-box hp-action-icon-box--safe">
-                        {safeState === "success" ? <Check size={18} /> : <ShieldCheck size={18} />}
-                      </div>
-                      <div className="hp-action-text">
-                        <span className="hp-action-label">{safeState === "success" ? t.markSafeLabelDone : t.markSafeLabel}</span>
-                        <span className="hp-action-desc">{safeState === "posting" ? t.submittingLabel : t.markSafeDesc}</span>
-                      </div>
-                      <ArrowRight size={14} className="hp-action-arrow" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Location stats + filter chips — BELOW actions */}
-                <div className="hp-ls">
-                  <div className="hp-ls-title">
-                    {(gpsResult.locality || gpsResult.districtName).toUpperCase()} OVERVIEW
-                  </div>
-
-                  <div className="hp-chip-group">
-                    <span className="hp-chip-label">{t.todayLabel2}</span>
-                    <div className="hp-chip-row">
-                      <button className="hp-chip hp-chip--alert" onClick={() => navigate(`/district/${gpsResult.districtSlug}`, { state: { statusFilter: "active", localityFilter: gpsResult.locality, dateFilter: "today" } })}>
-                        <TriangleAlert size={11} />{locTodayAlertCount} {locTodayAlertCount !== 1 ? t.alertsWord : t.alertsWord}
-                      </button>
-                      <button className="hp-chip hp-chip--safe" onClick={() => navigate(`/district/${gpsResult.districtSlug}`, { state: { statusFilter: "safe", localityFilter: gpsResult.locality, dateFilter: "today" } })}>
-                        <ShieldCheck size={11} />{locTodaySafeCount} {locTodaySafeCount !== 1 ? t.safeUpdatePlural : t.safeUpdateSingle}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="hp-chip-group">
-                    <span className="hp-chip-label">{t.overallLabel}</span>
-                    <div className="hp-chip-row">
-                      <button className="hp-chip hp-chip--alert" onClick={() => navigate(`/district/${gpsResult.districtSlug}`, { state: { statusFilter: "active", localityFilter: gpsResult.locality } })}>
-                        <TriangleAlert size={11} />{locTotalAlertCount} {locTotalAlertCount !== 1 ? t.alertsWord : t.alertsWord}
-                      </button>
-                      <button className="hp-chip hp-chip--safe" onClick={() => navigate(`/district/${gpsResult.districtSlug}`, { state: { statusFilter: "safe", localityFilter: gpsResult.locality } })}>
-                        <ShieldCheck size={11} />{locTotalSafeCount} {locTotalSafeCount !== 1 ? t.safeUpdatePlural : t.safeUpdateSingle}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-          </div>{/* /.hp-left-card */}
-        </div>{/* /.hp-left-col */}
-
-        {/* ── Right column (slider) ── */}
-        <div className="hp-right-col">
-          <div className="hp-slider-card">
-            <div className="hp-slider-hd">
-              <span className="hp-slider-hd-title">
-                {t.liveAcrossKerala}
-                {locRptLoading && <span style={{ marginLeft: 8, fontSize: 10, opacity: 0.6 }}>Loading…</span>}
-              </span>
-              {gpsResult && (
-                <button className="hp-slider-view-all" onClick={() => navigate(`/district/${gpsResult.districtSlug}`)}>
-                  {gpsResult.districtName} Reports <ArrowRight size={13} />
-                </button>
-              )}
-            </div>
-
-            {/* Image area */}
-            <div className="hp-slider-img-area">
-              {sliderReport?.images?.length > 0 ? (
-                <img
-                  className="hp-slider-img"
-                  src={imageUrl(sliderReport.images[0].file_path)}
-                  alt={sliderReport.content}
-                />
-              ) : (
-                <div className={`hp-slider-placeholder hp-slider-placeholder--${sliderReport ? reportStatusKey(sliderReport) : "active"}`}>
-                  {sliderReport ? (
-                    reportStatusKey(sliderReport) === "safe" ? <ShieldCheck size={56} opacity={0.35} /> :
-                    reportStatusKey(sliderReport) === "resolved" ? <BadgeCheck size={56} opacity={0.35} /> :
-                    <TriangleAlert size={56} opacity={0.35} />
-                  ) : <TriangleAlert size={56} opacity={0.2} />}
-                </div>
-              )}
-
-              {/* Arrows */}
-              {sliderReports.length > 1 && (
-                <>
-                  <button className="hp-slider-arrow hp-slider-arrow--prev" onClick={() => setSliderIdx(i => (i - 1 + sliderReports.length) % sliderReports.length)}>
-                    ‹
-                  </button>
-                  <button className="hp-slider-arrow hp-slider-arrow--next" onClick={() => setSliderIdx(i => (i + 1) % sliderReports.length)}>
-                    ›
-                  </button>
-                  <div className="hp-slider-dots">
-                    {sliderReports.map((_, i) => (
-                      <span key={i} className={`hp-slider-dot${sliderIdx === i ? " hp-slider-dot--on" : ""}`} onClick={() => setSliderIdx(i)} />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Content */}
-            {sliderReport ? (
-              <div className="hp-slider-body" onClick={() => handleOpenReport(sliderReport)}>
-                <h2 className="hp-slider-title">{reportText(sliderReport)}</h2>
-                <div className="hp-slider-meta">
-                  {(sliderReport.locality || sliderReport.district_name) && (
-                    <span><MapPin size={12} />{sliderReport.locality || sliderReport.district_name}</span>
-                  )}
-                  <span><Clock size={12} />{timeAgo(sliderReport.created_at, lang)}</span>
-                </div>
-                <div className="hp-slider-metrics">
-                  <span className="hp-slider-metric">
-                    <CheckCircle size={18} /><strong>{sliderReport.confirmed_count}</strong><small>{t.confirmationsLabel}</small>
-                  </span>
-                  <span className="hp-slider-metric">
-                    <MessageSquare size={18} /><strong>{sliderReport.comment_count}</strong><small>{t.commentsWord}</small>
-                  </span>
-                  <span className="hp-slider-metric">
-                    <Eye size={18} /><strong>{sliderReport.views_count ?? 0}</strong><small>{t.viewsLabel}</small>
-                  </span>
-                  <span className="hp-slider-metric hp-slider-metric--share">
-                    <Share2 size={18} /><small>{t.shareWord}</small>
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="hp-slider-empty">{t.noRecentReportsSlider}</div>
-            )}
-          </div>
-        </div>{/* /.hp-right-col */}
-
-      </div>{/* /.hp-main */}
-
-      {/* ── All Districts ── */}
-      <div className="hp-districts">
-        <div className="hp-districts-hd">
-          <h2 className="hp-districts-title">{t.allDistricts}</h2>
+            </button>
+          ))}
         </div>
-        {loading ? (
-          <div className="hp-dcard-grid">
-            {Array.from({ length: 14 }).map((_, i) => <div key={i} className="hp-dcard-skel" />)}
+      )}
+    </div>
+  );
+}
+
+/* ─── Report Alert Modal ────────────────────────────────────── */
+
+function ReportAlertModal({
+  place,
+  onClose,
+  onSubmitted,
+}: {
+  place: Place;
+  onClose: () => void;
+  onSubmitted: () => void;
+}) {
+  const [severity, setSeverity] = useState<Severity>("warn");
+  const [category, setCategory] = useState("Flood");
+  const [message, setMessage] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function pickImage(f: File | null) {
+    setImageFile(f);
+    setImagePreview(f ? URL.createObjectURL(f) : null);
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = message.trim();
+    if (trimmed.length < 1 || trimmed.length > 500) { setError("Message must be 1–500 characters."); return; }
+    if (imageFile && imageFile.size > 5 * 1024 * 1024) { setError("Image must be under 5 MB."); return; }
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/districts/${place.slug}/reports`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reporter_name: "Anonymous",
+          content: trimmed,
+          severity,
+          category,
+          location_attached: true,
+          latitude: place.lat,
+          longitude: place.lon,
+          locality: place.name,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setError((err as { detail?: string }).detail || "Submission failed. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+
+      const created = await res.json() as { id: number };
+
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append("file", imageFile);
+        await fetch(`/api/reports/${created.id}/images`, { method: "POST", body: formData });
+      }
+
+      onSubmitted();
+    } catch {
+      setError("Network error. Please try again.");
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={submit}
+        className="w-full max-w-lg bg-surface border border-warn/40 p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="font-display text-[10px] uppercase tracking-widest text-warn font-bold mb-1">New Report</div>
+            <h2 className="font-display text-xl font-bold uppercase tracking-tight">{place.name}</h2>
+            <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
+              {place.district} District · {place.context}
+            </div>
           </div>
-        ) : (
-          <div className="hp-dcard-grid">
-            {sortedDistricts.map((d, idx) => (
-              <DistrictFlipCard
-                key={d.slug}
-                district={d}
-                reports={reportsByDistrict[d.slug] ?? []}
-                safeCount={safeByDistrict[d.slug] ?? 0}
-                cardIdx={idx}
-                lang={lang}
-              />
+          <button type="button" onClick={onClose} className="font-display text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground">
+            Close ✕
+          </button>
+        </div>
+
+        <label className="block space-y-2">
+          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Category</span>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full bg-background border border-surface focus:border-primary px-3 py-2 text-sm outline-none"
+          >
+            {["Flood", "Landslide", "Road Damage", "Power Outage", "Medical Emergency", "Fire", "Other"].map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </label>
+
+        <div className="space-y-2">
+          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Severity</span>
+          <div className="grid grid-cols-3 gap-2">
+            {(["safe", "warn", "critical"] as Severity[]).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setSeverity(s)}
+                className={`font-display text-xs uppercase tracking-widest font-bold py-2 border transition-colors ${
+                  severity === s
+                    ? s === "critical" ? "border-critical bg-critical/20 text-critical"
+                      : s === "warn" ? "border-warn bg-warn/20 text-warn"
+                      : "border-primary bg-primary/20 text-primary"
+                    : "border-surface text-muted-foreground hover:border-foreground/40"
+                }`}
+              >
+                {s}
+              </button>
             ))}
           </div>
-        )}
-      </div>
-
-      {/* ── Site Footer ── */}
-      <footer className="hp-site-footer">
-        <span className="hp-site-footer-copy">© 2025 LiveDisaster · Built for Kerala</span>
-        <div className="hp-site-footer-right">
-          <a href="https://www.linkedin.com/in/jishinc" target="_blank" rel="noopener noreferrer" className="hp-site-footer-dev">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-            Developed by Jishin C
-          </a>
         </div>
-      </footer>
 
-      {selectedReport && (
-        <ReportDetailModal
-          report={selectedReport}
-          related={recentReports.filter(r => r.id !== selectedReport.id).slice(0, 4)}
-          onClose={() => setSelectedReport(null)}
-          onUpdated={(updated: Report) => {
-            setSelectedReport(updated);
-            setRecentReports(prev => prev.map(r => r.id === updated.id ? updated : r));
-          }}
-        />
+        <label className="block space-y-2">
+          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">What happened?</span>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={4}
+            maxLength={500}
+            placeholder="Brief description (what you saw, road blocked, risk level...)..."
+            className="w-full bg-background border border-surface focus:border-primary px-3 py-2 text-sm outline-none resize-none placeholder:text-muted-foreground/60"
+          />
+          <div className="flex justify-between text-[10px] font-display uppercase tracking-widest text-muted-foreground">
+            <span className={error ? "text-critical" : ""}>{error ?? "Visible publicly on the live feed"}</span>
+            <span>{message.length}/500</span>
+          </div>
+        </label>
+
+        <div className="space-y-2">
+          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Photo (optional, max 5 MB)</span>
+          {imagePreview ? (
+            <div className="relative">
+              <img src={imagePreview} alt="preview" className="w-full max-h-56 object-cover border border-surface" />
+              <button
+                type="button"
+                onClick={() => pickImage(null)}
+                className="absolute top-2 right-2 font-display text-[10px] uppercase tracking-widest font-bold px-2 py-1 bg-background/80 border border-surface hover:border-critical"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <label className="flex items-center justify-center w-full border border-dashed border-surface hover:border-primary py-6 cursor-pointer text-center">
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => pickImage(e.target.files?.[0] ?? null)} />
+              <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">+ Attach photo</span>
+            </label>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-3 pt-2">
+          <button type="button" onClick={onClose} className="font-display text-xs uppercase tracking-widest px-4 py-2 border border-surface hover:border-foreground/40">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="font-display text-xs uppercase tracking-widest font-bold px-4 py-2 bg-warn text-background hover:bg-warn/90 disabled:opacity-50"
+          >
+            {submitting ? "Submitting..." : "Submit Report"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/* ─── District Dossier Modal ────────────────────────────────── */
+
+function DistrictModal({
+  district,
+  reports,
+  alerts,
+  onClose,
+}: {
+  district: string;
+  reports: Report[];
+  alerts: OfficialAlert[];
+  onClose: () => void;
+}) {
+  const places = useMemo(() => {
+    const set = new Set<string>();
+    reports.forEach((r) => r.place && set.add(r.place));
+    return Array.from(set);
+  }, [reports]);
+  const [activePlace, setActivePlace] = useState<string | null>(null);
+  const visibleReports = activePlace ? reports.filter((r) => r.place === activePlace) : reports;
+
+  const sev = maxSeverity([
+    ...reports.map((r) => ({ severity: r.severity })),
+    ...alerts.map((a) => ({ severity: a.severity })),
+  ]);
+  const headline =
+    alerts.find((a) => a.severity === "critical")?.disasterType ??
+    alerts[0]?.disasterType ??
+    (reports.length > 0 ? "Crowd reports active" : "No active incidents");
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-5xl bg-background border border-surface max-h-[92vh] flex flex-col overflow-hidden"
+      >
+        <header className={`relative border-b-4 ${severityBorder(sev)} bg-surface p-6`}>
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="font-display text-[10px] uppercase tracking-[0.3em] text-muted-foreground font-bold">
+              Dossier · Kerala Disaster Watch
+            </div>
+            <button type="button" onClick={onClose} className="font-display text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground">
+              Close ✕
+            </button>
+          </div>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="font-display text-3xl md:text-5xl font-extrabold uppercase tracking-tight leading-none">{district}</h2>
+              <div className="font-display text-sm md:text-base text-foreground/80 mt-2">{headline}</div>
+            </div>
+            <div className="flex gap-6">
+              <DossierMetric value={alerts.length} label="Official" tone={sev} />
+              <DossierMetric value={reports.length} label="Crowd" tone="primary" />
+              <DossierMetric value={places.length} label="Places" tone="muted" />
+            </div>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-y-auto">
+          <section className="border-b border-surface">
+            <div className="px-6 pt-5 pb-3 flex items-center justify-between">
+              <h3 className="font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">Official Advisories</h3>
+              <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground/70">NDMA Sachet · IMD · KSDMA</span>
+            </div>
+            {alerts.length === 0 ? (
+              <div className="px-6 pb-6 text-sm text-muted-foreground/70 italic">No official advisories are active for {district} right now.</div>
+            ) : (
+              <div className="px-6 pb-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                {alerts.map((a) => <OfficialAlertCard key={a.id} alert={a} />)}
+              </div>
+            )}
+          </section>
+
+          <section>
+            <div className="px-6 pt-5 pb-3">
+              <h3 className="font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Crowd Briefs ({visibleReports.length})
+              </h3>
+            </div>
+            {places.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto px-6 pb-3">
+                <button
+                  type="button"
+                  onClick={() => setActivePlace(null)}
+                  className={`shrink-0 font-display text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 border transition-colors ${
+                    activePlace === null ? "border-primary bg-primary/20 text-primary" : "border-surface text-muted-foreground hover:border-foreground/40"
+                  }`}
+                >
+                  All places
+                </button>
+                {places.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setActivePlace(p)}
+                    className={`shrink-0 font-display text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 border transition-colors ${
+                      activePlace === p ? "border-primary bg-primary/20 text-primary" : "border-surface text-muted-foreground hover:border-foreground/40"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="px-6 pb-6 space-y-3">
+              {visibleReports.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground/60 italic text-xs font-display uppercase tracking-widest">
+                  No crowd reports yet{activePlace ? ` for ${activePlace}` : ""}.
+                </div>
+              ) : (
+                visibleReports.map((r) => <ReportCard key={r.id} report={r} />)
+              )}
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Small components ──────────────────────────────────────── */
+
+function DossierMetric({ value, label, tone }: {
+  value: number;
+  label: string;
+  tone: Severity | "primary" | "muted";
+}) {
+  const color =
+    tone === "critical" ? "text-critical" : tone === "warn" ? "text-warn"
+      : tone === "primary" ? "text-primary" : tone === "safe" ? "text-primary"
+      : "text-foreground/50";
+  return (
+    <div className="text-right">
+      <div className={`font-display text-3xl font-bold tabular-nums ${color}`}>{value}</div>
+      <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{label}</div>
+    </div>
+  );
+}
+
+function OfficialAlertCard({ alert }: { alert: OfficialAlert }) {
+  return (
+    <article className={`bg-surface border-l-4 ${severityBorder(alert.severity)} p-4 space-y-2`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className={`font-display text-[10px] uppercase tracking-widest font-bold ${severityText(alert.severity)}`}>
+            {alert.severityLabel} · {alert.disasterType}
+          </div>
+          <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground mt-0.5">{alert.source}</div>
+        </div>
+        <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground text-right shrink-0">
+          {formatAlertWindow(alert.effectiveStart)}
+          {alert.effectiveEnd ? ` → ${formatAlertWindow(alert.effectiveEnd)}` : ""}
+        </div>
+      </div>
+      {alert.message && <p className="text-sm text-foreground/90">{alert.message}</p>}
+      <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground/80">Area: {alert.areaDescription}</div>
+    </article>
+  );
+}
+
+function FeedRow({ report, flash }: { report: Report; flash: boolean }) {
+  return (
+    <div className={`border-l-2 pl-3 py-1 transition-colors ${severityBorder(report.severity)} ${flash ? "bg-warn/10" : ""}`}>
+      <div className="font-display text-xs text-muted-foreground mb-1 flex items-center gap-2">
+        {flash && (
+          <span className="font-display text-[9px] uppercase tracking-widest font-bold bg-warn text-background px-1.5 py-0.5">New</span>
+        )}
+        <span>{report.place ? `${report.place}, ` : ""}{report.district}</span>
+        <span>· {formatReportTime(report.created_at)}</span>
+      </div>
+      <div className="text-sm font-semibold">{report.message}</div>
+      {report.image_url && (
+        <img src={report.image_url} alt="" className="mt-2 w-full max-h-32 object-cover border border-surface" />
       )}
+    </div>
+  );
+}
+
+function ReportCard({ report }: { report: Report }) {
+  return (
+    <article className={`bg-background border-l-4 ${severityBorder(report.severity)} p-4`}>
+      <div className="flex justify-between items-start gap-3 mb-2">
+        <div>
+          <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
+            {report.place ?? report.district} · {report.category ?? "General"}
+          </div>
+          <div className={`font-display text-[10px] uppercase tracking-widest font-bold ${severityText(report.severity)}`}>
+            {report.severity}
+          </div>
+        </div>
+        <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
+          {formatReportTime(report.created_at)}
+        </span>
+      </div>
+      <p className="text-sm">{report.message}</p>
+      {report.image_url && (
+        <img src={report.image_url} alt="" className="mt-3 w-full max-h-64 object-cover border border-surface" />
+      )}
+    </article>
+  );
+}
+
+function Stat({ value, label, tone }: {
+  value: string;
+  label: string;
+  tone: "warn" | "primary" | "muted";
+}) {
+  const color = tone === "warn" ? "text-warn" : tone === "primary" ? "text-primary" : "text-foreground/40";
+  return (
+    <div className="space-y-1">
+      <div className={`font-display text-3xl font-bold tabular-nums ${color}`}>{value}</div>
+      <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{label}</div>
     </div>
   );
 }

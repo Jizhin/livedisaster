@@ -1,7 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { Analytics } from "@vercel/analytics/react";
 import { LanguageProvider } from "./i18n/LanguageContext";
 import { AdminLogin } from "./pages/AdminLogin";
 import { AdminPanel } from "./pages/AdminPanel";
@@ -21,6 +20,5 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         </Routes>
       </BrowserRouter>
     </LanguageProvider>
-    <Analytics />
   </React.StrictMode>
 );

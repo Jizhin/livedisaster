@@ -29,6 +29,8 @@ class Report(Base):
     country: Mapped[str | None] = mapped_column(String(80), nullable=True)
     pincode: Mapped[str | None] = mapped_column(String(20), nullable=True)
     is_approved: Mapped[bool] = mapped_column(default=True, index=True)
+    severity: Mapped[str] = mapped_column(String(10), default="warn", server_default="warn")
+    category: Mapped[str | None] = mapped_column(String(40), nullable=True)
     source_type: Mapped[str] = mapped_column(String(20), default="community")
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

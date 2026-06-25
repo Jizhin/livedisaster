@@ -21,7 +21,11 @@ def _serialize_report(db: Session, report: Report) -> ReportRead:
 
 
 def recent_reports(db: Session, limit: int = 6) -> list[ReportRead]:
-    return [_serialize_report(db, r) for r in report_crud.list_latest(db, min(limit, 20))]
+    return [_serialize_report(db, r) for r in report_crud.list_latest(db, min(limit, 50))]
+
+
+def feed_all_reports(db: Session, limit: int = 40) -> list[ReportRead]:
+    return [_serialize_report(db, r) for r in report_crud.list_latest(db, min(limit, 50))]
 
 
 def district_feed(db: Session, district_slug: str, sort: str = "newest", date_filter: str = "today") -> list[ReportRead]:
