@@ -74,11 +74,22 @@ type ApiReport = {
   images: Array<{ file_path: string }>;
 };
 
+type ApiComment = { id: number; author_name: string; content: string; created_at: string };
+type ApiReportDetail = ApiReport & {
+  confirmed_count?: number;
+  incorrect_count?: number;
+  resolved_count?: number;
+  comment_count?: number;
+  views_count?: number;
+  status?: string;
+  comments?: ApiComment[];
+};
+
 /* ─── District constants ─────────────────────────────────────── */
 
 const DISTRICTS: District[] = [
   { code: "KL-01", name: "Trivandrum",     slug: "trivandrum",     lat: 8.5241,  lon: 76.9366 },
-  { code: "KL-02", name: "Kollam",          slug: "kollam",          lat: 8.8932,  lon: 76.6141 },
+  { code: "KL-02", name: "Kollam",         slug: "kollam",         lat: 8.8932,  lon: 76.6141 },
   { code: "KL-03", name: "Pathanamthitta", slug: "pathanamthitta", lat: 9.2648,  lon: 76.787  },
   { code: "KL-04", name: "Alappuzha",      slug: "alappuzha",      lat: 9.4981,  lon: 76.3388 },
   { code: "KL-05", name: "Kottayam",       slug: "kottayam",       lat: 9.5916,  lon: 76.5222 },
@@ -92,6 +103,16 @@ const DISTRICTS: District[] = [
   { code: "KL-13", name: "Kannur",         slug: "kannur",         lat: 11.8745, lon: 75.3704 },
   { code: "KL-14", name: "Kasaragod",      slug: "kasaragod",      lat: 12.4996, lon: 74.9869 },
 ];
+
+const CATEGORY_META: Record<string, { emoji: string; label: string }> = {
+  "Flood":             { emoji: "🌊", label: "Flood" },
+  "Landslide":         { emoji: "⛰️", label: "Landslide" },
+  "Road Damage":       { emoji: "🚧", label: "Road Damage" },
+  "Power Outage":      { emoji: "⚡", label: "Power Outage" },
+  "Medical Emergency": { emoji: "🚨", label: "Medical" },
+  "Fire":              { emoji: "🔥", label: "Fire" },
+  "Other":             { emoji: "📌", label: "Other" },
+};
 
 const KERALA_CENTER = { lat: 10.5, lon: 76.3 };
 const SEVERITY_RANK: Record<Severity, number> = { safe: 0, warn: 1, critical: 2 };
@@ -187,12 +208,20 @@ function formatAlertWindow(iso: string | null): string {
   return d.toLocaleString("en-IN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" });
 }
 
-const severityColor = (s: Severity) =>
-  s === "critical" ? "bg-critical" : s === "warn" ? "bg-warn" : "bg-primary";
-const severityText = (s: Severity) =>
-  s === "critical" ? "text-critical" : s === "warn" ? "text-warn" : "text-primary";
-const severityBorder = (s: Severity) =>
-  s === "critical" ? "border-critical" : s === "warn" ? "border-warn" : "border-primary";
+const catEmoji = (c: string | null) => CATEGORY_META[c ?? ""]?.emoji ?? "📌";
+
+const sevText = (s: Severity) =>
+  s === "critical" ? "text-destructive" : s === "warn" ? "text-warn" : "text-success";
+
+const sevBadge = (s: Severity) =>
+  s === "critical"
+    ? "bg-destructive/10 text-destructive border-destructive/25"
+    : s === "warn"
+    ? "bg-warn/15 text-warn border-warn/25"
+    : "bg-success/10 text-success border-success/25";
+
+const sevBorderL = (s: Severity) =>
+  s === "critical" ? "border-l-destructive" : s === "warn" ? "border-l-warn" : "border-l-success";
 
 /* ─── Hooks ─────────────────────────────────────────────────── */
 
@@ -235,17 +264,6 @@ async function reverseGeocode(lat: number, lon: number): Promise<Place | null> {
     return toPlace(f);
   } catch { return null; }
 }
-
-type ApiComment = { id: number; author_name: string; content: string; created_at: string };
-type ApiReportDetail = ApiReport & {
-  confirmed_count?: number;
-  incorrect_count?: number;
-  resolved_count?: number;
-  comment_count?: number;
-  views_count?: number;
-  status?: string;
-  comments?: ApiComment[];
-};
 
 function useReportDetail(reportId: string | null) {
   const [data, setData] = useState<ApiReportDetail | null>(null);
@@ -340,265 +358,433 @@ function useLocalTime() {
   return time;
 }
 
-/* ─── Main page ─────────────────────────────────────────────── */
+/* ─── Module-level welcome flag ──────────────────────────────── */
 
-// Module-level flag: survives re-renders, resets only on full page reload
 let _welcomeDismissed = false;
+
+/* ─── Site Header ────────────────────────────────────────────── */
+
+function SiteHeader({
+  reportsCount,
+  status,
+  onPost,
+  lang,
+  toggle,
+}: {
+  reportsCount: number;
+  status: "connecting" | "live" | "offline";
+  onPost: () => void;
+  lang: string;
+  toggle: () => void;
+}) {
+  return (
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-md">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <div className="flex items-center gap-2.5">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary font-display text-lg font-bold text-primary-foreground">
+            L
+          </div>
+          <div className="leading-tight">
+            <div className="font-display text-lg font-semibold tracking-tight">
+              Live<span className="text-accent">Kerala</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+              <span className="live-dot" />
+              {status === "live"
+                ? `${reportsCount} live reports`
+                : status === "connecting"
+                ? "Connecting…"
+                : "Offline"}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggle}
+            className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+          >
+            {lang === "en" ? "ML" : "EN"}
+          </button>
+          <button
+            type="button"
+            onClick={onPost}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent px-3.5 py-2 text-sm font-semibold text-accent-foreground transition hover:brightness-105"
+          >
+            <span aria-hidden>＋</span>
+            <span className="hidden sm:inline">Post update</span>
+            <span className="sm:hidden">Post</span>
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/* ─── Main page ─────────────────────────────────────────────── */
 
 export function HomePage() {
   const { lang, t, toggle } = useLanguage();
   const time = useLocalTime();
   const { reports, status, flashId } = useLiveReports(40);
   const { alerts, status: alertStatus } = useKeralaAlerts();
-  const tickerItems = useMemo(() => {
-    if (alerts.length === 0) return [];
-    return [...alerts, ...alerts];
-  }, [alerts]);
-  const topAlert = alerts[0] ?? null;
 
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [districtFocus, setDistrictFocus] = useState<string | null>(null);
-
   const [welcomeOpen, setWelcomeOpen] = useState(() => !_welcomeDismissed);
   const dataReady = status === "live" && alertStatus !== "loading";
+
+  const [filterDistrict, setFilterDistrict] = useState("all");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   function dismissWelcome() {
     _welcomeDismissed = true;
     setWelcomeOpen(false);
   }
 
-  return (
-    <div className="min-h-screen w-full bg-background text-foreground p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+  const filteredReports = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return reports
+      .filter((r) => filterDistrict === "all" || r.district === filterDistrict)
+      .filter((r) => filterCategory === "all" || r.category === filterCategory)
+      .filter(
+        (r) =>
+          !q ||
+          r.message.toLowerCase().includes(q) ||
+          (r.place ?? "").toLowerCase().includes(q),
+      );
+  }, [reports, filterDistrict, filterCategory, searchQuery]);
 
-        {/* Header */}
-        <header className="flex justify-between items-end border-b border-surface pb-6 gap-4">
-          <div className="space-y-1">
-            <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-extrabold uppercase leading-none">
-              {t.mainTitle}
-            </h1>
-            <p className="font-display text-primary text-xs sm:text-sm uppercase tracking-widest font-bold">
-              {t.keralaDisasterWatch}
-            </p>
-          </div>
-          <div className="flex items-end gap-3">
-            <div className="hidden md:block text-right">
-              <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">{t.localTime}</div>
-              <div className="font-display text-base font-bold tabular-nums">{time || "—"}</div>
-            </div>
+  const topDistricts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of reports) counts.set(r.district, (counts.get(r.district) ?? 0) + 1);
+    return DISTRICTS.map((d) => ({ ...d, count: counts.get(d.name) ?? 0 }))
+      .filter((d) => d.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [reports]);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <SiteHeader
+        reportsCount={reports.length}
+        status={status}
+        onPost={() => (selectedPlace ? setReportOpen(true) : undefined)}
+        lang={lang}
+        toggle={toggle}
+      />
+
+      <main className="mx-auto max-w-6xl px-4 pb-20 pt-6 sm:px-6 sm:pt-10">
+
+        {/* ── Hero ── */}
+        <section className="mb-8">
+          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <span className="live-dot" />
+            Live across 14 districts · {time || "—"}
+          </p>
+          <h1 className="font-display text-3xl font-semibold leading-tight tracking-tight text-balance text-foreground sm:text-5xl">
+            What's happening across{" "}
+            <span className="text-accent">Kerala</span>, right now.
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+            <span className="font-semibold text-foreground">{reports.length} reports</span>{" "}
+            in the last 24 hours. Confirm what you've seen or report an incident from your area.
+          </p>
+        </section>
+
+        {/* ── Composer / Location picker ── */}
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] sm:p-5">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {t.step1Location}
+          </p>
+          <LocationPicker selected={selectedPlace} onSelect={setSelectedPlace} />
+          {selectedPlace && (
             <button
               type="button"
-              onClick={toggle}
-              className="font-display text-xs uppercase tracking-widest font-bold px-3 py-2 border border-surface hover:border-primary transition-colors"
+              onClick={() => setReportOpen(true)}
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:brightness-105"
             >
-              {lang === "en" ? "ML" : "EN"}
+              <span aria-hidden>＋</span> Post update for {selectedPlace.name}
             </button>
-          </div>
-        </header>
-
-        {/* Official Alerts Ticker */}
-        <div className="bg-surface border-y border-primary/20 overflow-hidden py-3">
-          {tickerItems.length === 0 ? (
-            <div className="font-display text-xs uppercase font-bold tracking-wider text-muted-foreground px-4">
-              {alertStatus === "loading"
-                ? t.fetchingAdvisories
-                : alertStatus === "error"
-                  ? t.advisoryFeedUnavail
-                  : t.noActiveAdvisories}
-            </div>
-          ) : (
-            <div className="flex whitespace-nowrap gap-8 font-display text-xs uppercase font-bold tracking-wider animate-ticker w-max">
-              {tickerItems.map((a, i) => (
-                <span key={`${a.id}-${i}`} className="flex items-center gap-2">
-                  <span className={severityText(a.severity)}>●</span>
-                  <span className="text-foreground">{a.district ?? "Kerala"}:</span>
-                  <span className="text-muted-foreground">{a.disasterType} · {a.source}</span>
-                  <span className="text-muted-foreground/40 ml-4">|</span>
-                </span>
-              ))}
-            </div>
           )}
         </div>
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* ── Filter bar ── */}
+        <div className="mt-4 rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-card)]">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search reports or localities…"
+              className="min-w-0 flex-1 rounded-full border border-border bg-background px-3.5 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <select
+              value={filterDistrict}
+              onChange={(e) => setFilterDistrict(e.target.value)}
+              className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground"
+            >
+              <option value="all">All districts</option>
+              {DISTRICTS.map((d) => (
+                <option key={d.code} value={d.name}>{d.name}</option>
+              ))}
+            </select>
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground"
+            >
+              <option value="all">All categories</option>
+              {Object.entries(CATEGORY_META).map(([k, v]) => (
+                <option key={k} value={k}>{v.emoji} {v.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
-          {/* Left: Featured alert + Report action */}
-          <div className="lg:col-span-8 space-y-6">
+        {/* ── Main 2-col grid ── */}
+        <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
 
-            {topAlert ? (
-              <article className={`relative border-l-4 p-6 ${
-                topAlert.severity === "critical" ? "bg-critical/10 border-critical"
-                  : topAlert.severity === "warn" ? "bg-warn/10 border-warn"
-                  : "bg-primary/10 border-primary"
-              }`}>
-                <div className="flex justify-between items-start mb-4 gap-4 flex-wrap">
-                  <span className={`font-display px-3 py-1 text-xs font-bold uppercase tracking-widest ${
-                    topAlert.severity === "critical" ? "bg-critical text-critical-foreground"
-                      : topAlert.severity === "warn" ? "bg-warn text-background"
-                      : "bg-primary text-background"
-                  }`}>
-                    {topAlert.severityLabel} · {topAlert.source}
-                  </span>
-                  <span className="text-xs text-muted-foreground font-display">
-                    {formatAlertWindow(topAlert.effectiveStart)}
-                  </span>
-                </div>
-                <h2 className="font-display text-2xl md:text-3xl font-bold mb-3 leading-tight">
-                  {topAlert.district ?? "Kerala"}: {topAlert.disasterType}
-                </h2>
-                <p className="text-base md:text-lg text-foreground/80 mb-4">
-                  {topAlert.message || topAlert.areaDescription}
-                </p>
-                <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
-                  Area: {topAlert.areaDescription}
-                </div>
-              </article>
-            ) : (
-              <article className="relative bg-surface border-l-4 border-primary/40 p-6">
-                <div className="font-display text-[10px] uppercase tracking-widest text-primary font-bold mb-2">{t.allClearFeed}</div>
-                <h2 className="font-display text-2xl md:text-3xl font-bold mb-3 leading-tight">
-                  {t.noActiveSachet}
-                </h2>
-                <p className="text-base text-foreground/70">
-                  {t.crowdSourcedNote}
-                </p>
-              </article>
-            )}
-
-            <div className="bg-surface p-6 space-y-5">
-              <div>
-                <label className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground mb-3 font-bold">
-                  {t.step1Location}
-                </label>
-                <LocationPicker selected={selectedPlace} onSelect={setSelectedPlace} />
+          {/* Left: chips + feed */}
+          <div className="min-w-0">
+            {/* District chips */}
+            <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
+              <div className="flex w-max gap-2 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setFilterDistrict("all")}
+                  className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
+                    filterDistrict === "all"
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border bg-card text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  All Kerala
+                </button>
+                {DISTRICTS.map((d) => {
+                  const cnt = reports.filter((r) => r.district === d.name).length;
+                  const active = filterDistrict === d.name;
+                  return (
+                    <button
+                      key={d.code}
+                      type="button"
+                      onClick={() => setFilterDistrict(active ? "all" : d.name)}
+                      className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
+                        active
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-border bg-card text-foreground hover:bg-secondary"
+                      }`}
+                    >
+                      <span>{d.name}</span>
+                      {cnt > 0 && (
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                            active
+                              ? "bg-background/15 text-background"
+                              : "bg-secondary text-muted-foreground"
+                          }`}
+                        >
+                          {cnt}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-              <button
-                type="button"
-                disabled={!selectedPlace}
-                onClick={() => setReportOpen(true)}
-                className="w-full flex flex-col items-start p-6 bg-background border border-warn/30 enabled:hover:border-warn transition-all text-left group disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <div className="flex items-center justify-between w-full mb-4">
-                  <div className="w-10 h-10 rounded-full bg-warn/20 flex items-center justify-center group-enabled:group-hover:scale-110 transition-transform">
-                    <div className="w-4 h-4 bg-warn rotate-45" />
-                  </div>
-                  <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">{t.step2Label}</span>
-                </div>
-                <span className="font-display text-xl font-bold mb-1 uppercase tracking-tight">{t.reportAlertLabel}</span>
-                <span className="text-sm text-muted-foreground">
-                  {selectedPlace
-                    ? `${t.submitForLocation} ${selectedPlace.name}, ${selectedPlace.district}.`
-                    : t.searchLocHint}
-                </span>
-              </button>
+            </div>
+
+            {/* Feed header */}
+            <div className="mt-4 flex items-center justify-between">
+              <h2 className="font-display text-xl font-semibold">Latest updates</h2>
+              <span className="text-xs font-medium text-muted-foreground">
+                {filteredReports.length} shown · newest first
+              </span>
+            </div>
+
+            {/* Report list */}
+            <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+              {filteredReports.length === 0 ? (
+                <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  No reports match these filters.
+                </p>
+              ) : (
+                <ul>
+                  {filteredReports.map((r) => (
+                    <ReportRowItem key={r.id} report={r} flash={flashId === r.id} />
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
 
-          {/* Right: Stats + Live Feed */}
-          <div className="lg:col-span-4 space-y-6">
-            <div className="bg-surface p-6">
-              <h3 className="font-display text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6">{t.keralaOverview}</h3>
-              <div className="grid grid-cols-2 gap-6">
-                <Stat value={String(alerts.filter((a) => a.severity !== "safe").length)} label={t.officialAlerts} tone="warn" />
-                <Stat value={String(reports.length)} label={t.crowdReports} tone="primary" />
-                <Stat
-                  value={String(new Set([
-                    ...alerts.map((a) => a.district).filter(Boolean),
-                    ...reports.map((r) => r.district),
-                  ]).size)}
-                  label={t.districtsActive}
-                  tone="warn"
-                />
-                <Stat
-                  value={String(new Set([
-                    ...alerts.filter((a) => a.severity === "critical").map((a) => a.district),
-                    ...reports.filter((r) => r.severity === "critical").map((r) => r.district),
-                  ].filter(Boolean)).size)}
-                  label={t.criticalZones}
-                  tone="muted"
-                />
-              </div>
-            </div>
+          {/* Right rail */}
+          <div className="hidden lg:block">
+            <div className="sticky top-24 space-y-5">
 
-            <div className="bg-surface flex flex-col h-[400px]">
-              <div className="p-4 border-b border-background/40 flex justify-between items-center gap-2">
-                <h3 className="font-display text-xs font-bold uppercase tracking-widest">{t.liveReports}</h3>
-                <div className="flex items-center gap-2 font-display text-[10px] uppercase tracking-widest text-muted-foreground">
-                  <span>{status === "live" ? t.statusLive : status === "connecting" ? t.statusConnecting : t.statusOffline}</span>
-                  <span className={`w-2 h-2 rounded-full ${
-                    status === "live" ? "bg-primary animate-pulse"
-                      : status === "connecting" ? "bg-warn animate-pulse"
-                      : "bg-critical"
-                  }`} />
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {reports.length === 0 && status !== "connecting" && (
-                  <div className="text-center py-8 text-muted-foreground/60 italic text-xs">{t.noRecentAlerts}</div>
+              {/* Official alerts */}
+              <section className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+                <h3 className="font-display text-base font-semibold">{t.officialAdvisories}</h3>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">NDMA Sachet · IMD · KSDMA</p>
+                {alertStatus === "loading" ? (
+                  <p className="mt-3 animate-pulse text-xs text-muted-foreground">{t.fetchingAdvisories}</p>
+                ) : alerts.length === 0 ? (
+                  <p className="mt-3 text-xs italic text-muted-foreground">{t.noActiveAdvisories}</p>
+                ) : (
+                  <ul className="mt-3 space-y-2">
+                    {alerts.slice(0, 4).map((a) => (
+                      <li
+                        key={a.id}
+                        className={`rounded-lg border-l-2 py-2 pl-3 text-xs ${sevBorderL(a.severity)} ${
+                          a.severity === "critical"
+                            ? "bg-destructive/5"
+                            : a.severity === "warn"
+                            ? "bg-warn/5"
+                            : "bg-success/5"
+                        }`}
+                      >
+                        <div className={`font-semibold ${sevText(a.severity)}`}>
+                          {a.district ?? "Kerala"} · {a.disasterType}
+                        </div>
+                        <div className="mt-0.5 truncate text-muted-foreground">{a.source}</div>
+                      </li>
+                    ))}
+                    {alerts.length > 4 && (
+                      <li className="pt-1 text-center text-xs text-muted-foreground">
+                        +{alerts.length - 4} more
+                      </li>
+                    )}
+                  </ul>
                 )}
-                {reports.slice(0, 20).map((r) => (
-                  <FeedRow key={r.id} report={r} flash={flashId === r.id} />
-                ))}
-              </div>
+              </section>
+
+              {/* Most active districts */}
+              {topDistricts.length > 0 && (
+                <section className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+                  <h3 className="font-display text-base font-semibold">Most active districts</h3>
+                  <ul className="mt-3 space-y-1">
+                    {topDistricts.map((d) => (
+                      <li key={d.code}>
+                        <button
+                          type="button"
+                          onClick={() => setDistrictFocus(d.name)}
+                          className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm transition hover:bg-secondary"
+                        >
+                          <span className="font-medium text-foreground">{d.name}</span>
+                          <span className="tabular-nums text-xs font-semibold text-accent">
+                            {d.count}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {/* Stats */}
+              <section className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+                <h3 className="font-display text-base font-semibold">Overview</h3>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="font-display text-2xl font-semibold tabular-nums text-accent">
+                      {alerts.filter((a) => a.severity !== "safe").length}
+                    </div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {t.officialAlerts}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-display text-2xl font-semibold tabular-nums text-primary">
+                      {reports.length}
+                    </div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {t.crowdReports}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-display text-2xl font-semibold tabular-nums">
+                      {new Set([
+                        ...alerts.map((a) => a.district).filter(Boolean),
+                        ...reports.map((r) => r.district),
+                      ]).size}
+                    </div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {t.districtsActive}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-display text-2xl font-semibold tabular-nums text-destructive">
+                      {reports.filter((r) => r.severity === "critical").length}
+                    </div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {t.criticalZones}
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
         </div>
 
-        {/* District Grid */}
-        <section className="space-y-4 pt-8 border-t border-surface">
-          <h3 className="font-display text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            {t.allDistricts} · {t.tapToInspect}
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-px bg-surface border border-surface">
+        {/* ── All 14 districts ── */}
+        <section className="mt-16 border-t border-border pt-8">
+          <h3 className="font-display text-lg font-semibold">{t.allDistricts}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{t.tapToInspect}</p>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
             {DISTRICTS.map((d) => {
               const dReports = reports.filter((r) => r.district === d.name);
               const dAlerts = alerts.filter((a) => a.district === d.name);
               const total = dReports.length + dAlerts.length;
-              const sev: Severity = maxSeverity([
+              const sev = maxSeverity([
                 ...dReports.map((r) => ({ severity: r.severity })),
                 ...dAlerts.map((a) => ({ severity: a.severity })),
               ]);
-              const load = total === 0 ? 0 : Math.min(1, total / 8);
               return (
                 <button
                   key={d.code}
                   type="button"
                   onClick={() => setDistrictFocus(d.name)}
-                  className="bg-background p-4 hover:bg-surface transition-colors text-left"
+                  className="group flex flex-col items-start rounded-2xl border border-border bg-card p-3 text-left shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:shadow-md"
                 >
-                  <div className="font-display text-[10px] uppercase text-muted-foreground mb-2 font-bold flex justify-between">
-                    <span>{d.code}</span>
-                    {total > 0 && <span className={severityText(sev)}>{total}</span>}
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {d.code}
                   </div>
-                  <div className="font-display text-sm font-bold uppercase tracking-tight">{d.name}</div>
-                  <div className="mt-4 h-1 w-full bg-foreground/5 rounded-full overflow-hidden">
-                    {total > 0 && (
-                      <div
-                        className={`h-full ${severityColor(sev)} ${sev === "critical" ? "animate-pulse" : ""}`}
-                        style={{ width: `${Math.max(8, load * 100)}%` }}
-                      />
-                    )}
+                  <div className="mt-1 font-display text-sm font-semibold leading-snug text-foreground">
+                    {d.name}
                   </div>
+                  {total > 0 && (
+                    <div className={`mt-1 text-[10px] font-bold tabular-nums ${sevText(sev)}`}>
+                      {total} active
+                    </div>
+                  )}
+                  <div
+                    className={`mt-2 h-1 w-full rounded-full ${
+                      total > 0
+                        ? sev === "critical"
+                          ? "bg-destructive"
+                          : sev === "warn"
+                          ? "bg-warn"
+                          : "bg-success"
+                        : "bg-secondary"
+                    }`}
+                    style={{ opacity: total > 0 ? Math.max(0.3, Math.min(1, total / 6)) : 0.2 }}
+                  />
                 </button>
               );
             })}
           </div>
         </section>
 
-        <footer className="pt-8 pb-4 text-center font-display text-[10px] uppercase tracking-widest text-muted-foreground/60">
+        <footer className="mt-16 border-t border-border pt-6 text-center text-xs text-muted-foreground">
           {t.communityPowered}
         </footer>
-      </div>
+      </main>
 
+      {/* ── Modals ── */}
       {welcomeOpen && (
-        <WelcomeModal
-          dataReady={dataReady}
-          lang={lang}
-          t={t}
-          onDismiss={dismissWelcome}
-        />
+        <WelcomeModal dataReady={dataReady} lang={lang} t={t} onDismiss={dismissWelcome} />
       )}
 
       {reportOpen && selectedPlace && (
@@ -643,48 +829,44 @@ function WelcomeModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/90 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md bg-surface border border-primary/30 flex flex-col overflow-hidden">
-        {/* Title bar */}
-        <div className={`h-1 w-full transition-all duration-700 ${dataReady ? "bg-primary" : "bg-warn/60 animate-pulse"}`} />
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+        <div className={`h-1 w-full transition-all duration-700 ${dataReady ? "bg-success" : "bg-accent animate-pulse"}`} />
         <div className="p-6 space-y-5">
           <div className="space-y-1">
-            <div className="font-display text-[10px] uppercase tracking-[0.3em] text-primary font-bold">
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">
               {t.welcomeTag}
-            </div>
-            <h2 className="font-display text-2xl font-extrabold uppercase leading-tight">
-              {t.welcomeHeadline}
-            </h2>
-            <p className="text-sm text-foreground/70">{t.welcomeSub}</p>
+            </p>
+            <h2 className="font-display text-2xl font-semibold leading-tight">{t.welcomeHeadline}</h2>
+            <p className="text-sm text-muted-foreground">{t.welcomeSub}</p>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             {steps.map((s, i) => (
-              <div key={i} className="flex items-start gap-3 bg-background/60 px-4 py-3">
-                <span className="text-xl shrink-0 mt-0.5">{s.icon}</span>
+              <div key={i} className="flex items-start gap-3 rounded-xl bg-secondary/60 px-4 py-3">
+                <span className="mt-0.5 shrink-0 text-xl">{s.icon}</span>
                 <div>
-                  <div className="font-display text-xs font-bold uppercase tracking-widest mb-0.5">{s.title}</div>
-                  <div className="text-xs text-foreground/60">{s.desc}</div>
+                  <div className="text-xs font-bold uppercase tracking-widest">{s.title}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">{s.desc}</div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Loading / ready state */}
           <div className="flex items-center gap-3">
             {dataReady ? (
-              <span className="font-display text-[10px] uppercase tracking-widest text-primary font-bold flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-primary" /> {t.welcomeReady}
+              <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-success">
+                <span className="h-2 w-2 rounded-full bg-success" /> {t.welcomeReady}
               </span>
             ) : (
-              <span className="font-display text-[10px] uppercase tracking-widest text-warn/80 flex items-center gap-1.5 animate-pulse">
-                <span className="w-2 h-2 rounded-full bg-warn" /> {t.welcomeLoading}
+              <span className="flex animate-pulse items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-warn">
+                <span className="h-2 w-2 rounded-full bg-warn" /> {t.welcomeLoading}
               </span>
             )}
             <button
               type="button"
               onClick={onDismiss}
-              className="ml-auto font-display text-xs uppercase tracking-widest font-bold px-5 py-2.5 bg-primary text-background hover:bg-primary/90 transition-colors"
+              className="ml-auto rounded-full bg-accent px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-accent-foreground transition hover:brightness-105"
             >
               {t.welcomeBtn}
             </button>
@@ -748,60 +930,58 @@ function LocationPicker({
             setOpen(true);
             if (selected) onSelect(null);
           }}
-          placeholder="Search your place (e.g. Payyannur, Kakkanad...)"
-          className="flex-1 bg-background border border-surface focus:border-primary px-4 py-3 text-sm outline-none transition-colors placeholder:text-muted-foreground/60"
+          placeholder="Search your place (e.g. Payyannur, Kakkanad…)"
+          className="flex-1 rounded-full border border-border bg-background px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30 transition-shadow"
         />
         <button
           type="button"
           onClick={detectLocation}
           disabled={geoLoading}
-          className="font-display text-[10px] uppercase tracking-widest font-bold px-3 py-3 bg-background border border-primary/40 hover:border-primary text-primary disabled:opacity-50"
+          className="rounded-full border border-border bg-background px-3.5 py-2 text-xs font-semibold text-primary transition hover:bg-secondary disabled:opacity-50"
         >
-          {geoLoading ? "..." : "📍 Auto"}
+          {geoLoading ? "…" : "📍 Auto"}
         </button>
       </div>
 
       {selected && (
-        <div className="flex items-center justify-between bg-primary/10 border border-primary/30 px-3 py-2">
+        <div className="flex items-center justify-between rounded-full border border-primary/30 bg-primary/5 px-4 py-2">
           <div>
-            <div className="font-display text-sm font-bold">{selected.name}</div>
-            <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
-              {selected.district} District · {selected.context}
-            </div>
+            <span className="text-sm font-semibold text-foreground">{selected.name}</span>
+            <span className="ml-2 text-xs text-muted-foreground">
+              {selected.district} · {selected.context}
+            </span>
           </div>
           <button
             type="button"
             onClick={() => { onSelect(null); setQuery(""); }}
-            className="font-display text-[10px] uppercase text-muted-foreground hover:text-foreground"
+            className="ml-3 text-xs text-muted-foreground hover:text-foreground"
           >
-            Clear ✕
+            ✕
           </button>
         </div>
       )}
 
       {geoError && (
-        <div className="font-display text-[10px] uppercase tracking-widest text-critical">{geoError}</div>
+        <p className="text-xs font-semibold text-destructive">{geoError}</p>
       )}
 
       {open && !selected && (query.trim().length >= 2 || loading) && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-background border border-surface max-h-72 overflow-y-auto shadow-xl">
+        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
           {loading && (
-            <div className="px-3 py-2 font-display text-[10px] uppercase tracking-widest text-muted-foreground">Searching...</div>
+            <div className="px-4 py-2 text-xs text-muted-foreground">Searching…</div>
           )}
           {!loading && results.length === 0 && (
-            <div className="px-3 py-2 font-display text-[10px] uppercase tracking-widest text-muted-foreground">No places found in Kerala</div>
+            <div className="px-4 py-2 text-xs text-muted-foreground">No places found in Kerala</div>
           )}
           {results.map((p, i) => (
             <button
               key={`${p.lat}-${p.lon}-${i}`}
               type="button"
               onClick={() => { onSelect(p); setQuery(p.name); setOpen(false); }}
-              className="w-full text-left px-3 py-2 hover:bg-surface border-b border-surface/60 last:border-0"
+              className="w-full border-b border-border/50 px-4 py-2.5 text-left transition last:border-0 hover:bg-secondary"
             >
-              <div className="text-sm font-semibold">{p.name}</div>
-              <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">
-                {p.district} · {p.context}
-              </div>
+              <div className="text-sm font-semibold text-foreground">{p.name}</div>
+              <div className="text-xs text-muted-foreground">{p.district} · {p.context}</div>
             </button>
           ))}
         </div>
@@ -883,117 +1063,122 @@ function ReportAlertModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4"
       onClick={onClose}
     >
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={submit}
-        className="w-full max-w-lg bg-surface border border-warn/40 p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] max-h-[90vh] overflow-y-auto"
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="font-display text-[10px] uppercase tracking-widest text-warn font-bold mb-1">{t.newReportTag}</div>
-            <h2 className="font-display text-xl font-bold uppercase tracking-tight">{place.name}</h2>
-            <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
-              {place.district} District · {place.context}
+        <div className="p-5 sm:p-6 space-y-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-accent">{t.newReportTag}</p>
+              <h2 className="font-display text-xl font-semibold mt-0.5">{place.name}</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {place.district} District · {place.context}
+              </p>
+            </div>
+            <button type="button" onClick={onClose} className="text-xs font-semibold text-muted-foreground hover:text-foreground">
+              {t.close} ✕
+            </button>
+          </div>
+
+          <label className="block space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t.categoryLabel}</span>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              {Object.entries(CATEGORY_META).map(([k, v]) => (
+                <option key={k} value={k}>{v.emoji} {v.label}</option>
+              ))}
+              <option value="Other">📌 Other</option>
+            </select>
+          </label>
+
+          <div className="space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t.severityTagLabel}</span>
+            <div className="grid grid-cols-3 gap-2">
+              {(["safe", "warn", "critical"] as Severity[]).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSeverity(s)}
+                  className={`rounded-full border py-2 text-xs font-bold uppercase tracking-widest transition ${
+                    severity === s
+                      ? s === "critical"
+                        ? "border-destructive bg-destructive/10 text-destructive"
+                        : s === "warn"
+                        ? "border-warn bg-warn/10 text-warn"
+                        : "border-success bg-success/10 text-success"
+                      : "border-border text-muted-foreground hover:border-foreground/40"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
             </div>
           </div>
-          <button type="button" onClick={onClose} className="font-display text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground">
-            {t.close} ✕
-          </button>
-        </div>
 
-        <label className="block space-y-2">
-          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t.categoryLabel}</span>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="w-full bg-background border border-surface focus:border-primary px-3 py-2 text-sm outline-none"
-          >
-            {["Flood", "Landslide", "Road Damage", "Power Outage", "Medical Emergency", "Fire", "Other"].map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </label>
-
-        <div className="space-y-2">
-          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t.severityTagLabel}</span>
-          <div className="grid grid-cols-3 gap-2">
-            {(["safe", "warn", "critical"] as Severity[]).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setSeverity(s)}
-                className={`font-display text-xs uppercase tracking-widest font-bold py-2 border transition-colors ${
-                  severity === s
-                    ? s === "critical" ? "border-critical bg-critical/20 text-critical"
-                      : s === "warn" ? "border-warn bg-warn/20 text-warn"
-                      : "border-primary bg-primary/20 text-primary"
-                    : "border-surface text-muted-foreground hover:border-foreground/40"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <label className="block space-y-2">
-          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t.whatHappened}</span>
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={4}
-            maxLength={500}
-            placeholder={t.describePlaceholder}
-            className="w-full bg-background border border-surface focus:border-primary px-3 py-2 text-sm outline-none resize-none placeholder:text-muted-foreground/60"
-          />
-          <div className="flex justify-between text-[10px] font-display uppercase tracking-widest text-muted-foreground">
-            <span className={error ? "text-critical" : ""}>{error ?? t.visiblePublicly}</span>
-            <span>{message.length}/500</span>
-          </div>
-        </label>
-
-        <div className="space-y-2">
-          <span className="font-display block text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t.photoOptionalLabel}</span>
-          {imagePreview ? (
-            <div className="relative">
-              <img src={imagePreview} alt="preview" className="w-full max-h-56 object-cover border border-surface" />
-              <button
-                type="button"
-                onClick={() => pickImage(null)}
-                className="absolute top-2 right-2 font-display text-[10px] uppercase tracking-widest font-bold px-2 py-1 bg-background/80 border border-surface hover:border-critical"
-              >
-                {t.removePhoto}
-              </button>
+          <label className="block space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t.whatHappened}</span>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={4}
+              maxLength={500}
+              placeholder={t.describePlaceholder}
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none resize-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span className={error ? "text-destructive font-medium" : ""}>{error ?? t.visiblePublicly}</span>
+              <span>{message.length}/500</span>
             </div>
-          ) : (
-            <label className="flex items-center justify-center w-full border border-dashed border-surface hover:border-primary py-6 cursor-pointer text-center">
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => pickImage(e.target.files?.[0] ?? null)} />
-              <span className="font-display text-[10px] uppercase tracking-widest text-muted-foreground">{t.attachPhotoBtn}</span>
-            </label>
-          )}
-        </div>
+          </label>
 
-        <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onClose} className="font-display text-xs uppercase tracking-widest px-4 py-2 border border-surface hover:border-foreground/40">
-            {t.cancel}
-          </button>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="font-display text-xs uppercase tracking-widest font-bold px-4 py-2 bg-warn text-background hover:bg-warn/90 disabled:opacity-50"
-          >
-            {submitting ? t.submitting : t.submitReportBtn}
-          </button>
+          <div className="space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t.photoOptionalLabel}</span>
+            {imagePreview ? (
+              <div className="relative">
+                <img src={imagePreview} alt="preview" className="w-full max-h-48 rounded-xl object-cover border border-border" />
+                <button
+                  type="button"
+                  onClick={() => pickImage(null)}
+                  className="absolute right-2 top-2 rounded-full border border-border bg-card px-2 py-1 text-[10px] font-bold uppercase tracking-widest hover:border-destructive"
+                >
+                  {t.removePhoto}
+                </button>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border py-6 transition hover:border-primary hover:bg-secondary/40">
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => pickImage(e.target.files?.[0] ?? null)} />
+                <span className="text-xs font-semibold text-muted-foreground">{t.attachPhotoBtn}</span>
+              </label>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="rounded-full border border-border px-4 py-2 text-xs font-semibold hover:bg-secondary">
+              {t.cancel}
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="rounded-full bg-accent px-4 py-2 text-xs font-bold text-accent-foreground transition hover:brightness-105 disabled:opacity-50"
+            >
+              {submitting ? t.submitting : t.submitReportBtn}
+            </button>
+          </div>
         </div>
       </form>
     </div>
   );
 }
 
-/* ─── District Dossier Modal ────────────────────────────────── */
+/* ─── District Modal ────────────────────────────────────────── */
 
 function DistrictModal({
   district,
@@ -1025,65 +1210,76 @@ function DistrictModal({
     alerts[0]?.disasterType ??
     (reports.length > 0 ? "Crowd reports active" : "No active incidents");
 
+  const sevStrip = sev === "critical" ? "bg-destructive" : sev === "warn" ? "bg-warn" : "bg-success";
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-3xl bg-background border border-foreground/25 max-h-[85vh] flex flex-col overflow-hidden"
+        className="relative flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]"
       >
-        <header className={`relative border-b-2 ${severityBorder(sev)} bg-surface px-4 py-3`}>
-          <div className="flex items-center justify-between gap-3 mb-1.5">
-            <div className="font-display text-[9px] uppercase tracking-[0.3em] text-muted-foreground font-bold">
+        {/* Severity strip */}
+        <div className={`h-1 w-full shrink-0 ${sevStrip}`} />
+
+        {/* Header */}
+        <header className="shrink-0 border-b border-border px-5 py-4">
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">
               {t.dossierLabel}
-            </div>
-            <button type="button" onClick={onClose} className="font-display text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground">
+            </p>
+            <button type="button" onClick={onClose} className="text-xs font-semibold text-muted-foreground hover:text-foreground">
               {t.close} ✕
             </button>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="font-display text-xl md:text-2xl font-extrabold uppercase tracking-tight leading-none">{district}</h2>
-              <div className="font-display text-[10px] text-foreground/60 mt-0.5 uppercase tracking-widest">{headline}</div>
+              <h2 className="font-display text-2xl font-semibold tracking-tight">{district}</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">{headline}</p>
             </div>
             <div className="flex gap-4">
-              <DossierMetric value={alerts.length} label={t.officialLabel} tone={sev} />
-              <DossierMetric value={reports.length} label={t.crowdLabel} tone="primary" />
-              <DossierMetric value={places.length} label={t.placesMetricLabel} tone="muted" />
+              <DistrictStat value={alerts.length} label={t.officialLabel} color={sevText(sev)} />
+              <DistrictStat value={reports.length} label={t.crowdLabel} color="text-primary" />
+              <DistrictStat value={places.length} label={t.placesMetricLabel} color="text-muted-foreground" />
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto">
-          <section className="border-b border-surface">
-            <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-              <h3 className="font-display text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{t.officialAdvisories}</h3>
-              <span className="font-display text-[9px] uppercase tracking-widest text-muted-foreground/50">NDMA · IMD · KSDMA</span>
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto divide-y divide-border">
+          {/* Official advisories */}
+          <section>
+            <div className="flex items-center justify-between px-5 py-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t.officialAdvisories}</h3>
+              <span className="text-[10px] text-muted-foreground/60">NDMA · IMD · KSDMA</span>
             </div>
             {alerts.length === 0 ? (
-              <div className="px-4 pb-3 text-xs text-muted-foreground/70 italic">{t.noOfficialAdvisory} {district}.</div>
+              <p className="px-5 pb-4 text-xs italic text-muted-foreground">{t.noOfficialAdvisory} {district}.</p>
             ) : (
-              <div className="px-4 pb-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-                {alerts.map((a) => <OfficialAlertCard key={a.id} alert={a} />)}
+              <div className="grid grid-cols-1 gap-2 px-5 pb-4 md:grid-cols-2">
+                {alerts.map((a) => <ModalAlertCard key={a.id} alert={a} />)}
               </div>
             )}
           </section>
 
+          {/* Crowd reports */}
           <section>
-            <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-              <h3 className="font-display text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            <div className="px-5 py-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 {t.crowdBriefs} ({visibleReports.length})
               </h3>
             </div>
             {places.length > 0 && (
-              <div className="flex gap-1.5 overflow-x-auto px-4 pb-2">
+              <div className="flex gap-1.5 overflow-x-auto px-5 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <button
                   type="button"
                   onClick={() => setActivePlace(null)}
-                  className={`shrink-0 font-display text-[9px] uppercase tracking-widest font-bold px-2.5 py-1 border transition-colors ${
-                    activePlace === null ? "border-primary bg-primary/20 text-primary" : "border-surface text-muted-foreground hover:border-foreground/40"
+                  className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                    activePlace === null
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border bg-card text-foreground hover:bg-secondary"
                   }`}
                 >
                   {t.allPlaces}
@@ -1093,8 +1289,10 @@ function DistrictModal({
                     key={p}
                     type="button"
                     onClick={() => setActivePlace(p)}
-                    className={`shrink-0 font-display text-[9px] uppercase tracking-widest font-bold px-2.5 py-1 border transition-colors ${
-                      activePlace === p ? "border-primary bg-primary/20 text-primary" : "border-surface text-muted-foreground hover:border-foreground/40"
+                    className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                      activePlace === p
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border bg-card text-foreground hover:bg-secondary"
                     }`}
                   >
                     {p}
@@ -1102,14 +1300,14 @@ function DistrictModal({
                 ))}
               </div>
             )}
-            <div className="px-4 pb-4 space-y-1.5">
+            <div className="space-y-1.5 px-5 pb-5">
               {visibleReports.length === 0 ? (
-                <div className="text-center py-6 text-muted-foreground/60 italic text-xs font-display uppercase tracking-widest">
+                <p className="py-6 text-center text-xs italic text-muted-foreground">
                   {t.noCrowdReportsYet}{activePlace ? ` ${t.forLabel} ${activePlace}` : ""}.
-                </div>
+                </p>
               ) : (
                 visibleReports.map((r) => (
-                  <ReportCard key={r.id} report={r} onClick={() => setSelectedReport(r)} />
+                  <ModalReportCard key={r.id} report={r} onClick={() => setSelectedReport(r)} />
                 ))
               )}
             </div>
@@ -1117,10 +1315,7 @@ function DistrictModal({
         </div>
 
         {selectedReport && (
-          <ReportDetailPanel
-            report={selectedReport}
-            onBack={() => setSelectedReport(null)}
-          />
+          <ReportDetailPanel report={selectedReport} onBack={() => setSelectedReport(null)} />
         )}
       </div>
     </div>
@@ -1154,7 +1349,11 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
     if (voted) return;
     setVoted(kind);
     if (localCounts) {
-      setLocalCounts((c) => c ? ({ ...c, [kind === "confirm" ? "confirmed" : kind]: c[kind === "confirm" ? "confirmed" : kind as "incorrect" | "resolved"] + 1 }) : c);
+      setLocalCounts((c) =>
+        c
+          ? { ...c, [kind === "confirm" ? "confirmed" : kind]: c[kind === "confirm" ? "confirmed" : (kind as "incorrect" | "resolved")] + 1 }
+          : c,
+      );
     }
     await fetch(`${API_BASE}/reports/${report.id}/verifications`, {
       method: "POST",
@@ -1194,129 +1393,134 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
     : report.image_url;
 
   return (
-    <div className="absolute inset-0 bg-background z-10 flex flex-col overflow-hidden border-t-2 border-primary/60">
+    <div className="absolute inset-0 z-10 flex flex-col overflow-hidden rounded-2xl bg-card border-t-2 border-primary">
       {/* Header */}
-      <header className="flex items-center gap-3 px-4 py-2.5 border-b border-foreground/15 bg-surface shrink-0">
-        <button type="button" onClick={onBack}
-          className="font-display text-[10px] uppercase tracking-widest font-bold text-primary hover:text-foreground transition-colors">
+      <header className="flex shrink-0 items-center gap-3 border-b border-border bg-secondary/40 px-4 py-2.5">
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-xs font-semibold text-primary hover:text-foreground transition-colors"
+        >
           ← {t.backToList}
         </button>
-        <span className="text-foreground/20 text-xs">|</span>
-        <span className={`font-display text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 border ${
-          report.severity === "critical" ? "border-critical bg-critical/20 text-critical"
-            : report.severity === "warn" ? "border-warn bg-warn/20 text-warn"
-            : "border-primary bg-primary/20 text-primary"
-        }`}>{report.severity}</span>
-        {report.category && (
-          <span className="font-display text-[10px] uppercase tracking-widest text-foreground/60">{report.category}</span>
-        )}
-        <span className="font-display text-[10px] uppercase tracking-widest text-foreground/50 ml-auto">
-          {formatReportTime(report.created_at)}
+        <span className="text-border">|</span>
+        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${sevBadge(report.severity)}`}>
+          {report.severity}
         </span>
+        {report.category && (
+          <span className="text-xs text-muted-foreground">
+            {catEmoji(report.category)} {report.category}
+          </span>
+        )}
+        <span className="ml-auto text-xs text-muted-foreground">{formatReportTime(report.created_at)}</span>
       </header>
 
-      {/* Location + message — fixed, never scrolls */}
-      <div className="shrink-0 px-4 py-3 space-y-2 border-b border-foreground/10">
-        <div className="font-display text-[10px] uppercase tracking-widest text-foreground/50">
+      {/* Location + message (fixed) */}
+      <div className="shrink-0 space-y-2 border-b border-border px-4 py-3">
+        <p className="text-xs text-muted-foreground">
           📍 {report.place ? `${report.place}, ` : ""}{report.district}
-        </div>
+        </p>
         <p className="text-sm leading-relaxed text-foreground">{report.message}</p>
         {imgUrl && (
-          <img src={imgUrl} alt="" className="w-full max-h-32 object-cover border border-foreground/15" />
+          <img src={imgUrl} alt="" className="w-full max-h-32 rounded-xl object-cover border border-border" />
         )}
       </div>
 
-      {/* Vote buttons — fixed, never scrolls */}
-      <div className="shrink-0 px-4 py-3 border-b border-foreground/10">
-        <div className="font-display text-[10px] uppercase tracking-widest text-foreground font-bold mb-2">
+      {/* Votes (fixed) */}
+      <div className="shrink-0 border-b border-border px-4 py-3">
+        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-foreground">
           {t.communityVotesLabel}
-        </div>
+        </p>
         {loading ? (
-          <div className="font-display text-[10px] uppercase tracking-widest text-foreground/40 animate-pulse">{t.loadingDetail}</div>
+          <p className="animate-pulse text-xs text-muted-foreground">{t.loadingDetail}</p>
         ) : (
           <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               disabled={!!voted}
               onClick={() => vote("confirm")}
-              className={`font-display text-[10px] uppercase tracking-widest font-bold py-3 border transition-all disabled:cursor-default ${
+              className={`rounded-xl border py-3 text-[10px] font-bold uppercase tracking-widest transition disabled:cursor-default ${
                 voted === "confirm"
-                  ? "border-primary bg-primary/25 text-primary"
+                  ? "border-success bg-success/15 text-success"
                   : voted
-                  ? "border-foreground/10 text-foreground/25 bg-foreground/3"
-                  : "border-primary/50 text-primary bg-primary/8 hover:bg-primary/20 hover:border-primary"
+                  ? "border-border text-muted-foreground/40"
+                  : "border-success/40 bg-success/5 text-success hover:bg-success/15 hover:border-success"
               }`}
             >
-              <span className="block text-lg tabular-nums leading-none mb-0.5 font-extrabold">{localCounts?.confirmed ?? 0}</span>
+              <span className="block text-lg font-extrabold tabular-nums leading-none mb-0.5">
+                {localCounts?.confirmed ?? 0}
+              </span>
               {t.confirm}{voted === "confirm" && " ✓"}
             </button>
             <button
               type="button"
               disabled={!!voted}
               onClick={() => vote("incorrect")}
-              className={`font-display text-[10px] uppercase tracking-widest font-bold py-3 border transition-all disabled:cursor-default ${
+              className={`rounded-xl border py-3 text-[10px] font-bold uppercase tracking-widest transition disabled:cursor-default ${
                 voted === "incorrect"
-                  ? "border-warn bg-warn/25 text-warn"
+                  ? "border-destructive bg-destructive/15 text-destructive"
                   : voted
-                  ? "border-foreground/10 text-foreground/25 bg-foreground/3"
-                  : "border-warn/50 text-warn bg-warn/8 hover:bg-warn/20 hover:border-warn"
+                  ? "border-border text-muted-foreground/40"
+                  : "border-destructive/40 bg-destructive/5 text-destructive hover:bg-destructive/15 hover:border-destructive"
               }`}
             >
-              <span className="block text-lg tabular-nums leading-none mb-0.5 font-extrabold">{localCounts?.incorrect ?? 0}</span>
+              <span className="block text-lg font-extrabold tabular-nums leading-none mb-0.5">
+                {localCounts?.incorrect ?? 0}
+              </span>
               {t.incorrect}{voted === "incorrect" && " ✓"}
             </button>
             <button
               type="button"
               disabled={!!voted}
               onClick={() => vote("resolved")}
-              className={`font-display text-[10px] uppercase tracking-widest font-bold py-3 border transition-all disabled:cursor-default ${
+              className={`rounded-xl border py-3 text-[10px] font-bold uppercase tracking-widest transition disabled:cursor-default ${
                 voted === "resolved"
-                  ? "border-foreground/60 bg-foreground/15 text-foreground"
+                  ? "border-foreground/50 bg-foreground/10 text-foreground"
                   : voted
-                  ? "border-foreground/10 text-foreground/25 bg-foreground/3"
-                  : "border-foreground/35 text-foreground/70 bg-foreground/5 hover:bg-foreground/12 hover:border-foreground/60"
+                  ? "border-border text-muted-foreground/40"
+                  : "border-border text-muted-foreground hover:bg-secondary hover:border-foreground/40"
               }`}
             >
-              <span className="block text-lg tabular-nums leading-none mb-0.5 font-extrabold">{localCounts?.resolved ?? 0}</span>
+              <span className="block text-lg font-extrabold tabular-nums leading-none mb-0.5">
+                {localCounts?.resolved ?? 0}
+              </span>
               {t.resolvedV}{voted === "resolved" && " ✓"}
             </button>
           </div>
         )}
       </div>
 
-      {/* Comments list — only this scrolls */}
-      <div className="flex-1 overflow-y-auto min-h-0 px-4 py-3 space-y-2">
-        <div className="font-display text-[10px] uppercase tracking-widest text-foreground font-bold">
-          {t.discussionHd}
-        </div>
+      {/* Comments list (scrollable) */}
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
+        <p className="text-xs font-bold uppercase tracking-wider text-foreground">{t.discussionHd}</p>
         {comments.length === 0 ? (
-          <div className="font-display text-[10px] italic text-foreground/40">{t.noCommentsYet}</div>
+          <p className="text-xs italic text-muted-foreground">{t.noCommentsYet}</p>
         ) : (
           comments.map((c) => (
-            <div key={c.id} className="bg-surface border border-foreground/10 px-3 py-2">
-              <div className="font-display text-[9px] uppercase tracking-widest text-foreground/45 mb-1">
+            <div key={c.id} className="rounded-xl border border-border bg-secondary/40 px-3 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 {c.author_name} · {formatReportTime(c.created_at)}
-              </div>
-              <p className="text-sm text-foreground leading-snug">{c.content}</p>
+              </p>
+              <p className="mt-1 text-sm text-foreground leading-snug">{c.content}</p>
             </div>
           ))
         )}
       </div>
 
-      {/* Comment form — pinned to bottom, always visible */}
-      <div className="shrink-0 border-t border-foreground/15 bg-surface px-4 py-3">
+      {/* Comment form (pinned) */}
+      <div className="shrink-0 border-t border-border bg-secondary/30 px-4 py-3">
         <form onSubmit={submitComment} className="flex gap-2">
           <textarea
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
             rows={2}
             placeholder={t.commentPlaceholder}
-            className="flex-1 bg-background border border-foreground/20 focus:border-primary px-3 py-2 text-xs outline-none resize-none placeholder:text-foreground/35 text-foreground"
+            className="flex-1 resize-none rounded-xl border border-border bg-card px-3 py-2 text-xs outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30 text-foreground"
           />
           <button
             type="submit"
             disabled={posting || !commentText.trim()}
-            className="font-display text-[10px] uppercase tracking-widest font-bold px-4 bg-primary text-background hover:bg-primary/80 disabled:opacity-35 disabled:cursor-not-allowed shrink-0 transition-colors"
+            className="shrink-0 rounded-xl bg-accent px-4 text-[10px] font-bold uppercase tracking-widest text-accent-foreground transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {posting ? "…" : t.postComment}
           </button>
@@ -1328,98 +1532,101 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
 
 /* ─── Small components ──────────────────────────────────────── */
 
-function DossierMetric({ value, label, tone }: {
-  value: number;
-  label: string;
-  tone: Severity | "primary" | "muted";
-}) {
-  const color =
-    tone === "critical" ? "text-critical" : tone === "warn" ? "text-warn"
-      : tone === "primary" ? "text-primary" : tone === "safe" ? "text-primary"
-      : "text-foreground/50";
+function ReportRowItem({ report, flash }: { report: Report; flash: boolean }) {
+  const [open, setOpen] = useState(false);
+  const cat = CATEGORY_META[report.category ?? ""] ?? { emoji: "📌", label: "Other" };
+
+  return (
+    <li className={`group border-b border-border/70 last:border-b-0 ${flash ? "bg-accent/5" : ""}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="grid w-full grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 text-left transition hover:bg-secondary/60 sm:px-4"
+      >
+        <span
+          aria-hidden
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-secondary text-base"
+          title={cat.label}
+        >
+          {cat.emoji}
+        </span>
+        <span className="hidden w-14 shrink-0 text-xs font-medium tabular-nums text-muted-foreground sm:inline">
+          {formatReportTime(report.created_at)}
+        </span>
+        <span className="min-w-0">
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="shrink-0 text-xs font-semibold text-foreground">{report.district}</span>
+            {report.place && (
+              <span className="hidden shrink-0 text-[11px] text-muted-foreground sm:inline">· {report.place}</span>
+            )}
+            <span className="truncate text-sm text-foreground">{report.message}</span>
+          </span>
+          <span className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground sm:hidden">
+            {formatReportTime(report.created_at)}
+            {report.place && <span>· {report.place}</span>}
+          </span>
+        </span>
+        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${sevBadge(report.severity)}`}>
+          {report.severity}
+        </span>
+      </button>
+
+      {open && (
+        <div className="border-t border-border/50 bg-secondary/30 px-3 py-3 sm:px-4">
+          <p className="text-sm leading-relaxed text-foreground text-pretty">{report.message}</p>
+          {report.image_url && (
+            <img src={report.image_url} alt="" className="mt-2 w-full max-h-48 rounded-xl object-cover border border-border" />
+          )}
+          <p className="mt-2 text-xs text-muted-foreground">
+            📍 {report.place ? `${report.place}, ` : ""}{report.district} · {cat.emoji} {cat.label} · {formatReportTime(report.created_at)}
+          </p>
+        </div>
+      )}
+    </li>
+  );
+}
+
+function ModalReportCard({ report, onClick }: { report: Report; onClick: () => void }) {
+  const cat = CATEGORY_META[report.category ?? ""] ?? { emoji: "📌", label: "Other" };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex w-full items-start gap-3 rounded-xl border border-border bg-background p-3 text-left transition hover:border-primary/40 hover:bg-secondary/40"
+    >
+      <span className="mt-0.5 shrink-0 text-lg">{cat.emoji}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span className={`font-bold ${sevText(report.severity)}`}>{report.severity.toUpperCase()}</span>
+          <span>·</span>
+          <span>{report.place ?? report.district}</span>
+          <span className="ml-auto">{formatReportTime(report.created_at)}</span>
+        </div>
+        <p className="mt-0.5 text-sm text-foreground leading-snug line-clamp-2">{report.message}</p>
+      </div>
+    </button>
+  );
+}
+
+function ModalAlertCard({ alert }: { alert: OfficialAlert }) {
+  return (
+    <article className={`rounded-xl border-l-2 py-2 pl-3 pr-3 text-xs ${sevBorderL(alert.severity)} ${
+      alert.severity === "critical" ? "bg-destructive/5" : alert.severity === "warn" ? "bg-warn/5" : "bg-success/5"
+    }`}>
+      <div className={`font-semibold ${sevText(alert.severity)}`}>
+        {alert.severityLabel} · {alert.disasterType}
+      </div>
+      <div className="text-muted-foreground">{alert.source}</div>
+      {alert.message && <p className="mt-1 text-foreground/80 leading-snug line-clamp-2">{alert.message}</p>}
+    </article>
+  );
+}
+
+function DistrictStat({ value, label, color }: { value: number; label: string; color: string }) {
   return (
     <div className="text-right">
       <div className={`font-display text-xl font-bold tabular-nums leading-none ${color}`}>{value}</div>
-      <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground font-bold mt-0.5">{label}</div>
-    </div>
-  );
-}
-
-function OfficialAlertCard({ alert }: { alert: OfficialAlert }) {
-  return (
-    <article className={`bg-surface border-l-2 ${severityBorder(alert.severity)} px-3 py-2 space-y-1`}>
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className={`font-display text-[9px] uppercase tracking-widest font-bold ${severityText(alert.severity)}`}>
-            {alert.severityLabel} · {alert.disasterType}
-          </div>
-          <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground/70">{alert.source}</div>
-        </div>
-        <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground text-right shrink-0">
-          {formatAlertWindow(alert.effectiveStart)}
-        </div>
-      </div>
-      {alert.message && <p className="text-xs text-foreground/80 leading-snug">{alert.message}</p>}
-      <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground/60">Area: {alert.areaDescription}</div>
-    </article>
-  );
-}
-
-function FeedRow({ report, flash }: { report: Report; flash: boolean }) {
-  return (
-    <div className={`border-l-2 pl-3 py-1 transition-colors ${severityBorder(report.severity)} ${flash ? "bg-warn/10" : ""}`}>
-      <div className="font-display text-xs text-muted-foreground mb-1 flex items-center gap-2">
-        {flash && (
-          <span className="font-display text-[9px] uppercase tracking-widest font-bold bg-warn text-background px-1.5 py-0.5">New</span>
-        )}
-        <span>{report.place ? `${report.place}, ` : ""}{report.district}</span>
-        <span>· {formatReportTime(report.created_at)}</span>
-      </div>
-      <div className="text-sm font-semibold">{report.message}</div>
-      {report.image_url && (
-        <img src={report.image_url} alt="" className="mt-2 w-full max-h-32 object-cover border border-surface" />
-      )}
-    </div>
-  );
-}
-
-function ReportCard({ report, onClick }: { report: Report; onClick?: () => void }) {
-  return (
-    <article
-      className={`bg-background border-l-2 ${severityBorder(report.severity)} px-3 py-2 ${onClick ? "cursor-pointer hover:bg-surface/50 transition-colors" : ""}`}
-      onClick={onClick}
-    >
-      <div className="flex justify-between items-center gap-2 mb-0.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className={`font-display text-[9px] uppercase tracking-widest font-bold shrink-0 ${severityText(report.severity)}`}>
-            {report.severity}
-          </span>
-          <span className="font-display text-[9px] uppercase tracking-widest text-muted-foreground truncate">
-            {report.place ?? report.district}{report.category ? ` · ${report.category}` : ""}
-          </span>
-        </div>
-        <span className="font-display text-[9px] uppercase tracking-widest text-muted-foreground/70 shrink-0">
-          {formatReportTime(report.created_at)}
-        </span>
-      </div>
-      <p className="text-xs leading-snug text-foreground/90">{report.message}</p>
-      {report.image_url && (
-        <img src={report.image_url} alt="" className="mt-1.5 w-full max-h-20 object-cover border border-surface/60" />
-      )}
-    </article>
-  );
-}
-
-function Stat({ value, label, tone }: {
-  value: string;
-  label: string;
-  tone: "warn" | "primary" | "muted";
-}) {
-  const color = tone === "warn" ? "text-warn" : tone === "primary" ? "text-primary" : "text-foreground/40";
-  return (
-    <div className="space-y-1">
-      <div className={`font-display text-3xl font-bold tabular-nums ${color}`}>{value}</div>
-      <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{label}</div>
+      <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</div>
     </div>
   );
 }
