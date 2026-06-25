@@ -1215,101 +1215,92 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
         </span>
       </header>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto divide-y divide-foreground/10 min-h-0">
-        {/* Location + message */}
-        <div className="px-4 py-3 space-y-2">
-          <div className="font-display text-[10px] uppercase tracking-widest text-foreground/50">
-            📍 {report.place ? `${report.place}, ` : ""}{report.district}
-          </div>
-          <p className="text-sm leading-relaxed text-foreground">{report.message}</p>
-          {imgUrl && (
-            <img src={imgUrl} alt="" className="w-full max-h-40 object-cover border border-foreground/15 mt-1" />
-          )}
+      {/* Location + message — fixed, never scrolls */}
+      <div className="shrink-0 px-4 py-3 space-y-2 border-b border-foreground/10">
+        <div className="font-display text-[10px] uppercase tracking-widest text-foreground/50">
+          📍 {report.place ? `${report.place}, ` : ""}{report.district}
         </div>
+        <p className="text-sm leading-relaxed text-foreground">{report.message}</p>
+        {imgUrl && (
+          <img src={imgUrl} alt="" className="w-full max-h-32 object-cover border border-foreground/15" />
+        )}
+      </div>
 
-        {/* Vote buttons */}
-        <div className="px-4 py-3">
-          <div className="font-display text-[10px] uppercase tracking-widest text-foreground font-bold mb-2.5">
-            {t.communityVotesLabel}
-          </div>
-          {loading ? (
-            <div className="font-display text-[10px] uppercase tracking-widest text-foreground/40 animate-pulse">{t.loadingDetail}</div>
-          ) : (
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                disabled={!!voted}
-                onClick={() => vote("confirm")}
-                className={`font-display text-[10px] uppercase tracking-widest font-bold py-3 border transition-all disabled:cursor-default ${
-                  voted === "confirm"
-                    ? "border-primary bg-primary/25 text-primary"
-                    : voted
-                    ? "border-foreground/10 text-foreground/25 bg-foreground/3"
-                    : "border-primary/50 text-primary bg-primary/8 hover:bg-primary/20 hover:border-primary"
-                }`}
-              >
-                <span className="block text-lg tabular-nums leading-none mb-0.5 font-extrabold">
-                  {localCounts?.confirmed ?? 0}
-                </span>
-                {t.confirm}{voted === "confirm" && " ✓"}
-              </button>
-              <button
-                type="button"
-                disabled={!!voted}
-                onClick={() => vote("incorrect")}
-                className={`font-display text-[10px] uppercase tracking-widest font-bold py-3 border transition-all disabled:cursor-default ${
-                  voted === "incorrect"
-                    ? "border-warn bg-warn/25 text-warn"
-                    : voted
-                    ? "border-foreground/10 text-foreground/25 bg-foreground/3"
-                    : "border-warn/50 text-warn bg-warn/8 hover:bg-warn/20 hover:border-warn"
-                }`}
-              >
-                <span className="block text-lg tabular-nums leading-none mb-0.5 font-extrabold">
-                  {localCounts?.incorrect ?? 0}
-                </span>
-                {t.incorrect}{voted === "incorrect" && " ✓"}
-              </button>
-              <button
-                type="button"
-                disabled={!!voted}
-                onClick={() => vote("resolved")}
-                className={`font-display text-[10px] uppercase tracking-widest font-bold py-3 border transition-all disabled:cursor-default ${
-                  voted === "resolved"
-                    ? "border-foreground/60 bg-foreground/15 text-foreground"
-                    : voted
-                    ? "border-foreground/10 text-foreground/25 bg-foreground/3"
-                    : "border-foreground/35 text-foreground/70 bg-foreground/5 hover:bg-foreground/12 hover:border-foreground/60"
-                }`}
-              >
-                <span className="block text-lg tabular-nums leading-none mb-0.5 font-extrabold">
-                  {localCounts?.resolved ?? 0}
-                </span>
-                {t.resolvedV}{voted === "resolved" && " ✓"}
-              </button>
-            </div>
-          )}
+      {/* Vote buttons — fixed, never scrolls */}
+      <div className="shrink-0 px-4 py-3 border-b border-foreground/10">
+        <div className="font-display text-[10px] uppercase tracking-widest text-foreground font-bold mb-2">
+          {t.communityVotesLabel}
         </div>
-
-        {/* Comments list */}
-        <div className="px-4 py-3 space-y-2">
-          <div className="font-display text-[10px] uppercase tracking-widest text-foreground font-bold">
-            {t.discussionHd}
+        {loading ? (
+          <div className="font-display text-[10px] uppercase tracking-widest text-foreground/40 animate-pulse">{t.loadingDetail}</div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              disabled={!!voted}
+              onClick={() => vote("confirm")}
+              className={`font-display text-[10px] uppercase tracking-widest font-bold py-3 border transition-all disabled:cursor-default ${
+                voted === "confirm"
+                  ? "border-primary bg-primary/25 text-primary"
+                  : voted
+                  ? "border-foreground/10 text-foreground/25 bg-foreground/3"
+                  : "border-primary/50 text-primary bg-primary/8 hover:bg-primary/20 hover:border-primary"
+              }`}
+            >
+              <span className="block text-lg tabular-nums leading-none mb-0.5 font-extrabold">{localCounts?.confirmed ?? 0}</span>
+              {t.confirm}{voted === "confirm" && " ✓"}
+            </button>
+            <button
+              type="button"
+              disabled={!!voted}
+              onClick={() => vote("incorrect")}
+              className={`font-display text-[10px] uppercase tracking-widest font-bold py-3 border transition-all disabled:cursor-default ${
+                voted === "incorrect"
+                  ? "border-warn bg-warn/25 text-warn"
+                  : voted
+                  ? "border-foreground/10 text-foreground/25 bg-foreground/3"
+                  : "border-warn/50 text-warn bg-warn/8 hover:bg-warn/20 hover:border-warn"
+              }`}
+            >
+              <span className="block text-lg tabular-nums leading-none mb-0.5 font-extrabold">{localCounts?.incorrect ?? 0}</span>
+              {t.incorrect}{voted === "incorrect" && " ✓"}
+            </button>
+            <button
+              type="button"
+              disabled={!!voted}
+              onClick={() => vote("resolved")}
+              className={`font-display text-[10px] uppercase tracking-widest font-bold py-3 border transition-all disabled:cursor-default ${
+                voted === "resolved"
+                  ? "border-foreground/60 bg-foreground/15 text-foreground"
+                  : voted
+                  ? "border-foreground/10 text-foreground/25 bg-foreground/3"
+                  : "border-foreground/35 text-foreground/70 bg-foreground/5 hover:bg-foreground/12 hover:border-foreground/60"
+              }`}
+            >
+              <span className="block text-lg tabular-nums leading-none mb-0.5 font-extrabold">{localCounts?.resolved ?? 0}</span>
+              {t.resolvedV}{voted === "resolved" && " ✓"}
+            </button>
           </div>
-          {comments.length === 0 ? (
-            <div className="font-display text-[10px] italic text-foreground/40">{t.noCommentsYet}</div>
-          ) : (
-            comments.map((c) => (
-              <div key={c.id} className="bg-surface border border-foreground/10 px-3 py-2">
-                <div className="font-display text-[9px] uppercase tracking-widest text-foreground/45 mb-1">
-                  {c.author_name} · {formatReportTime(c.created_at)}
-                </div>
-                <p className="text-sm text-foreground leading-snug">{c.content}</p>
+        )}
+      </div>
+
+      {/* Comments list — only this scrolls */}
+      <div className="flex-1 overflow-y-auto min-h-0 px-4 py-3 space-y-2">
+        <div className="font-display text-[10px] uppercase tracking-widest text-foreground font-bold">
+          {t.discussionHd}
+        </div>
+        {comments.length === 0 ? (
+          <div className="font-display text-[10px] italic text-foreground/40">{t.noCommentsYet}</div>
+        ) : (
+          comments.map((c) => (
+            <div key={c.id} className="bg-surface border border-foreground/10 px-3 py-2">
+              <div className="font-display text-[9px] uppercase tracking-widest text-foreground/45 mb-1">
+                {c.author_name} · {formatReportTime(c.created_at)}
               </div>
-            ))
-          )}
-        </div>
+              <p className="text-sm text-foreground leading-snug">{c.content}</p>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Comment form — pinned to bottom, always visible */}
