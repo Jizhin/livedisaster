@@ -1136,8 +1136,8 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
   const [voted, setVoted] = useState<string | null>(null);
   const [comments, setComments] = useState<ApiComment[]>([]);
   const [commentText, setCommentText] = useState("");
-  const [commentName, setCommentName] = useState("");
   const [posting, setPosting] = useState(false);
+  const anonName = useRef(`user_${Math.random().toString(36).slice(2, 8)}`);
 
   useEffect(() => {
     if (data) {
@@ -1172,14 +1172,12 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
       const res = await fetch(`${API_BASE}/reports/${report.id}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ author_name: commentName.trim() || "Anonymous", content: text }),
+        body: JSON.stringify({ author_name: anonName.current, content: text }),
       });
       if (res.ok) {
-        // Backend returns ReportDetail (full report), not the comment —
-        // build the comment from what we sent instead of parsing response
         const newComment: ApiComment = {
           id: Date.now(),
-          author_name: commentName.trim() || "Anonymous",
+          author_name: anonName.current,
           content: text,
           created_at: new Date().toISOString(),
         };
@@ -1316,13 +1314,6 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
 
           {/* Comment form */}
           <form onSubmit={submitComment} className="pt-1.5 space-y-1.5">
-            <input
-              type="text"
-              value={commentName}
-              onChange={(e) => setCommentName(e.target.value)}
-              placeholder={t.namePlaceholder}
-              className="w-full bg-surface border border-foreground/20 focus:border-primary px-3 py-2 text-xs outline-none placeholder:text-foreground/35 text-foreground"
-            />
             <div className="flex gap-2">
               <textarea
                 value={commentText}
