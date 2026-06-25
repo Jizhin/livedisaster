@@ -1081,10 +1081,14 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
         body: JSON.stringify({ author_name: commentName.trim() || "Anonymous", content: text }),
       });
       if (res.ok) {
-        const newComment: ApiComment = await res.json().catch(() => ({
-          id: Date.now(), author_name: commentName.trim() || "Anonymous",
-          content: text, created_at: new Date().toISOString(),
-        }));
+        // Backend returns ReportDetail (full report), not the comment —
+        // build the comment from what we sent instead of parsing response
+        const newComment: ApiComment = {
+          id: Date.now(),
+          author_name: commentName.trim() || "Anonymous",
+          content: text,
+          created_at: new Date().toISOString(),
+        };
         setComments((prev) => [...prev, newComment]);
         setCommentText("");
       }
@@ -1133,7 +1137,7 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
 
         {/* Vote buttons */}
         <div className="px-4 py-3">
-          <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-2">
+          <div className="font-display text-[10px] uppercase tracking-widest text-foreground/70 font-bold mb-2">
             {t.communityVotesLabel}
           </div>
           {loading ? (
@@ -1173,7 +1177,7 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
 
         {/* Comments */}
         <div className="px-4 py-3 space-y-2">
-          <div className="font-display text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+          <div className="font-display text-[10px] uppercase tracking-widest text-foreground/70 font-bold">
             {t.discussionHd}
           </div>
           {comments.length === 0 ? (
@@ -1181,10 +1185,10 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
           ) : (
             comments.map((c) => (
               <div key={c.id} className="bg-surface/60 px-3 py-2">
-                <div className="font-display text-[9px] uppercase tracking-widest text-muted-foreground mb-0.5">
+                <div className="font-display text-[9px] uppercase tracking-widest text-foreground/50 mb-1">
                   {c.author_name} · {formatReportTime(c.created_at)}
                 </div>
-                <p className="text-xs leading-snug">{c.content}</p>
+                <p className="text-sm text-foreground leading-snug">{c.content}</p>
               </div>
             ))
           )}
