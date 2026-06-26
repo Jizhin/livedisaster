@@ -169,6 +169,7 @@
   pointer-events: none;
 }
 .leaflet-tooltip::before { border-top-color: #0f172a; }
+.leaflet-container { font-family: inherit; }
 
 /* ═══════════════════════════════════════════════════════════════
    EXISTING lkp-* STYLES (unchanged below this line)

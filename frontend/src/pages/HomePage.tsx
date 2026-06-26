@@ -485,6 +485,7 @@ export function HomePage() {
   const [districtFocus, setDistrictFocus] = useState<string | null>(null);
   const [detailReport, setDetailReport] = useState<Report | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"feed" | "map">("feed");
   const [welcomeOpen, setWelcomeOpen] = useState(() => !sessionStorage.getItem(WELCOME_KEY));
   const [loadingPhase, setLoadingPhase] = useState<"hidden" | "active" | "fading">("hidden");
   const [loadingMinPassed, setLoadingMinPassed] = useState(false);
@@ -609,6 +610,32 @@ export function HomePage() {
           <div className="sticky top-[61px] flex h-[calc(100vh-61px)] flex-col overflow-y-auto no-scrollbar">
             <div className="flex-1 space-y-5 p-4 xl:p-5">
 
+              {/* Feed / Map toggle */}
+              <div className="flex rounded-xl border border-border bg-secondary p-0.5 gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("feed")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${
+                    viewMode === "feed"
+                      ? "bg-card text-primary shadow-sm"
+                      : "text-muted-foreground hover:text-primary"
+                  }`}
+                >
+                  <span>📋</span> Feed
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("map")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${
+                    viewMode === "map"
+                      ? "bg-card text-primary shadow-sm"
+                      : "text-muted-foreground hover:text-primary"
+                  }`}
+                >
+                  <span>🗺</span> Map
+                </button>
+              </div>
+
               {/* Live status */}
               <div className="space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t.liveStatus}</p>
@@ -721,8 +748,15 @@ export function HomePage() {
           </div>
         </aside>
 
+        {/* ── MAP VIEW (full-width, desktop toggle) ── */}
+        {viewMode === "map" && (
+          <div className="flex-1 sticky top-[61px] h-[calc(100vh-61px)] overflow-hidden">
+            <WorldMap reports={filteredReports} onSelectReport={setDetailReport} />
+          </div>
+        )}
+
         {/* ── CENTER FEED ── */}
-        <main className="min-w-0 flex-1 border-r border-border/70">
+        <main className={`min-w-0 flex-1 border-r border-border/70 ${viewMode === "map" ? "hidden" : ""}`}>
           <div className="mx-auto max-w-2xl px-4 pb-24 pt-6 lg:px-6">
 
             {/* Official alerts (mobile+desktop top of feed) */}
@@ -827,16 +861,9 @@ export function HomePage() {
         </main>
 
         {/* ── RIGHT PANEL ── */}
-        <aside className="hidden xl:block xl:w-72 shrink-0">
-          <div className="sticky top-[61px] flex h-[calc(100vh-61px)] flex-col overflow-hidden">
-
-            {/* Live map – fills upper portion */}
-            <div className="flex-1 min-h-0 border-b border-border/40 overflow-hidden">
-              <WorldMap reports={reports} onSelectReport={setDetailReport} />
-            </div>
-
-            {/* Bottom strip – alerts + quick post + about */}
-            <div className="shrink-0 space-y-3 p-4 overflow-y-auto no-scrollbar" style={{ maxHeight: "42%" }}>
+        <aside className={`xl:w-72 shrink-0 ${viewMode === "map" ? "hidden" : "hidden xl:block"}`}>
+          <div className="sticky top-[61px] flex h-[calc(100vh-61px)] flex-col overflow-y-auto no-scrollbar">
+            <div className="flex-1 space-y-4 p-5">
 
               {/* Official alerts (right panel) */}
               {alertStatus === "ready" && alerts.filter((a) => a.severity !== "safe").length > 0 ? (
@@ -984,7 +1011,7 @@ function WorldMap({
       attributionControl: false,
       zoomControl: true,
     });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
       subdomains: "abcd",
       maxZoom: 19,
     }).addTo(map);
@@ -1007,11 +1034,11 @@ function WorldMap({
       const color =
         r.severity === "critical" ? "#ef4444" : r.severity === "warn" ? "#f59e0b" : "#22c55e";
       const circle = L.circleMarker([r.lat, r.lon], {
-        radius: 7,
+        radius: 9,
         fillColor: color,
         color: "#ffffff",
-        weight: 2,
-        fillOpacity: 0.85,
+        weight: 2.5,
+        fillOpacity: 0.9,
       });
       const label = catMeta(r.category).emoji + " " + (r.place || r.district || "");
       circle.bindTooltip(
