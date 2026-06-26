@@ -1466,7 +1466,25 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
     ? `${UPLOADS_ORIGIN}/uploads/${data.images[0].file_path}`
     : report.image_url;
 
+  const [imgExpanded, setImgExpanded] = useState(false);
+
   return (
+    <>
+    {/* Full-screen image overlay */}
+    {imgExpanded && imgUrl && (
+      <div
+        className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-4"
+        onClick={() => setImgExpanded(false)}
+      >
+        <img src={imgUrl} alt="" className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl" />
+        <button
+          type="button"
+          onClick={() => setImgExpanded(false)}
+          className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/20 text-white hover:bg-white/30"
+        >✕</button>
+      </div>
+    )}
+
     <div className="flex h-full flex-col">
       {/* Sticky header */}
       <div className="shrink-0 border-b border-border/60 px-5 py-3.5">
@@ -1481,13 +1499,30 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
 
       {/* Scrollable body */}
       <div className="no-scrollbar flex-1 overflow-y-auto">
+        {/* Image — full bleed at top if present */}
+        {imgUrl && (
+          <button
+            type="button"
+            onClick={() => setImgExpanded(true)}
+            className="group relative block w-full shrink-0 overflow-hidden border-b border-border/60"
+          >
+            <img
+              src={imgUrl}
+              alt="Report photo"
+              className="h-52 w-full object-cover transition group-hover:brightness-90"
+            />
+            <span className="absolute bottom-2 right-2 rounded-lg bg-black/50 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
+              Tap to expand
+            </span>
+          </button>
+        )}
+
         {/* Location + message */}
         <div className="border-b border-border/60 px-5 py-4">
           <p className="text-xs font-semibold text-accent">
             📍 {report.place ? `${report.place}, ` : ""}{report.district} · {formatReportTime(report.created_at)}
           </p>
           <p className="mt-2 text-sm leading-relaxed text-primary">{report.message}</p>
-          {imgUrl && <img src={imgUrl} alt="" className="mt-3 w-full max-h-36 rounded-2xl border border-border object-cover" />}
         </div>
 
         {/* Votes */}
@@ -1567,6 +1602,7 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
         </form>
       </div>
     </div>
+    </>
   );
 }
 
