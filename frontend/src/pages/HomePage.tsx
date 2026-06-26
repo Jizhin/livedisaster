@@ -379,7 +379,7 @@ function SiteHeader({
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-md">
-      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-5 py-3 sm:px-10">
+      <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-8">
         <div className="flex items-center gap-2.5">
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary font-display text-lg font-bold text-primary-foreground">
             L
@@ -480,10 +480,10 @@ export function HomePage() {
         toggle={toggle}
       />
 
-      <main className="mx-auto max-w-[1440px] px-5 pb-20 pt-8 sm:px-10 sm:pt-12">
+      <main className="px-4 pb-16 pt-6 sm:px-8">
 
         {/* ── Hero ── */}
-        <section className="mb-8">
+        <section className="mb-5">
           <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <span className="live-dot" />
             Live across 14 districts · {time || "—"}
@@ -499,7 +499,7 @@ export function HomePage() {
         </section>
 
         {/* ── Composer / Location picker ── */}
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] sm:p-5">
+        <div className="rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-card)] sm:p-4">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t.step1Location}
           </p>
@@ -516,7 +516,7 @@ export function HomePage() {
         </div>
 
         {/* ── Filter bar ── */}
-        <div className="mt-4 rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-card)]">
+        <div className="mt-3 rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-card)]">
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="search"
@@ -549,7 +549,7 @@ export function HomePage() {
         </div>
 
         {/* ── Main 2-col grid ── */}
-        <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
 
           {/* Left: chips + feed */}
           <div className="min-w-0">
@@ -745,7 +745,7 @@ export function HomePage() {
         </div>
 
         {/* ── All 14 districts ── */}
-        <section className="mt-16 border-t border-border pt-8">
+        <section className="mt-10 border-t border-border pt-6">
           <h3 className="font-display text-lg font-semibold">{t.allDistricts}</h3>
           <p className="mt-1 text-sm text-muted-foreground">{t.tapToInspect}</p>
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
