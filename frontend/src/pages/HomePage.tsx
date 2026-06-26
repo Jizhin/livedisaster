@@ -484,6 +484,7 @@ export function HomePage() {
   const [reportFlowOpen, setReportFlowOpen] = useState(false);
   const [districtFocus, setDistrictFocus] = useState<string | null>(null);
   const [detailReport, setDetailReport] = useState<Report | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !sessionStorage.getItem(WELCOME_KEY));
   const [loadingPhase, setLoadingPhase] = useState<"hidden" | "active" | "fading">("hidden");
   const [loadingMinPassed, setLoadingMinPassed] = useState(false);
@@ -827,8 +828,15 @@ export function HomePage() {
 
         {/* ── RIGHT PANEL ── */}
         <aside className="hidden xl:block xl:w-72 shrink-0">
-          <div className="sticky top-[61px] flex h-[calc(100vh-61px)] flex-col overflow-y-auto no-scrollbar">
-            <div className="flex-1 space-y-4 p-5">
+          <div className="sticky top-[61px] flex h-[calc(100vh-61px)] flex-col overflow-hidden">
+
+            {/* Live map – fills upper portion */}
+            <div className="flex-1 min-h-0 border-b border-border/40 overflow-hidden">
+              <WorldMap reports={reports} onSelectReport={setDetailReport} />
+            </div>
+
+            {/* Bottom strip – alerts + quick post + about */}
+            <div className="shrink-0 space-y-3 p-4 overflow-y-auto no-scrollbar" style={{ maxHeight: "42%" }}>
 
               {/* Official alerts (right panel) */}
               {alertStatus === "ready" && alerts.filter((a) => a.severity !== "safe").length > 0 ? (
@@ -840,7 +848,7 @@ export function HomePage() {
                     {alerts.filter((a) => a.severity !== "safe").slice(0, 5).map((a) => (
                       <div key={a.id} className={`rounded-xl border-l-2 py-2 pl-3 pr-2 text-xs ${sevBorderL(a.severity)}`}>
                         <div className={`font-bold ${sevText(a.severity)}`}>{a.disasterType}</div>
-                        <div className="text-muted-foreground">{a.district ?? "Kerala"} · {a.source}</div>
+                        <div className="text-muted-foreground">{a.district ?? "Worldwide"} · {a.source}</div>
                       </div>
                     ))}
                   </div>
@@ -880,11 +888,19 @@ export function HomePage() {
       </div>{/* end 3-col */}
 
       {/* ── Mobile floating bar ── */}
-      <div className="fixed inset-x-0 bottom-4 z-30 flex justify-center px-4 lg:hidden">
+      <div className="fixed inset-x-0 bottom-4 z-30 flex justify-center gap-2 px-4 xl:hidden">
+        <button
+          type="button"
+          onClick={() => setMapOpen(true)}
+          className="flex shrink-0 items-center gap-2 rounded-2xl bg-card border border-border px-4 py-3 text-sm font-semibold text-foreground shadow-xl transition active:scale-[0.99]"
+        >
+          <span className="text-base">🗺</span>
+          Map
+        </button>
         <button
           type="button"
           onClick={() => setReportFlowOpen(true)}
-          className="flex w-full max-w-sm items-center justify-between gap-3 rounded-2xl bg-primary px-4 py-3 text-primary-foreground shadow-xl ring-1 ring-[var(--color-gold)]/30 transition active:scale-[0.99]"
+          className="flex flex-1 items-center justify-between gap-3 rounded-2xl bg-primary px-4 py-3 text-primary-foreground shadow-xl ring-1 ring-[var(--color-gold)]/30 transition active:scale-[0.99]"
         >
           <span className="flex items-center gap-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--color-gold)] text-sm font-bold text-primary">＋</span>
@@ -923,9 +939,97 @@ export function HomePage() {
         <StandaloneDetailModal report={detailReport} onClose={() => setDetailReport(null)} />
       )}
 
+      {/* ── Mobile map modal ── */}
+      {mapOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-background xl:hidden">
+          <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+            <span className="font-display text-sm font-bold">🗺 Live Map</span>
+            <button
+              type="button"
+              onClick={() => setMapOpen(false)}
+              className="grid h-8 w-8 place-items-center rounded-full bg-muted text-muted-foreground hover:bg-muted/70"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex-1 min-h-0">
+            <WorldMap reports={reports} onSelectReport={(r) => { setMapOpen(false); setDetailReport(r); }} />
+          </div>
+        </div>
+      )}
+
       {loadingPhase !== "hidden" && <LoadingScreen fading={loadingPhase === "fading"} />}
     </div>
   );
+}
+
+/* ─── World Map (Leaflet via CDN) ───────────────────────────── */
+function WorldMap({
+  reports,
+  onSelectReport,
+}: {
+  reports: Report[];
+  onSelectReport: (r: Report) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  const layerRef = useRef<any>(null);
+
+  useEffect(() => {
+    const L = (window as any).L;
+    if (!containerRef.current || mapRef.current || !L) return;
+    const map = L.map(containerRef.current, {
+      center: [20, 0],
+      zoom: 2,
+      attributionControl: false,
+      zoomControl: true,
+    });
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      subdomains: "abcd",
+      maxZoom: 19,
+    }).addTo(map);
+    L.control.attribution({ prefix: false }).addTo(map);
+    layerRef.current = L.layerGroup().addTo(map);
+    mapRef.current = map;
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      layerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const L = (window as any).L;
+    if (!L || !mapRef.current || !layerRef.current) return;
+    layerRef.current.clearLayers();
+    const located = reports.filter((r) => r.lat !== null && r.lon !== null);
+    located.forEach((r) => {
+      const color =
+        r.severity === "critical" ? "#ef4444" : r.severity === "warn" ? "#f59e0b" : "#22c55e";
+      const circle = L.circleMarker([r.lat, r.lon], {
+        radius: 7,
+        fillColor: color,
+        color: "#ffffff",
+        weight: 2,
+        fillOpacity: 0.85,
+      });
+      const label = catMeta(r.category).emoji + " " + (r.place || r.district || "");
+      circle.bindTooltip(
+        `<strong style="font-size:12px">${label}</strong><br/><span style="font-size:11px">${r.message.slice(0, 80)}${r.message.length > 80 ? "…" : ""}</span>`,
+        { direction: "top", offset: [0, -6] }
+      );
+      circle.on("click", () => onSelectReport(r));
+      layerRef.current.addLayer(circle);
+    });
+    if (located.length > 0) {
+      try {
+        const bounds = (window as any).L.latLngBounds(located.map((r) => [r.lat, r.lon]));
+        mapRef.current.fitBounds(bounds.pad(0.2), { maxZoom: 10, animate: false });
+      } catch {}
+    }
+  }, [reports, onSelectReport]);
+
+  return <div ref={containerRef} className="h-full w-full" />;
 }
 
 /* ─── Category Tile ─────────────────────────────────────────── */

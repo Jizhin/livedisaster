@@ -157,6 +157,19 @@
 /* ─── Google Fonts ─── */
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Figtree:wght@400;500;600;700&family=Noto+Sans+Malayalam:wght@400;600;700;900&display=swap');
 
+/* ─── Leaflet tooltip override ─── */
+.leaflet-tooltip {
+  background: #0f172a;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  color: #e2e8f0;
+  padding: 6px 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  font-family: inherit;
+  pointer-events: none;
+}
+.leaflet-tooltip::before { border-top-color: #0f172a; }
+
 /* ═══════════════════════════════════════════════════════════════
    EXISTING lkp-* STYLES (unchanged below this line)
    ═══════════════════════════════════════════════════════════════ */
