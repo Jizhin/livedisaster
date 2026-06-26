@@ -1142,7 +1142,7 @@ function ReportFlowModal({ onClose, onReported }: { onClose: () => void; onRepor
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative flex h-[560px] w-full max-w-sm flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-[var(--shadow-hero)]"
+        className="relative flex h-[min(560px,calc(100dvh-2rem))] w-full max-w-sm flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-[var(--shadow-hero)]"
       >
         {step === "location" ? (
           <LocationPickerStep onSelect={handlePlaceSelected} onClose={onClose} />
@@ -1239,7 +1239,7 @@ function LocationPickerStep({ onSelect, onClose }: { onSelect: (p: Place) => voi
 function ReportFormStep({ place, onBack, onClose, onReported }: { place: Place; onBack: () => void; onClose: () => void; onReported: () => void }) {
   const { t } = useLanguage();
   const [severity, setSeverity] = useState<Severity>("warn");
-  const [category, setCategory] = useState("Flood");
+  const [category, setCategory] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -1254,6 +1254,7 @@ function ReportFormStep({ place, onBack, onClose, onReported }: { place: Place; 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = message.trim();
+    if (!category) { setError("Please select a category."); return; }
     if (!trimmed) { setError("Please describe what happened."); return; }
     if (imageFile && imageFile.size > 5 * 1024 * 1024) { setError("Image must be under 5 MB."); return; }
     setSubmitting(true); setError(null);
@@ -1406,7 +1407,7 @@ function StandaloneDetailModal({ report, onClose }: { report: Report; onClose: (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-sm p-4" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative flex h-[600px] w-full max-w-md flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-[var(--shadow-hero)]"
+        className="relative flex h-[min(640px,calc(100dvh-2rem))] w-full max-w-md flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-[var(--shadow-hero)]"
       >
         <ReportDetailPanel report={report} onBack={onClose} />
       </div>
