@@ -1407,7 +1407,7 @@ function StandaloneDetailModal({ report, onClose }: { report: Report; onClose: (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-sm p-4" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative flex h-[min(640px,calc(100dvh-2rem))] w-full max-w-md flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-[var(--shadow-hero)]"
+        className="relative flex max-h-[min(640px,calc(100dvh-2rem))] w-full max-w-md flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-[var(--shadow-hero)]"
       >
         <ReportDetailPanel report={report} onBack={onClose} />
       </div>
@@ -1486,7 +1486,7 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
       </div>
     )}
 
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Sticky header */}
       <div className="shrink-0 border-b border-border/60 px-5 py-3.5">
         <div className="flex items-center justify-between">
@@ -1559,10 +1559,7 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
         <div className="px-5 py-4">
           <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t.discussionHd.replace("💬 ", "")}</p>
           {comments.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-secondary/50 px-4 py-5 text-center">
-              <p className="text-xs text-muted-foreground">{t.noCommentsYet}</p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground/60">Be the first to share an update below</p>
-            </div>
+            <p className="text-xs italic text-muted-foreground/60">{t.noCommentsYet}</p>
           ) : (
             <div className="space-y-2">
               {comments.map((c) => (
