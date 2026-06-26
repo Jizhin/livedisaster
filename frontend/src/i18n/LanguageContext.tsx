@@ -15,16 +15,9 @@ const LanguageContext = createContext<LangCtx>({
 });
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLang] = useState<Lang>(() => {
-    try { return (localStorage.getItem("kl_lang") as Lang) || "en"; }
-    catch { return "en"; }
-  });
+  const [lang, setLang] = useState<Lang>("en");
 
-  const toggle = () => {
-    const next: Lang = lang === "en" ? "ml" : "en";
-    setLang(next);
-    try { localStorage.setItem("kl_lang", next); } catch { /* ignored */ }
-  };
+  const toggle = () => setLang((l) => l === "en" ? "ml" : "en");
 
   return (
     <LanguageContext.Provider value={{ lang, t: T[lang], toggle }}>
