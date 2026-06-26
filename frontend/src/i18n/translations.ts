@@ -309,14 +309,14 @@ export const T = {
     loadingDetail:       "Loading…",
 
     /* Page title */
-    pageTitle:           "Something Happened Nearby — LiveKerala",
+    pageTitle:           "LiveKerala — Kerala Community Disaster Watch",
 
     /* Header */
     communityDisasterWatch: "Community disaster watch",
     reportBtn:           "Report",
 
     /* Hero */
-    heroGreeting:        "Namaskaram, Neighbor.",
+    heroGreeting:        "Something Happened Nearby?",
     heroDesc:            "See something on the road, in your area, or near home? Tell your neighbors. They'll do the same for you.",
     reportIncidentBtn:   "Report an Incident",
     browseDistricts:     "Browse Districts",
@@ -734,14 +734,14 @@ export const T = {
     loadingDetail:       "ലോഡ് ചെയ്യുന്നു…",
 
     /* Page title */
-    pageTitle:           "നിങ്ങളുടെ അടുത്തെവിടെയെങ്കിലും എന്തെങ്കിലും സംഭവിച്ചോ? — LiveKerala",
+    pageTitle:           "LiveKerala — കേരള കമ്മ്യൂണിറ്റി ദുരന്ത നിരീക്ഷണം",
 
     /* Header */
     communityDisasterWatch: "കമ്മ്യൂണിറ്റി ദുരന്ത നിരീക്ഷണം",
     reportBtn:           "റിപ്പോർട്ട്",
 
     /* Hero */
-    heroGreeting:        "നമസ്കാരം, അയൽക്കാരാ.",
+    heroGreeting:        "നിങ്ങളുടെ അടുത്തെവിടെയെങ്കിലും എന്തെങ്കിലും സംഭവിച്ചോ?",
     heroDesc:            "റോഡിലോ, നിങ്ങളുടെ പ്രദേശത്തോ, വീടിനടുത്തോ എന്തെങ്കിലും കണ്ടോ? അയൽക്കാരെ അറിയിക്കൂ. അവർ നിങ്ങൾക്കും അറിയിക്കും.",
     reportIncidentBtn:   "സംഭവം റിപ്പോർട്ട് ചെയ്യുക",
     browseDistricts:     "ജില്ലകൾ കാണുക",
