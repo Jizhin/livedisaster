@@ -535,7 +535,7 @@ export function HomePage() {
   const [reportFlowOpen, setReportFlowOpen] = useState(false);
   const [districtFocus, setDistrictFocus] = useState<string | null>(null);
   const [detailReport, setDetailReport] = useState<Report | null>(null);
-  const [welcomeOpen, setWelcomeOpen] = useState(() => !localStorage.getItem(WELCOME_KEY));
+  const [welcomeOpen, setWelcomeOpen] = useState(() => !sessionStorage.getItem(WELCOME_KEY));
   const [loadingPhase, setLoadingPhase] = useState<"hidden" | "active" | "fading">("hidden");
   const [loadingMinPassed, setLoadingMinPassed] = useState(false);
 
@@ -544,7 +544,7 @@ export function HomePage() {
   useEffect(() => { setVisibleCount(15); }, [filterDistrict, filterCategory, searchQuery]);
 
   function dismissWelcome() {
-    localStorage.setItem(WELCOME_KEY, "1");
+    sessionStorage.setItem(WELCOME_KEY, "1");
     setWelcomeOpen(false);
     setLoadingMinPassed(false);
     setLoadingPhase("active");
