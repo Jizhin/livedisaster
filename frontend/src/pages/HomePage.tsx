@@ -1001,6 +1001,7 @@ function WorldMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const layerRef = useRef<any>(null);
+  const fitDoneRef = useRef(false);
 
   useEffect(() => {
     const L = (window as any).L;
@@ -1023,6 +1024,7 @@ function WorldMap({
       map.remove();
       mapRef.current = null;
       layerRef.current = null;
+      fitDoneRef.current = false;
     };
   }, []);
 
@@ -1049,10 +1051,11 @@ function WorldMap({
       circle.on("click", () => onSelectReport(r));
       layerRef.current.addLayer(circle);
     });
-    if (located.length > 0) {
+    if (located.length > 0 && !fitDoneRef.current) {
       try {
         const bounds = (window as any).L.latLngBounds(located.map((r) => [r.lat, r.lon]));
         mapRef.current.fitBounds(bounds.pad(0.2), { maxZoom: 10, animate: false });
+        fitDoneRef.current = true;
       } catch {}
     }
   }, [reports, onSelectReport]);
