@@ -85,7 +85,7 @@ type ApiReportDetail = ApiReport & {
   comments?: ApiComment[];
 };
 
-/* ─── District constants ─────────────────────────────────────── */
+/* ─── Constants ─────────────────────────────────────────────── */
 
 const DISTRICTS: District[] = [
   { code: "KL-01", name: "Trivandrum",     slug: "trivandrum",     lat: 8.5241,  lon: 76.9366 },
@@ -107,8 +107,8 @@ const DISTRICTS: District[] = [
 const CATEGORY_META: Record<string, { emoji: string; label: string }> = {
   "Flood":             { emoji: "🌊", label: "Flood" },
   "Landslide":         { emoji: "⛰️", label: "Landslide" },
-  "Road Damage":       { emoji: "🚧", label: "Road Damage" },
-  "Power Outage":      { emoji: "⚡", label: "Power Outage" },
+  "Road Damage":       { emoji: "🚧", label: "Road" },
+  "Power Outage":      { emoji: "⚡", label: "Power" },
   "Medical Emergency": { emoji: "🚨", label: "Medical" },
   "Fire":              { emoji: "🔥", label: "Fire" },
   "Other":             { emoji: "📌", label: "Other" },
@@ -201,14 +201,15 @@ function formatReportTime(iso: string) {
   return d.toLocaleString("en-IN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" });
 }
 
-function formatAlertWindow(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("en-IN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" });
+function catMeta(c: string | null) {
+  return CATEGORY_META[c ?? ""] ?? { emoji: "📌", label: "Other" };
 }
 
-const catEmoji = (c: string | null) => CATEGORY_META[c ?? ""]?.emoji ?? "📌";
+function reportInitials(id: string): string {
+  const n = parseInt(id, 10) || 0;
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXY";
+  return letters[n % letters.length] + letters[(n * 7) % letters.length];
+}
 
 const sevText = (s: Severity) =>
   s === "critical" ? "text-destructive" : s === "warn" ? "text-warn" : "text-success";
@@ -279,7 +280,7 @@ function useReportDetail(reportId: string | null) {
   return { data, loading };
 }
 
-function useLiveReports(limit = 40) {
+function useLiveReports(limit = 50) {
   const [reports, setReports] = useState<Report[]>([]);
   const [status, setStatus] = useState<"connecting" | "live" | "offline">("connecting");
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -287,7 +288,6 @@ function useLiveReports(limit = 40) {
 
   useEffect(() => {
     let active = true;
-
     async function fetchReports() {
       try {
         const res = await fetch(`${API_BASE}/reports/feed?limit=${limit}`);
@@ -307,7 +307,6 @@ function useLiveReports(limit = 40) {
         if (active) setStatus("offline");
       }
     }
-
     fetchReports();
     const interval = setInterval(fetchReports, 20000);
     return () => { active = false; clearInterval(interval); };
@@ -319,27 +318,18 @@ function useLiveReports(limit = 40) {
 function useKeralaAlerts() {
   const [alerts, setAlerts] = useState<OfficialAlert[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-
   useEffect(() => {
     let active = true;
     const load = () => {
       fetch(`${API_BASE}/ndma-alerts`)
         .then((r) => r.json())
-        .then((data: OfficialAlert[]) => {
-          if (!active) return;
-          setAlerts(data);
-          setStatus("ready");
-        })
-        .catch((err) => {
-          console.error("[alerts]", err);
-          if (active) setStatus("error");
-        });
+        .then((data: OfficialAlert[]) => { if (!active) return; setAlerts(data); setStatus("ready"); })
+        .catch((err) => { console.error("[alerts]", err); if (active) setStatus("error"); });
     };
     load();
     const id = setInterval(load, 5 * 60 * 1000);
     return () => { active = false; clearInterval(id); };
   }, []);
-
   return { alerts, status };
 }
 
@@ -359,115 +349,239 @@ function useLocalTime() {
 }
 
 /* ─── Module-level welcome flag ──────────────────────────────── */
-
 let _welcomeDismissed = false;
 
-/* ─── Site Header ────────────────────────────────────────────── */
+/* ─── Loading Screen ────────────────────────────────────────── */
+const LOADING_MESSAGES = [
+  {
+    headline: "Your neighbors are watching out for you.",
+    sub: "Thousands of people across Kerala report what they see in real time.",
+  },
+  {
+    headline: "Connecting to 14 districts…",
+    sub: "Live reports from Trivandrum to Kasaragod are on their way.",
+  },
+  {
+    headline: "Syncing official advisories…",
+    sub: "Loading NDMA · IMD · KSDMA alerts for your area.",
+  },
+  {
+    headline: "Together, we keep Kerala safe.",
+    sub: "Every report you share helps someone near you make a better decision.",
+  },
+  {
+    headline: "Real-time. Community-powered.",
+    sub: "No algorithm, no delay — just neighbors helping neighbors.",
+  },
+  {
+    headline: "Almost there…",
+    sub: "Your live community feed is loading.",
+  },
+];
 
+function LoadingScreen({ fading }: { fading: boolean }) {
+  const [msgIdx, setMsgIdx] = useState(0);
+  const [textVisible, setTextVisible] = useState(true);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTextVisible(false);
+      setTimeout(() => {
+        setMsgIdx((i) => (i + 1) % LOADING_MESSAGES.length);
+        setTextVisible(true);
+      }, 350);
+    }, 2400);
+    return () => clearInterval(id);
+  }, []);
+
+  const msg = LOADING_MESSAGES[msgIdx];
+
+  return (
+    <div
+      className={`fixed inset-0 z-[70] flex flex-col items-center justify-center bg-primary px-8 transition-opacity duration-700 ${
+        fading ? "opacity-0 pointer-events-none" : "opacity-100"
+      }`}
+    >
+      {/* Gold glow blobs */}
+      <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[var(--color-gold)]/15 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-accent/20 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/3 h-80 w-80 -translate-x-1/2 rounded-full bg-[var(--color-gold)]/5 blur-3xl" />
+
+      <div className="relative flex w-full max-w-xs flex-col items-center text-center">
+        {/* Logo mark */}
+        <div className="grid h-16 w-16 place-items-center rounded-full bg-[var(--color-gold)] font-display text-2xl font-bold text-primary shadow-xl shadow-black/30 ring-4 ring-[var(--color-gold)]/30 mb-5">
+          L
+        </div>
+
+        <div className="font-display text-2xl font-bold text-primary-foreground">
+          Live<span className="text-[var(--color-gold)]">Kerala</span>
+        </div>
+        <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-foreground/50">
+          Community · Live · Safe
+        </p>
+
+        {/* Animated pulse dots */}
+        <div className="mt-8 flex items-center gap-2 mb-10">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <span
+              key={i}
+              className="rounded-full bg-[var(--color-gold)]"
+              style={{
+                width: i === 2 ? "0.625rem" : "0.375rem",
+                height: i === 2 ? "0.625rem" : "0.375rem",
+                opacity: i === 2 ? 1 : 0.4,
+                animation: `live-pulse 1.6s ease-out ${i * 0.15}s infinite`,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Rotating motivational message */}
+        <div
+          className="min-h-[5rem] transition-opacity duration-300"
+          style={{ opacity: textVisible ? 1 : 0 }}
+        >
+          <p className="font-display text-[18px] font-bold leading-snug text-primary-foreground">
+            {msg.headline}
+          </p>
+          <p className="mt-2.5 text-sm leading-relaxed text-primary-foreground/65">
+            {msg.sub}
+          </p>
+        </div>
+
+        {/* Progress bar */}
+        <div className="mt-10 h-0.5 w-32 overflow-hidden rounded-full bg-primary-foreground/15">
+          <div
+            className="h-full rounded-full bg-[var(--color-gold)]"
+            style={{ animation: "loading-bar 2.4s ease-in-out infinite" }}
+          />
+        </div>
+      </div>
+
+      {/* Bottom live chip */}
+      <div className="absolute bottom-10 flex items-center gap-2 rounded-full border border-primary-foreground/10 bg-primary-foreground/5 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-primary-foreground/50">
+        <span className="live-dot" />
+        Loading live data
+      </div>
+
+      <style>{`
+        @keyframes loading-bar {
+          0%   { width: 0%;   margin-left: 0%; }
+          50%  { width: 60%;  margin-left: 20%; }
+          100% { width: 0%;   margin-left: 100%; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/* ─── Site Header ────────────────────────────────────────────── */
 function SiteHeader({
   reportsCount,
   status,
-  onPost,
+  onReport,
   lang,
   toggle,
 }: {
   reportsCount: number;
   status: "connecting" | "live" | "offline";
-  onPost: () => void;
+  onReport: () => void;
   lang: string;
   toggle: () => void;
 }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-md">
-      <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-8">
-        <div className="flex items-center gap-2.5">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary font-display text-lg font-bold text-primary-foreground">
+    <header className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-md">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3 sm:px-8 lg:px-10">
+        {/* Logo */}
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary font-display text-base font-bold text-primary-foreground ring-2 ring-[var(--color-gold)]/40">
             L
           </div>
-          <div className="leading-tight">
-            <div className="font-display text-lg font-semibold tracking-tight">
-              Live<span className="text-accent">Kerala</span>
+          <div className="min-w-0">
+            <div className="font-display text-lg font-bold tracking-tight text-primary">
+              Live<span className="text-[var(--color-gold)]">Kerala</span>
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+            <div className="hidden items-center gap-1.5 text-[11px] font-medium text-muted-foreground sm:flex">
               <span className="live-dot" />
-              {status === "live"
-                ? `${reportsCount} live reports`
-                : status === "connecting"
-                ? "Connecting…"
-                : "Offline"}
+              {status === "live" ? `${reportsCount} live` : status === "connecting" ? "Connecting…" : "Offline"}
+              {" · "}Community disaster watch
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Nav */}
+        <nav className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={toggle}
-            className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+            className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-primary/60 transition hover:bg-secondary"
           >
-            {lang === "en" ? "ML" : "EN"}
+            {lang === "en" ? "മ" : "EN"}
           </button>
           <button
             type="button"
-            onClick={onPost}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent px-3.5 py-2 text-sm font-semibold text-accent-foreground transition hover:brightness-105"
+            onClick={onReport}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--color-gold)] px-4 py-2 text-sm font-bold text-primary shadow-sm transition hover:brightness-105 active:scale-95"
           >
             <span aria-hidden>＋</span>
-            <span className="hidden sm:inline">Post update</span>
-            <span className="sm:hidden">Post</span>
+            <span>Report</span>
           </button>
-        </div>
+        </nav>
       </div>
     </header>
   );
 }
 
-/* ─── Main page ─────────────────────────────────────────────── */
-
+/* ─── Main Page ─────────────────────────────────────────────── */
 export function HomePage() {
   const { lang, t, toggle } = useLanguage();
   const time = useLocalTime();
-  const { reports, status, flashId } = useLiveReports(40);
+  const { reports, status, flashId } = useLiveReports(50);
   const { alerts, status: alertStatus } = useKeralaAlerts();
-
-  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
-  const [reportOpen, setReportOpen] = useState(false);
-  const [districtFocus, setDistrictFocus] = useState<string | null>(null);
-  const [welcomeOpen, setWelcomeOpen] = useState(() => !_welcomeDismissed);
-  const dataReady = status === "live" && alertStatus !== "loading";
 
   const [filterDistrict, setFilterDistrict] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(15);
 
+  const [reportFlowOpen, setReportFlowOpen] = useState(false);
+  const [districtFocus, setDistrictFocus] = useState<string | null>(null);
+  const [detailReport, setDetailReport] = useState<Report | null>(null);
+  const [welcomeOpen, setWelcomeOpen] = useState(() => !_welcomeDismissed);
+  const [loadingPhase, setLoadingPhase] = useState<"hidden" | "active" | "fading">("hidden");
+  const [loadingMinPassed, setLoadingMinPassed] = useState(false);
+
   useEffect(() => { setVisibleCount(15); }, [filterDistrict, filterCategory, searchQuery]);
 
   function dismissWelcome() {
     _welcomeDismissed = true;
     setWelcomeOpen(false);
+    setLoadingMinPassed(false);
+    setLoadingPhase("active");
+    setTimeout(() => setLoadingMinPassed(true), 2200);
   }
+
+  useEffect(() => {
+    if (loadingPhase === "active" && loadingMinPassed && status === "live" && alertStatus !== "loading") {
+      setLoadingPhase("fading");
+      const t = setTimeout(() => setLoadingPhase("hidden"), 750);
+      return () => clearTimeout(t);
+    }
+  }, [loadingPhase, loadingMinPassed, status, alertStatus]);
 
   const filteredReports = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return reports
       .filter((r) => filterDistrict === "all" || r.district === filterDistrict)
       .filter((r) => filterCategory === "all" || r.category === filterCategory)
-      .filter(
-        (r) =>
-          !q ||
-          r.message.toLowerCase().includes(q) ||
-          (r.place ?? "").toLowerCase().includes(q),
-      );
+      .filter((r) => !q || r.message.toLowerCase().includes(q) || (r.place ?? "").toLowerCase().includes(q));
   }, [reports, filterDistrict, filterCategory, searchQuery]);
 
-  const topDistricts = useMemo(() => {
+  const pulseDistricts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const r of reports) counts.set(r.district, (counts.get(r.district) ?? 0) + 1);
     return DISTRICTS.map((d) => ({ ...d, count: counts.get(d.name) ?? 0 }))
-      .filter((d) => d.count > 0)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+      .sort((a, b) => b.count - a.count);
   }, [reports]);
 
   return (
@@ -475,340 +589,383 @@ export function HomePage() {
       <SiteHeader
         reportsCount={reports.length}
         status={status}
-        onPost={() => (selectedPlace ? setReportOpen(true) : undefined)}
+        onReport={() => setReportFlowOpen(true)}
         lang={lang}
         toggle={toggle}
       />
 
-      <main className="px-4 pb-16 pt-6 sm:px-8">
+      {/* ══ FULL-WIDTH HERO ══ */}
+      <section className="relative overflow-hidden bg-primary">
+        <div aria-hidden className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-[var(--color-gold)]/10 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-accent/15 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute bottom-0 right-1/4 h-40 w-40 rounded-full bg-[var(--color-gold)]/8 blur-2xl" />
 
-        {/* ── Hero ── */}
-        <section className="mb-5">
-          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <span className="live-dot" />
-            Live across 14 districts · {time || "—"}
-          </p>
-          <h1 className="font-display text-4xl font-semibold leading-tight tracking-tight text-balance text-foreground sm:text-6xl">
-            What's happening across{" "}
-            <span className="text-accent">Kerala</span>, right now.
-          </h1>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            <span className="font-semibold text-foreground">{reports.length} reports</span>{" "}
-            in the last 24 hours. Confirm what you've seen or report an incident from your area.
-          </p>
-        </section>
-
-        {/* ── Composer / Location picker ── */}
-        <div className="rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-card)] sm:p-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {t.step1Location}
-          </p>
-          <LocationPicker selected={selectedPlace} onSelect={setSelectedPlace} />
-          {selectedPlace && (
-            <button
-              type="button"
-              onClick={() => setReportOpen(true)}
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:brightness-105"
-            >
-              <span aria-hidden>＋</span> Post update for {selectedPlace.name}
-            </button>
-          )}
-        </div>
-
-        {/* ── Filter bar ── */}
-        <div className="mt-3 rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-card)]">
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search reports or localities…"
-              className="min-w-0 flex-1 rounded-full border border-border bg-background px-3.5 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-            <select
-              value={filterDistrict}
-              onChange={(e) => setFilterDistrict(e.target.value)}
-              className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground"
-            >
-              <option value="all">All districts</option>
-              {DISTRICTS.map((d) => (
-                <option key={d.code} value={d.name}>{d.name}</option>
-              ))}
-            </select>
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground"
-            >
-              <option value="all">All categories</option>
-              {Object.entries(CATEGORY_META).map(([k, v]) => (
-                <option key={k} value={k}>{v.emoji} {v.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* ── Main 2-col grid ── */}
-        <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-
-          {/* Left: chips + feed */}
-          <div className="min-w-0">
-            {/* District chips */}
-            <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
-              <div className="flex w-max gap-2 pb-2">
+        <div className="relative mx-auto max-w-6xl px-5 py-10 sm:px-8 lg:px-10 lg:py-14">
+          <div className="flex items-center justify-between gap-10">
+            {/* Left: Headline + CTA */}
+            <div className="min-w-0 flex-1">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-primary-foreground/80">
+                <span className="live-dot" />
+                {reports.length} live reports · {time || "—"}
+              </span>
+              <h1 className="mt-5 font-display text-4xl font-bold leading-tight tracking-tight text-primary-foreground lg:text-5xl xl:text-[56px]">
+                Namaskaram,{" "}
+                <span className="text-[var(--color-gold)]">Neighbor.</span>
+              </h1>
+              <p className="mt-3 max-w-lg text-base leading-relaxed text-primary-foreground/70 lg:text-[15px]">
+                See something on the road, in your area, or near home? Tell your neighbors. They'll do the same for you.
+              </p>
+              <div className="mt-7 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setFilterDistrict("all")}
-                  className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
-                    filterDistrict === "all"
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-border bg-card text-foreground hover:bg-secondary"
+                  onClick={() => setReportFlowOpen(true)}
+                  className="inline-flex items-center gap-2.5 rounded-2xl bg-[var(--color-gold)] px-7 py-3.5 font-display text-sm font-bold text-primary shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]"
+                >
+                  <span aria-hidden>＋</span> Report an Incident
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDistrictFocus(pulseDistricts[0]?.name ?? null)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-primary-foreground/20 px-6 py-3.5 text-sm font-semibold text-primary-foreground/75 transition hover:bg-primary-foreground/10"
+                >
+                  Browse Districts →
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Live stat cards (desktop only) */}
+            <div className="hidden shrink-0 lg:grid lg:w-64 lg:grid-cols-2 lg:gap-3 xl:w-72">
+              <div className="rounded-2xl bg-primary-foreground/10 p-4 text-center backdrop-blur-sm">
+                <div className="font-display text-3xl font-bold tabular-nums text-primary-foreground">{reports.length}</div>
+                <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground/60">Live Reports</div>
+              </div>
+              <div className="rounded-2xl bg-primary-foreground/10 p-4 text-center backdrop-blur-sm">
+                <div className="font-display text-3xl font-bold tabular-nums text-[var(--color-gold)]">
+                  {pulseDistricts.filter((d) => d.count > 0).length}
+                </div>
+                <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground/60">Active Districts</div>
+              </div>
+              <div className="col-span-2 flex items-center gap-2 rounded-2xl bg-primary-foreground/10 px-4 py-3 backdrop-blur-sm">
+                <span className="live-dot shrink-0" />
+                <span className="text-xs font-semibold text-primary-foreground/70">
+                  {status === "live" ? "Feed updating every 20 seconds" : status === "connecting" ? "Connecting…" : "Feed offline"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ══ 3-COLUMN APP LAYOUT ══ */}
+      <div className="flex">
+
+        {/* ── LEFT NAV SIDEBAR ── */}
+        <aside className="hidden lg:block lg:w-60 xl:w-64 shrink-0 border-r border-border/70">
+          <div className="sticky top-[61px] flex h-[calc(100vh-61px)] flex-col overflow-y-auto no-scrollbar">
+            <div className="flex-1 space-y-5 p-4 xl:p-5">
+
+              {/* Live status */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Live Status</p>
+                <div className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-2.5">
+                  <span className="live-dot shrink-0" />
+                  <span className="text-xs font-semibold text-primary">
+                    {status === "live" ? `${reports.length} reports · live` : status === "connecting" ? "Connecting…" : "Offline"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-border bg-card p-3 text-center">
+                    <div className="font-display text-xl font-bold tabular-nums text-primary">{reports.length}</div>
+                    <div className="text-[10px] font-bold uppercase text-muted-foreground">Reports</div>
+                  </div>
+                  <div className="rounded-xl border border-border bg-card p-3 text-center">
+                    <div className="font-display text-xl font-bold tabular-nums text-accent">
+                      {pulseDistricts.filter((d) => d.count > 0).length}
+                    </div>
+                    <div className="text-[10px] font-bold uppercase text-muted-foreground">Districts</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category nav */}
+              <div className="space-y-0.5">
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Category</p>
+                <button
+                  type="button"
+                  onClick={() => setFilterCategory("all")}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
+                    filterCategory === "all" ? "bg-primary text-primary-foreground font-semibold" : "text-primary hover:bg-secondary"
                   }`}
                 >
-                  All Kerala
+                  <span className="text-base">✦</span>
+                  <span className="font-medium">All Reports</span>
+                  <span className={`ml-auto text-[11px] font-bold tabular-nums ${filterCategory === "all" ? "text-[var(--color-gold)]" : "text-muted-foreground"}`}>
+                    {reports.length}
+                  </span>
                 </button>
-                {DISTRICTS.map((d) => {
-                  const cnt = reports.filter((r) => r.district === d.name).length;
-                  const active = filterDistrict === d.name;
+                {Object.entries(CATEGORY_META).map(([k, v]) => {
+                  const count = reports.filter((r) => r.category === k).length;
+                  const isActive = filterCategory === k;
                   return (
                     <button
-                      key={d.code}
+                      key={k}
                       type="button"
-                      onClick={() => setFilterDistrict(active ? "all" : d.name)}
-                      className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
-                        active
-                          ? "border-foreground bg-foreground text-background"
-                          : "border-border bg-card text-foreground hover:bg-secondary"
+                      onClick={() => setFilterCategory(isActive ? "all" : k)}
+                      className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
+                        isActive ? "bg-primary text-primary-foreground font-semibold" : "text-primary hover:bg-secondary"
                       }`}
                     >
-                      <span>{d.name}</span>
-                      {cnt > 0 && (
-                        <span
-                          className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
-                            active
-                              ? "bg-background/15 text-background"
-                              : "bg-secondary text-muted-foreground"
-                          }`}
-                        >
-                          {cnt}
+                      <span className="text-base">{v.emoji}</span>
+                      <span className="font-medium">{v.label}</span>
+                      {count > 0 && (
+                        <span className={`ml-auto text-[11px] font-bold tabular-nums ${isActive ? "text-[var(--color-gold)]" : "text-accent"}`}>
+                          {count}
                         </span>
                       )}
                     </button>
                   );
                 })}
               </div>
+
+              {/* District nav */}
+              <div className="space-y-0.5">
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Districts</p>
+                <button
+                  type="button"
+                  onClick={() => setFilterDistrict("all")}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition ${
+                    filterDistrict === "all" ? "bg-primary text-primary-foreground font-semibold" : "text-primary hover:bg-secondary"
+                  }`}
+                >
+                  <span className="font-medium">All Kerala</span>
+                </button>
+                {pulseDistricts.map((d) => {
+                  const isActive = filterDistrict === d.name;
+                  return (
+                    <button
+                      key={d.code}
+                      type="button"
+                      onClick={() => setFilterDistrict(isActive ? "all" : d.name)}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition ${
+                        isActive ? "bg-primary text-primary-foreground font-semibold" : "text-primary hover:bg-secondary"
+                      }`}
+                    >
+                      <span className="font-medium">{d.name}</span>
+                      <span className={`text-[11px] font-bold tabular-nums ${
+                        isActive ? "text-[var(--color-gold)]" : d.count > 0 ? "text-accent" : "text-muted-foreground/25"
+                      }`}>
+                        {d.count > 0 ? d.count : "—"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+            </div>
+
+            {/* Report button pinned at bottom of left nav */}
+            <div className="shrink-0 border-t border-border/70 p-4">
+              <button
+                type="button"
+                onClick={() => setReportFlowOpen(true)}
+                className="flex w-full items-center gap-2.5 rounded-xl bg-[var(--color-gold)] px-4 py-3 font-display text-sm font-bold text-primary transition hover:brightness-105 active:scale-[0.98]"
+              >
+                <span>＋</span> Report an Incident
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        {/* ── CENTER FEED ── */}
+        <main className="min-w-0 flex-1 border-r border-border/70">
+          <div className="mx-auto max-w-2xl px-4 pb-24 pt-6 lg:px-6">
+
+            {/* Official alerts (mobile+desktop top of feed) */}
+            {alertStatus === "ready" && alerts.filter((a) => a.severity !== "safe").length > 0 && (
+              <div className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-destructive">
+                  ⚠ {alerts.filter((a) => a.severity !== "safe").length} official advisory · NDMA · IMD
+                </p>
+                {alerts.filter((a) => a.severity !== "safe").slice(0, 2).map((a) => (
+                  <p key={a.id} className="mt-1 text-xs leading-snug text-foreground/75">
+                    {a.disasterType} — {a.district ?? "Kerala"} · {a.source}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {/* Mobile-only category filter strip */}
+            <div className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:hidden">
+              <button type="button" onClick={() => setFilterCategory("all")}
+                className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${filterCategory === "all" ? "bg-primary text-primary-foreground" : "border border-border text-primary"}`}>
+                ✦ All
+              </button>
+              {Object.entries(CATEGORY_META).map(([k, v]) => (
+                <button key={k} type="button" onClick={() => setFilterCategory(filterCategory === k ? "all" : k)}
+                  className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${filterCategory === k ? "bg-primary text-primary-foreground" : "border border-border text-primary"}`}>
+                  {v.emoji} {v.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Mobile-only district filter strip */}
+            <div className="no-scrollbar -mx-4 mb-4 flex gap-1.5 overflow-x-auto px-4 pb-1 lg:hidden">
+              <button type="button" onClick={() => setFilterDistrict("all")}
+                className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${filterDistrict === "all" ? "bg-primary text-primary-foreground" : "border border-border text-primary"}`}>
+                All Kerala
+              </button>
+              {pulseDistricts.filter((d) => d.count > 0).map((d) => (
+                <button key={d.code} type="button" onClick={() => setFilterDistrict(filterDistrict === d.name ? "all" : d.name)}
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${filterDistrict === d.name ? "bg-primary text-primary-foreground" : "border border-border text-primary"}`}>
+                  {d.name} <span className="text-accent font-bold">{d.count}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Search */}
+            <div className="mb-5">
+              <label className="relative block">
+                <span aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-primary/40">⌕</span>
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search a place, report, or area…"
+                  className="w-full rounded-2xl border border-border bg-card py-2.5 pl-9 pr-4 text-sm text-primary placeholder:text-primary/40 shadow-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                />
+              </label>
             </div>
 
             {/* Feed header */}
-            <div className="mt-4 flex items-center justify-between">
-              <h2 className="font-display text-2xl font-semibold">Latest updates</h2>
-              <span className="text-sm font-medium text-muted-foreground">
-                {Math.min(visibleCount, filteredReports.length)} of {filteredReports.length} · newest first
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-display text-lg font-bold text-primary">Latest from Neighbors</h2>
+              <span className="text-xs font-semibold text-muted-foreground">
+                {Math.min(visibleCount, filteredReports.length)} of {filteredReports.length}
               </span>
             </div>
 
-            {/* Report list */}
-            <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
-              {filteredReports.length === 0 ? (
-                <p className="px-4 py-10 text-center text-sm text-muted-foreground">
-                  No reports match these filters.
-                </p>
-              ) : (
-                <>
-                  <ul>
-                    {filteredReports.slice(0, visibleCount).map((r) => (
-                      <ReportRowItem key={r.id} report={r} flash={flashId === r.id} />
-                    ))}
-                  </ul>
-                  {visibleCount < filteredReports.length && (
-                    <div className="border-t border-border px-4 py-4 text-center">
-                      <button
-                        type="button"
-                        onClick={() => setVisibleCount((n) => n + 15)}
-                        className="rounded-full border border-border bg-background px-6 py-2 text-sm font-semibold text-foreground transition hover:bg-secondary hover:border-foreground/40"
-                      >
-                        Load more · {filteredReports.length - visibleCount} remaining
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+            {/* Feed */}
+            {filteredReports.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border bg-card px-5 py-14 text-center text-sm text-muted-foreground">
+                Nothing matches these filters.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredReports.slice(0, visibleCount).map((r) => (
+                  <NeighborCard
+                    key={r.id}
+                    report={r}
+                    flash={flashId === r.id}
+                    onViewDetail={() => setDetailReport(r)}
+                    onViewDistrict={() => setDistrictFocus(r.district)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {visibleCount < filteredReports.length && (
+              <div className="mt-5 text-center">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((n) => n + 15)}
+                  className="rounded-full border border-[var(--color-gold)]/40 bg-card px-7 py-2.5 text-sm font-bold text-primary shadow-sm transition hover:bg-secondary"
+                >
+                  Load more · {filteredReports.length - visibleCount} remaining
+                </button>
+              </div>
+            )}
+
+            <footer className="mt-12 text-center text-xs text-muted-foreground">
+              {t.communityPowered}
+            </footer>
           </div>
+        </main>
 
-          {/* Right rail */}
-          <div className="hidden lg:block">
-            <div className="sticky top-24 space-y-5">
+        {/* ── RIGHT PANEL ── */}
+        <aside className="hidden xl:block xl:w-72 shrink-0">
+          <div className="sticky top-[61px] flex h-[calc(100vh-61px)] flex-col overflow-y-auto no-scrollbar">
+            <div className="flex-1 space-y-4 p-5">
 
-              {/* Official alerts */}
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-                <h3 className="font-display text-base font-semibold">{t.officialAdvisories}</h3>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">NDMA Sachet · IMD · KSDMA</p>
-                {alertStatus === "loading" ? (
-                  <p className="mt-3 animate-pulse text-xs text-muted-foreground">{t.fetchingAdvisories}</p>
-                ) : alerts.length === 0 ? (
-                  <p className="mt-3 text-xs italic text-muted-foreground">{t.noActiveAdvisories}</p>
-                ) : (
-                  <ul className="mt-3 space-y-2">
-                    {alerts.slice(0, 4).map((a) => (
-                      <li
-                        key={a.id}
-                        className={`rounded-lg border-l-2 py-2 pl-3 text-xs ${sevBorderL(a.severity)} ${
-                          a.severity === "critical"
-                            ? "bg-destructive/5"
-                            : a.severity === "warn"
-                            ? "bg-warn/5"
-                            : "bg-success/5"
-                        }`}
-                      >
-                        <div className={`font-semibold ${sevText(a.severity)}`}>
-                          {a.district ?? "Kerala"} · {a.disasterType}
-                        </div>
-                        <div className="mt-0.5 truncate text-muted-foreground">{a.source}</div>
-                      </li>
+              {/* Official alerts (right panel) */}
+              {alertStatus === "ready" && alerts.filter((a) => a.severity !== "safe").length > 0 ? (
+                <div className="rounded-2xl border border-destructive/15 bg-destructive/5 p-4">
+                  <p className="mb-2.5 text-[10px] font-bold uppercase tracking-wider text-destructive">
+                    ⚠ Official Alerts · {alerts.filter((a) => a.severity !== "safe").length}
+                  </p>
+                  <div className="space-y-2">
+                    {alerts.filter((a) => a.severity !== "safe").slice(0, 5).map((a) => (
+                      <div key={a.id} className={`rounded-xl border-l-2 py-2 pl-3 pr-2 text-xs ${sevBorderL(a.severity)}`}>
+                        <div className={`font-bold ${sevText(a.severity)}`}>{a.disasterType}</div>
+                        <div className="text-muted-foreground">{a.district ?? "Kerala"} · {a.source}</div>
+                      </div>
                     ))}
-                    {alerts.length > 4 && (
-                      <li className="pt-1 text-center text-xs text-muted-foreground">
-                        +{alerts.length - 4} more
-                      </li>
-                    )}
-                  </ul>
-                )}
-              </section>
-
-              {/* Most active districts */}
-              {topDistricts.length > 0 && (
-                <section className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-                  <h3 className="font-display text-base font-semibold">Most active districts</h3>
-                  <ul className="mt-3 space-y-1">
-                    {topDistricts.map((d) => (
-                      <li key={d.code}>
-                        <button
-                          type="button"
-                          onClick={() => setDistrictFocus(d.name)}
-                          className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm transition hover:bg-secondary"
-                        >
-                          <span className="font-medium text-foreground">{d.name}</span>
-                          <span className="tabular-nums text-xs font-semibold text-accent">
-                            {d.count}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-
-              {/* Stats */}
-              <section className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-                <h3 className="font-display text-base font-semibold">Overview</h3>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <div>
-                    <div className="font-display text-2xl font-semibold tabular-nums text-accent">
-                      {alerts.filter((a) => a.severity !== "safe").length}
-                    </div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {t.officialAlerts}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="font-display text-2xl font-semibold tabular-nums text-primary">
-                      {reports.length}
-                    </div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {t.crowdReports}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="font-display text-2xl font-semibold tabular-nums">
-                      {new Set([
-                        ...alerts.map((a) => a.district).filter(Boolean),
-                        ...reports.map((r) => r.district),
-                      ]).size}
-                    </div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {t.districtsActive}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="font-display text-2xl font-semibold tabular-nums text-destructive">
-                      {reports.filter((r) => r.severity === "critical").length}
-                    </div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {t.criticalZones}
-                    </div>
                   </div>
                 </div>
-              </section>
+              ) : (
+                <div className="rounded-2xl border border-success/20 bg-success/5 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-success">✓ No Active Alerts</p>
+                  <p className="mt-1 text-xs text-muted-foreground">No official advisories from NDMA, IMD, or KSDMA at this time.</p>
+                </div>
+              )}
+
+              {/* Quick post */}
+              <button
+                type="button"
+                onClick={() => setReportFlowOpen(true)}
+                className="w-full rounded-2xl bg-primary p-5 text-left ring-1 ring-[var(--color-gold)]/20 transition hover:brightness-110 active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--color-gold)] text-lg font-bold text-primary">＋</span>
+                  <div>
+                    <div className="font-display text-sm font-bold text-primary-foreground">Report what you see</div>
+                    <div className="text-[11px] text-primary-foreground/60">Help your neighbors stay safe</div>
+                  </div>
+                </div>
+              </button>
+
+              {/* App info */}
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">About</p>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  LiveKerala is a community-powered disaster watch platform. Reports are crowd-verified and supplemented with official NDMA · IMD · KSDMA advisories.
+                </p>
+              </div>
+
             </div>
           </div>
-        </div>
+        </aside>
 
-        {/* ── All 14 districts ── */}
-        <section className="mt-10 border-t border-border pt-6">
-          <h3 className="font-display text-lg font-semibold">{t.allDistricts}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">{t.tapToInspect}</p>
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-            {DISTRICTS.map((d) => {
-              const dReports = reports.filter((r) => r.district === d.name);
-              const dAlerts = alerts.filter((a) => a.district === d.name);
-              const total = dReports.length + dAlerts.length;
-              const sev = maxSeverity([
-                ...dReports.map((r) => ({ severity: r.severity })),
-                ...dAlerts.map((a) => ({ severity: a.severity })),
-              ]);
-              return (
-                <button
-                  key={d.code}
-                  type="button"
-                  onClick={() => setDistrictFocus(d.name)}
-                  className="group flex flex-col items-start rounded-2xl border border-border bg-card p-3 text-left shadow-[var(--shadow-card)] transition hover:border-primary/40 hover:shadow-md"
-                >
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    {d.code}
-                  </div>
-                  <div className="mt-1 font-display text-sm font-semibold leading-snug text-foreground">
-                    {d.name}
-                  </div>
-                  {total > 0 && (
-                    <div className={`mt-1 text-[10px] font-bold tabular-nums ${sevText(sev)}`}>
-                      {total} active
-                    </div>
-                  )}
-                  <div
-                    className={`mt-2 h-1 w-full rounded-full ${
-                      total > 0
-                        ? sev === "critical"
-                          ? "bg-destructive"
-                          : sev === "warn"
-                          ? "bg-warn"
-                          : "bg-success"
-                        : "bg-secondary"
-                    }`}
-                    style={{ opacity: total > 0 ? Math.max(0.3, Math.min(1, total / 6)) : 0.2 }}
-                  />
-                </button>
-              );
-            })}
-          </div>
-        </section>
+      </div>{/* end 3-col */}
 
-        <footer className="mt-16 border-t border-border pt-6 text-center text-xs text-muted-foreground">
-          {t.communityPowered}
-        </footer>
-      </main>
+      {/* ── Mobile floating bar ── */}
+      <div className="fixed inset-x-0 bottom-4 z-30 flex justify-center px-4 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setReportFlowOpen(true)}
+          className="flex w-full max-w-sm items-center justify-between gap-3 rounded-2xl bg-primary px-4 py-3 text-primary-foreground shadow-xl ring-1 ring-[var(--color-gold)]/30 transition active:scale-[0.99]"
+        >
+          <span className="flex items-center gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--color-gold)] text-sm font-bold text-primary">＋</span>
+            <span className="leading-tight">
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-primary-foreground/70">Quick post</span>
+              <span className="block text-sm font-semibold">Report what you're seeing</span>
+            </span>
+          </span>
+          <span aria-hidden className="text-[var(--color-gold)]">→</span>
+        </button>
+      </div>
 
       {/* ── Modals ── */}
       {welcomeOpen && (
-        <WelcomeModal dataReady={dataReady} lang={lang} t={t} onDismiss={dismissWelcome} />
+        <WelcomeModal
+          dataReady={status === "live" && alertStatus !== "loading"}
+          t={t}
+          onDismiss={dismissWelcome}
+        />
       )}
 
-      {reportOpen && selectedPlace && (
-        <ReportAlertModal
-          place={selectedPlace}
-          onClose={() => setReportOpen(false)}
-          onSubmitted={() => setReportOpen(false)}
-        />
+      {reportFlowOpen && (
+        <ReportFlowModal onClose={() => setReportFlowOpen(false)} />
       )}
 
       {districtFocus && (
@@ -819,70 +976,140 @@ export function HomePage() {
           onClose={() => setDistrictFocus(null)}
         />
       )}
+
+      {detailReport && (
+        <StandaloneDetailModal report={detailReport} onClose={() => setDetailReport(null)} />
+      )}
+
+      {loadingPhase !== "hidden" && <LoadingScreen fading={loadingPhase === "fading"} />}
     </div>
   );
 }
 
-/* ─── Welcome Modal ─────────────────────────────────────────── */
+/* ─── Category Tile ─────────────────────────────────────────── */
+function CategoryTile({
+  emoji, label, active, onClick,
+}: { emoji: string; label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="group flex shrink-0 flex-col items-center gap-1.5">
+      <span className={`grid h-12 w-12 place-items-center rounded-2xl border text-xl transition ${
+        active
+          ? "border-[var(--color-gold)]/60 bg-[var(--color-gold)]/20 text-primary shadow-sm"
+          : "border-primary/10 bg-primary/5 text-primary group-hover:border-primary/20"
+      }`}>
+        {emoji}
+      </span>
+      <span className={`text-[10px] font-bold uppercase tracking-wider ${active ? "text-primary" : "text-primary/60"}`}>
+        {label}
+      </span>
+    </button>
+  );
+}
 
+/* ─── Neighbor Card ─────────────────────────────────────────── */
+function NeighborCard({
+  report, flash, onViewDetail, onViewDistrict,
+}: {
+  report: Report;
+  flash: boolean;
+  onViewDetail: () => void;
+  onViewDistrict: () => void;
+}) {
+  const cat = catMeta(report.category);
+  const initials = reportInitials(report.id);
+
+  return (
+    <article className={`flex flex-col gap-3 rounded-3xl border bg-card p-4 shadow-[var(--shadow-card)] transition sm:p-5 ${
+      flash ? "border-[var(--color-gold)]/60 bg-[var(--color-gold)]/5" : "border-primary/5"
+    }`}>
+      <header className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-background font-display text-xs font-bold text-primary ring-1 ring-[var(--color-gold)]/30">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-primary">neighbor_{report.id.slice(-5)}</p>
+            <p className="truncate text-[11px] font-medium text-accent">
+              {formatReportTime(report.created_at)}
+              {report.place && <> · {report.place}</>}
+              {" · "}
+              <button type="button" onClick={onViewDistrict} className="underline underline-offset-2">
+                {report.district}
+              </button>
+            </p>
+          </div>
+        </div>
+        <span className="shrink-0 rounded-lg bg-secondary px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+          <span className="mr-1" aria-hidden>{cat.emoji}</span>{cat.label}
+        </span>
+      </header>
+
+      <button type="button" onClick={onViewDetail} className="text-left">
+        <p className="text-[15px] leading-relaxed text-primary/90 text-pretty line-clamp-3">
+          {report.message}
+        </p>
+        {report.image_url && (
+          <img src={report.image_url} alt="" className="mt-2 w-full max-h-40 rounded-2xl object-cover" />
+        )}
+      </button>
+
+      <footer className="flex items-center gap-4 pt-0.5">
+        <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${sevBadge(report.severity)}`}>
+          {report.severity.toUpperCase()}
+        </span>
+        <button
+          type="button"
+          onClick={onViewDetail}
+          className="ml-auto text-xs font-bold text-[var(--color-gold)] transition hover:underline"
+        >
+          View & Vote →
+        </button>
+      </footer>
+    </article>
+  );
+}
+
+/* ─── Welcome Modal ─────────────────────────────────────────── */
 type TShape = typeof import("../i18n/translations").T["en"];
 
 function WelcomeModal({
-  dataReady,
-  lang,
-  t,
-  onDismiss,
-}: {
-  dataReady: boolean;
-  lang: string;
-  t: TShape;
-  onDismiss: () => void;
-}) {
+  dataReady, t, onDismiss,
+}: { dataReady: boolean; t: TShape; onDismiss: () => void }) {
   const steps = [
     { icon: "📍", title: t.welcomeStep1Title, desc: t.welcomeStep1Desc },
     { icon: "⚠️", title: t.welcomeStep2Title, desc: t.welcomeStep2Desc },
     { icon: "🗺️", title: t.welcomeStep3Title, desc: t.welcomeStep3Desc },
   ];
-
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
-        <div className={`h-1 w-full transition-all duration-700 ${dataReady ? "bg-success" : "bg-accent animate-pulse"}`} />
-        <div className="p-6 space-y-5">
-          <div className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">
-              {t.welcomeTag}
-            </p>
-            <h2 className="font-display text-2xl font-semibold leading-tight">{t.welcomeHeadline}</h2>
-            <p className="text-sm text-muted-foreground">{t.welcomeSub}</p>
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-foreground/30 backdrop-blur-sm sm:items-center p-4">
+      <div className="w-full max-w-sm overflow-hidden rounded-[2rem] border border-border bg-card shadow-[var(--shadow-hero)]">
+        <div className={`h-1.5 w-full ${dataReady ? "bg-success" : "bg-[var(--color-gold)] animate-pulse"}`} />
+        <div className="p-6 space-y-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">{t.welcomeTag}</p>
+            <h2 className="font-display text-2xl font-bold text-primary mt-1">{t.welcomeHeadline}</h2>
+            <p className="text-sm text-muted-foreground mt-1">{t.welcomeSub}</p>
           </div>
-
           <div className="space-y-2">
             {steps.map((s, i) => (
-              <div key={i} className="flex items-start gap-3 rounded-xl bg-secondary/60 px-4 py-3">
+              <div key={i} className="flex items-start gap-3 rounded-2xl bg-secondary px-4 py-3">
                 <span className="mt-0.5 shrink-0 text-xl">{s.icon}</span>
                 <div>
-                  <div className="text-xs font-bold uppercase tracking-widest">{s.title}</div>
+                  <div className="text-xs font-bold text-primary">{s.title}</div>
                   <div className="mt-0.5 text-xs text-muted-foreground">{s.desc}</div>
                 </div>
               </div>
             ))}
           </div>
-
-          <div className="flex items-center gap-3">
-            {dataReady ? (
-              <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-success">
-                <span className="h-2 w-2 rounded-full bg-success" /> {t.welcomeReady}
-              </span>
-            ) : (
-              <span className="flex animate-pulse items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-warn">
-                <span className="h-2 w-2 rounded-full bg-warn" /> {t.welcomeLoading}
-              </span>
-            )}
+          <div className="flex items-center gap-3 pt-1">
+            {dataReady
+              ? <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-success"><span className="h-2 w-2 rounded-full bg-success" />{t.welcomeReady}</span>
+              : <span className="flex animate-pulse items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-warn"><span className="h-2 w-2 rounded-full bg-warn" />{t.welcomeLoading}</span>
+            }
             <button
               type="button"
               onClick={onDismiss}
-              className="ml-auto rounded-full bg-accent px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-accent-foreground transition hover:brightness-105"
+              className="ml-auto rounded-full bg-[var(--color-gold)] px-5 py-2.5 text-xs font-bold text-primary transition hover:brightness-105"
             >
               {t.welcomeBtn}
             </button>
@@ -893,41 +1120,50 @@ function WelcomeModal({
   );
 }
 
-/* ─── Location Picker ───────────────────────────────────────── */
+/* ─── Report Flow Modal (location + form) ────────────────────── */
+function ReportFlowModal({ onClose }: { onClose: () => void }) {
+  const { t } = useLanguage();
+  const [step, setStep] = useState<"location" | "form">("location");
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
 
-function LocationPicker({
-  selected,
-  onSelect,
-}: {
-  selected: Place | null;
-  onSelect: (p: Place | null) => void;
-}) {
+  function handlePlaceSelected(p: Place) {
+    setSelectedPlace(p);
+    setStep("form");
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/30 backdrop-blur-sm p-3 sm:items-center sm:p-4"
+      onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm overflow-hidden rounded-[2rem] border border-border bg-card shadow-[var(--shadow-hero)] max-h-[92vh] overflow-y-auto"
+      >
+        {step === "location" ? (
+          <LocationPickerStep onSelect={handlePlaceSelected} onClose={onClose} />
+        ) : selectedPlace ? (
+          <ReportFormStep place={selectedPlace} onBack={() => setStep("location")} onClose={onClose} />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function LocationPickerStep({ onSelect, onClose }: { onSelect: (p: Place) => void; onClose: () => void }) {
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const { results, loading } = usePhotonSearch(query);
-  const boxRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
+  const [open, setOpen] = useState(false);
 
   async function detectLocation() {
     if (!navigator.geolocation) { setGeoError("Geolocation not supported."); return; }
-    setGeoLoading(true);
-    setGeoError(null);
+    setGeoLoading(true); setGeoError(null);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const place = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
         setGeoLoading(false);
         if (!place) { setGeoError("Couldn't resolve your location."); return; }
         onSelect(place);
-        setQuery(place.name);
       },
       (err) => { setGeoLoading(false); setGeoError(err.message || "Location permission denied."); },
       { enableHighAccuracy: true, timeout: 10000 },
@@ -935,88 +1171,60 @@ function LocationPicker({
   }
 
   return (
-    <div ref={boxRef} className="relative space-y-2">
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={query}
-          onFocus={() => setOpen(true)}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setOpen(true);
-            if (selected) onSelect(null);
-          }}
-          placeholder="Search your place (e.g. Payyannur, Kakkanad…)"
-          className="flex-1 rounded-full border border-border bg-background px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30 transition-shadow"
-        />
+    <div className="p-5 space-y-4">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">Step 1 of 2</p>
+          <h2 className="font-display text-xl font-bold text-primary mt-0.5">Where are you?</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Search your locality to start reporting</p>
+        </div>
+        <button type="button" onClick={onClose} className="text-xs font-bold text-muted-foreground hover:text-foreground">✕</button>
+      </div>
+
+      <div className="space-y-2">
+        <div className="relative">
+          <input
+            type="text"
+            value={query}
+            onFocus={() => setOpen(true)}
+            onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+            placeholder="Search your place (e.g. Payyannur, Kakkanad…)"
+            className="w-full rounded-2xl border border-border bg-background py-3 pl-4 pr-4 text-sm text-primary placeholder:text-primary/40 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+          />
+          {open && query.trim().length >= 2 && (
+            <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+              {loading && <div className="px-4 py-2 text-xs text-muted-foreground">Searching…</div>}
+              {!loading && results.length === 0 && <div className="px-4 py-2 text-xs text-muted-foreground">No places found in Kerala</div>}
+              {results.map((p, i) => (
+                <button
+                  key={`${p.lat}-${p.lon}-${i}`}
+                  type="button"
+                  onClick={() => { onSelect(p); setOpen(false); }}
+                  className="w-full border-b border-border/50 px-4 py-3 text-left transition last:border-0 hover:bg-secondary"
+                >
+                  <div className="text-sm font-bold text-primary">{p.name}</div>
+                  <div className="text-xs text-muted-foreground">{p.district} · {p.context}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           onClick={detectLocation}
           disabled={geoLoading}
-          className="rounded-full border border-border bg-background px-3.5 py-2 text-xs font-semibold text-primary transition hover:bg-secondary disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--color-gold)]/30 bg-[var(--color-gold)]/10 py-3 text-sm font-bold text-primary transition hover:bg-[var(--color-gold)]/20 disabled:opacity-50"
         >
-          {geoLoading ? "…" : "📍 Auto"}
+          📍 {geoLoading ? "Detecting…" : "Use my current location"}
         </button>
+        {geoError && <p className="text-xs font-semibold text-destructive">{geoError}</p>}
       </div>
-
-      {selected && (
-        <div className="flex items-center justify-between rounded-full border border-primary/30 bg-primary/5 px-4 py-2">
-          <div>
-            <span className="text-sm font-semibold text-foreground">{selected.name}</span>
-            <span className="ml-2 text-xs text-muted-foreground">
-              {selected.district} · {selected.context}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => { onSelect(null); setQuery(""); }}
-            className="ml-3 text-xs text-muted-foreground hover:text-foreground"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {geoError && (
-        <p className="text-xs font-semibold text-destructive">{geoError}</p>
-      )}
-
-      {open && !selected && (query.trim().length >= 2 || loading) && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
-          {loading && (
-            <div className="px-4 py-2 text-xs text-muted-foreground">Searching…</div>
-          )}
-          {!loading && results.length === 0 && (
-            <div className="px-4 py-2 text-xs text-muted-foreground">No places found in Kerala</div>
-          )}
-          {results.map((p, i) => (
-            <button
-              key={`${p.lat}-${p.lon}-${i}`}
-              type="button"
-              onClick={() => { onSelect(p); setQuery(p.name); setOpen(false); }}
-              className="w-full border-b border-border/50 px-4 py-2.5 text-left transition last:border-0 hover:bg-secondary"
-            >
-              <div className="text-sm font-semibold text-foreground">{p.name}</div>
-              <div className="text-xs text-muted-foreground">{p.district} · {p.context}</div>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
-/* ─── Report Alert Modal ────────────────────────────────────── */
-
-function ReportAlertModal({
-  place,
-  onClose,
-  onSubmitted,
-}: {
-  place: Place;
-  onClose: () => void;
-  onSubmitted: () => void;
-}) {
+function ReportFormStep({ place, onBack, onClose }: { place: Place; onBack: () => void; onClose: () => void }) {
   const { t } = useLanguage();
   const [severity, setSeverity] = useState<Severity>("warn");
   const [category, setCategory] = useState("Flood");
@@ -1034,11 +1242,9 @@ function ReportAlertModal({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = message.trim();
-    if (trimmed.length < 1 || trimmed.length > 500) { setError("Message must be 1–500 characters."); return; }
+    if (!trimmed) { setError("Please describe what happened."); return; }
     if (imageFile && imageFile.size > 5 * 1024 * 1024) { setError("Image must be under 5 MB."); return; }
-    setSubmitting(true);
-    setError(null);
-
+    setSubmitting(true); setError(null);
     try {
       const res = await fetch(`${API_BASE}/districts/${place.slug}/reports`, {
         method: "POST",
@@ -1054,23 +1260,19 @@ function ReportAlertModal({
           locality: place.name,
         }),
       });
-
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        setError((err as { detail?: string }).detail || "Submission failed. Please try again.");
+        setError((err as { detail?: string }).detail || "Submission failed.");
         setSubmitting(false);
         return;
       }
-
       const created = await res.json() as { id: number };
-
       if (imageFile) {
-        const formData = new FormData();
-        formData.append("file", imageFile);
-        await fetch(`${API_BASE}/reports/${created.id}/images`, { method: "POST", body: formData });
+        const fd = new FormData();
+        fd.append("file", imageFile);
+        await fetch(`${API_BASE}/reports/${created.id}/images`, { method: "POST", body: fd });
       }
-
-      onSubmitted();
+      onClose();
     } catch {
       setError("Network error. Please try again.");
       setSubmitting(false);
@@ -1078,268 +1280,120 @@ function ReportAlertModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4"
-      onClick={onClose}
-    >
-      <form
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={submit}
-        className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] max-h-[90vh] overflow-y-auto"
-      >
-        <div className="p-5 sm:p-6 space-y-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-accent">{t.newReportTag}</p>
-              <h2 className="font-display text-xl font-semibold mt-0.5">{place.name}</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {place.district} District · {place.context}
-              </p>
-            </div>
-            <button type="button" onClick={onClose} className="text-xs font-semibold text-muted-foreground hover:text-foreground">
-              {t.close} ✕
-            </button>
-          </div>
-
-          <label className="block space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t.categoryLabel}</span>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-            >
-              {Object.entries(CATEGORY_META).map(([k, v]) => (
-                <option key={k} value={k}>{v.emoji} {v.label}</option>
-              ))}
-              <option value="Other">📌 Other</option>
-            </select>
-          </label>
-
-          <div className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t.severityTagLabel}</span>
-            <div className="grid grid-cols-3 gap-2">
-              {(["safe", "warn", "critical"] as Severity[]).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setSeverity(s)}
-                  className={`rounded-full border py-2 text-xs font-bold uppercase tracking-widest transition ${
-                    severity === s
-                      ? s === "critical"
-                        ? "border-destructive bg-destructive/10 text-destructive"
-                        : s === "warn"
-                        ? "border-warn bg-warn/10 text-warn"
-                        : "border-success bg-success/10 text-success"
-                      : "border-border text-muted-foreground hover:border-foreground/40"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <label className="block space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t.whatHappened}</span>
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={4}
-              maxLength={500}
-              placeholder={t.describePlaceholder}
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none resize-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30"
-            />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span className={error ? "text-destructive font-medium" : ""}>{error ?? t.visiblePublicly}</span>
-              <span>{message.length}/500</span>
-            </div>
-          </label>
-
-          <div className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t.photoOptionalLabel}</span>
-            {imagePreview ? (
-              <div className="relative">
-                <img src={imagePreview} alt="preview" className="w-full max-h-48 rounded-xl object-cover border border-border" />
-                <button
-                  type="button"
-                  onClick={() => pickImage(null)}
-                  className="absolute right-2 top-2 rounded-full border border-border bg-card px-2 py-1 text-[10px] font-bold uppercase tracking-widest hover:border-destructive"
-                >
-                  {t.removePhoto}
-                </button>
-              </div>
-            ) : (
-              <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-border py-6 transition hover:border-primary hover:bg-secondary/40">
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => pickImage(e.target.files?.[0] ?? null)} />
-                <span className="text-xs font-semibold text-muted-foreground">{t.attachPhotoBtn}</span>
-              </label>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="rounded-full border border-border px-4 py-2 text-xs font-semibold hover:bg-secondary">
-              {t.cancel}
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-full bg-accent px-4 py-2 text-xs font-bold text-accent-foreground transition hover:brightness-105 disabled:opacity-50"
-            >
-              {submitting ? t.submitting : t.submitReportBtn}
-            </button>
-          </div>
+    <form onSubmit={submit} className="p-5 space-y-4">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">Step 2 of 2</p>
+          <h2 className="font-display text-xl font-bold text-primary mt-0.5">{place.name}</h2>
+          <p className="text-xs text-muted-foreground">{place.district} · {place.context}</p>
         </div>
-      </form>
-    </div>
+        <button type="button" onClick={onBack} className="text-xs font-bold text-accent hover:underline">← Back</button>
+      </div>
+
+      {/* Category */}
+      <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
+        {Object.entries(CATEGORY_META).map(([k, v]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setCategory(k)}
+            className={`shrink-0 flex flex-col items-center gap-1 rounded-2xl border px-3 py-2 transition ${
+              category === k
+                ? "border-[var(--color-gold)]/60 bg-[var(--color-gold)]/15 text-primary"
+                : "border-primary/10 bg-primary/5 text-primary/70"
+            }`}
+          >
+            <span className="text-lg leading-none">{v.emoji}</span>
+            <span className="text-[9px] font-bold uppercase tracking-wider">{v.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Severity */}
+      <div className="grid grid-cols-3 gap-2">
+        {(["safe", "warn", "critical"] as Severity[]).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setSeverity(s)}
+            className={`rounded-2xl border py-2.5 text-xs font-bold uppercase tracking-widest transition ${
+              severity === s
+                ? s === "critical"
+                  ? "border-destructive bg-destructive/10 text-destructive"
+                  : s === "warn"
+                  ? "border-warn bg-warn/10 text-warn"
+                  : "border-success bg-success/10 text-success"
+                : "border-border text-muted-foreground hover:border-foreground/30"
+            }`}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
+      {/* Message */}
+      <div>
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={3}
+          maxLength={500}
+          placeholder={t.describePlaceholder}
+          className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-primary resize-none placeholder:text-primary/40 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+        />
+        <div className="flex justify-between mt-1 text-xs text-muted-foreground">
+          <span className={error ? "text-destructive font-semibold" : ""}>{error ?? t.visiblePublicly}</span>
+          <span>{message.length}/500</span>
+        </div>
+      </div>
+
+      {/* Photo */}
+      {imagePreview ? (
+        <div className="relative">
+          <img src={imagePreview} alt="" className="w-full max-h-40 rounded-2xl object-cover border border-border" />
+          <button type="button" onClick={() => pickImage(null)} className="absolute right-2 top-2 rounded-full border border-border bg-card px-2 py-1 text-[10px] font-bold">
+            {t.removePhoto}
+          </button>
+        </div>
+      ) : (
+        <label className="flex cursor-pointer items-center justify-center rounded-2xl border border-dashed border-[var(--color-gold)]/40 py-5 hover:bg-[var(--color-gold)]/5 transition">
+          <input type="file" accept="image/*" className="hidden" onChange={(e) => pickImage(e.target.files?.[0] ?? null)} />
+          <span className="text-xs font-semibold text-muted-foreground">{t.attachPhotoBtn}</span>
+        </label>
+      )}
+
+      <div className="flex gap-3 pt-1">
+        <button type="button" onClick={onClose} className="flex-1 rounded-2xl border border-border py-3 text-sm font-semibold text-primary transition hover:bg-secondary">
+          {t.cancel}
+        </button>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="flex-1 rounded-2xl bg-[var(--color-gold)] py-3 text-sm font-bold text-primary transition hover:brightness-105 disabled:opacity-50"
+        >
+          {submitting ? t.submitting : t.submitReportBtn}
+        </button>
+      </div>
+    </form>
   );
 }
 
-/* ─── District Modal ────────────────────────────────────────── */
-
-function DistrictModal({
-  district,
-  reports,
-  alerts,
-  onClose,
-}: {
-  district: string;
-  reports: Report[];
-  alerts: OfficialAlert[];
-  onClose: () => void;
-}) {
-  const { t } = useLanguage();
-  const places = useMemo(() => {
-    const set = new Set<string>();
-    reports.forEach((r) => r.place && set.add(r.place));
-    return Array.from(set);
-  }, [reports]);
-  const [activePlace, setActivePlace] = useState<string | null>(null);
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
-  const visibleReports = activePlace ? reports.filter((r) => r.place === activePlace) : reports;
-
-  const sev = maxSeverity([
-    ...reports.map((r) => ({ severity: r.severity })),
-    ...alerts.map((a) => ({ severity: a.severity })),
-  ]);
-  const headline =
-    alerts.find((a) => a.severity === "critical")?.disasterType ??
-    alerts[0]?.disasterType ??
-    (reports.length > 0 ? "Crowd reports active" : "No active incidents");
-
-  const sevStrip = sev === "critical" ? "bg-destructive" : sev === "warn" ? "bg-warn" : "bg-success";
-
+/* ─── Standalone Detail Modal ────────────────────────────────── */
+function StandaloneDetailModal({ report, onClose }: { report: Report; onClose: () => void }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/30 backdrop-blur-sm p-3 sm:items-center sm:p-4" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]"
+        className="relative w-full max-w-sm overflow-hidden rounded-[2rem] border border-primary/10 bg-card shadow-[var(--shadow-hero)] flex flex-col"
+        style={{ maxHeight: "88vh" }}
       >
-        {/* Severity strip */}
-        <div className={`h-1 w-full shrink-0 ${sevStrip}`} />
-
-        {/* Header */}
-        <header className="shrink-0 border-b border-border px-5 py-4">
-          <div className="flex items-center justify-between gap-3 mb-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">
-              {t.dossierLabel}
-            </p>
-            <button type="button" onClick={onClose} className="text-xs font-semibold text-muted-foreground hover:text-foreground">
-              {t.close} ✕
-            </button>
-          </div>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="font-display text-2xl font-semibold tracking-tight">{district}</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">{headline}</p>
-            </div>
-            <div className="flex gap-4">
-              <DistrictStat value={alerts.length} label={t.officialLabel} color={sevText(sev)} />
-              <DistrictStat value={reports.length} label={t.crowdLabel} color="text-primary" />
-              <DistrictStat value={places.length} label={t.placesMetricLabel} color="text-muted-foreground" />
-            </div>
-          </div>
-        </header>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto divide-y divide-border">
-          {/* Official advisories */}
-          <section>
-            <div className="flex items-center justify-between px-5 py-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t.officialAdvisories}</h3>
-              <span className="text-[10px] text-muted-foreground/60">NDMA · IMD · KSDMA</span>
-            </div>
-            {alerts.length === 0 ? (
-              <p className="px-5 pb-4 text-xs italic text-muted-foreground">{t.noOfficialAdvisory} {district}.</p>
-            ) : (
-              <div className="grid grid-cols-1 gap-2 px-5 pb-4 md:grid-cols-2">
-                {alerts.map((a) => <ModalAlertCard key={a.id} alert={a} />)}
-              </div>
-            )}
-          </section>
-
-          {/* Crowd reports */}
-          <section>
-            <div className="px-5 py-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                {t.crowdBriefs} ({visibleReports.length})
-              </h3>
-            </div>
-            {places.length > 0 && (
-              <div className="flex gap-1.5 overflow-x-auto px-5 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <button
-                  type="button"
-                  onClick={() => setActivePlace(null)}
-                  className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                    activePlace === null
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-border bg-card text-foreground hover:bg-secondary"
-                  }`}
-                >
-                  {t.allPlaces}
-                </button>
-                {places.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setActivePlace(p)}
-                    className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                      activePlace === p
-                        ? "border-foreground bg-foreground text-background"
-                        : "border-border bg-card text-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="space-y-1.5 px-5 pb-5">
-              {visibleReports.length === 0 ? (
-                <p className="py-6 text-center text-xs italic text-muted-foreground">
-                  {t.noCrowdReportsYet}{activePlace ? ` ${t.forLabel} ${activePlace}` : ""}.
-                </p>
-              ) : (
-                visibleReports.map((r) => (
-                  <ModalReportCard key={r.id} report={r} onClick={() => setSelectedReport(r)} />
-                ))
-              )}
-            </div>
-          </section>
-        </div>
-
-        {selectedReport && (
-          <ReportDetailPanel report={selectedReport} onBack={() => setSelectedReport(null)} />
-        )}
+        <ReportDetailPanel report={report} onBack={onClose} />
       </div>
     </div>
   );
 }
 
 /* ─── Report Detail Panel ───────────────────────────────────── */
-
 function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => void }) {
   const { t } = useLanguage();
   const { data, loading } = useReportDetail(report.id);
@@ -1349,14 +1403,11 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
   const [commentText, setCommentText] = useState("");
   const [posting, setPosting] = useState(false);
   const anonName = useRef(`user_${Math.random().toString(36).slice(2, 8)}`);
+  const cat = catMeta(report.category);
 
   useEffect(() => {
     if (data) {
-      setLocalCounts({
-        confirmed: data.confirmed_count ?? 0,
-        incorrect: data.incorrect_count ?? 0,
-        resolved: data.resolved_count ?? 0,
-      });
+      setLocalCounts({ confirmed: data.confirmed_count ?? 0, incorrect: data.incorrect_count ?? 0, resolved: data.resolved_count ?? 0 });
       setComments(data.comments ?? []);
     }
   }, [data]);
@@ -1364,13 +1415,7 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
   async function vote(kind: "confirm" | "incorrect" | "resolved") {
     if (voted) return;
     setVoted(kind);
-    if (localCounts) {
-      setLocalCounts((c) =>
-        c
-          ? { ...c, [kind === "confirm" ? "confirmed" : kind]: c[kind === "confirm" ? "confirmed" : (kind as "incorrect" | "resolved")] + 1 }
-          : c,
-      );
-    }
+    setLocalCounts((c) => c ? { ...c, [kind === "confirm" ? "confirmed" : kind]: c[kind === "confirm" ? "confirmed" : kind as "incorrect" | "resolved"] + 1 } : c);
     await fetch(`${API_BASE}/reports/${report.id}/verifications`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1390,18 +1435,10 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
         body: JSON.stringify({ author_name: anonName.current, content: text }),
       });
       if (res.ok) {
-        const newComment: ApiComment = {
-          id: Date.now(),
-          author_name: anonName.current,
-          content: text,
-          created_at: new Date().toISOString(),
-        };
-        setComments((prev) => [...prev, newComment]);
+        setComments((prev) => [...prev, { id: Date.now(), author_name: anonName.current, content: text, created_at: new Date().toISOString() }]);
         setCommentText("");
       }
-    } finally {
-      setPosting(false);
-    }
+    } finally { setPosting(false); }
   }
 
   const imgUrl = data?.images?.[0]?.file_path
@@ -1409,134 +1446,89 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
     : report.image_url;
 
   return (
-    <div className="absolute inset-0 z-10 flex flex-col overflow-hidden rounded-2xl bg-card border-t-2 border-primary">
+    <div className="flex flex-col overflow-hidden" style={{ maxHeight: "88vh" }}>
       {/* Header */}
-      <header className="flex shrink-0 items-center gap-3 border-b border-border bg-secondary/40 px-4 py-2.5">
-        <button
-          type="button"
-          onClick={onBack}
-          className="text-xs font-semibold text-primary hover:text-foreground transition-colors"
-        >
-          ← {t.backToList}
-        </button>
-        <span className="text-border">|</span>
-        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${sevBadge(report.severity)}`}>
-          {report.severity}
-        </span>
-        {report.category && (
-          <span className="text-xs text-muted-foreground">
-            {catEmoji(report.category)} {report.category}
-          </span>
-        )}
-        <span className="ml-auto text-xs text-muted-foreground">{formatReportTime(report.created_at)}</span>
-      </header>
-
-      {/* Location + message (fixed) */}
-      <div className="shrink-0 space-y-2 border-b border-border px-4 py-3">
-        <p className="text-xs text-muted-foreground">
-          📍 {report.place ? `${report.place}, ` : ""}{report.district}
-        </p>
-        <p className="text-sm leading-relaxed text-foreground">{report.message}</p>
-        {imgUrl && (
-          <img src={imgUrl} alt="" className="w-full max-h-32 rounded-xl object-cover border border-border" />
-        )}
+      <div className="shrink-0 border-b border-border px-5 py-3.5">
+        <div className="flex items-center justify-between">
+          <button type="button" onClick={onBack} className="text-xs font-bold text-accent hover:underline">← {t.backToList}</button>
+          <div className="flex items-center gap-2">
+            <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase ${sevBadge(report.severity)}`}>
+              {report.severity}
+            </span>
+            <span className="rounded-lg bg-secondary px-2.5 py-1 text-[10px] font-bold text-primary">
+              {cat.emoji} {cat.label}
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Votes (fixed) */}
-      <div className="shrink-0 border-b border-border px-4 py-3">
-        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-foreground">
-          {t.communityVotesLabel}
+      {/* Location + message (fixed) */}
+      <div className="shrink-0 border-b border-border px-5 py-4 space-y-2">
+        <p className="text-xs font-semibold text-accent">
+          📍 {report.place ? `${report.place}, ` : ""}{report.district} · {formatReportTime(report.created_at)}
         </p>
+        <p className="text-base leading-relaxed text-primary">{report.message}</p>
+        {imgUrl && <img src={imgUrl} alt="" className="w-full max-h-36 rounded-2xl object-cover border border-border mt-2" />}
+      </div>
+
+      {/* Votes */}
+      <div className="shrink-0 border-b border-border px-5 py-4">
+        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-wider text-primary">{t.communityVotesLabel}</p>
         {loading ? (
           <p className="animate-pulse text-xs text-muted-foreground">{t.loadingDetail}</p>
         ) : (
           <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              disabled={!!voted}
-              onClick={() => vote("confirm")}
-              className={`rounded-xl border py-3 text-[10px] font-bold uppercase tracking-widest transition disabled:cursor-default ${
-                voted === "confirm"
-                  ? "border-success bg-success/15 text-success"
-                  : voted
-                  ? "border-border text-muted-foreground/40"
-                  : "border-success/40 bg-success/5 text-success hover:bg-success/15 hover:border-success"
-              }`}
-            >
-              <span className="block text-lg font-extrabold tabular-nums leading-none mb-0.5">
-                {localCounts?.confirmed ?? 0}
-              </span>
-              {t.confirm}{voted === "confirm" && " ✓"}
-            </button>
-            <button
-              type="button"
-              disabled={!!voted}
-              onClick={() => vote("incorrect")}
-              className={`rounded-xl border py-3 text-[10px] font-bold uppercase tracking-widest transition disabled:cursor-default ${
-                voted === "incorrect"
-                  ? "border-destructive bg-destructive/15 text-destructive"
-                  : voted
-                  ? "border-border text-muted-foreground/40"
-                  : "border-destructive/40 bg-destructive/5 text-destructive hover:bg-destructive/15 hover:border-destructive"
-              }`}
-            >
-              <span className="block text-lg font-extrabold tabular-nums leading-none mb-0.5">
-                {localCounts?.incorrect ?? 0}
-              </span>
-              {t.incorrect}{voted === "incorrect" && " ✓"}
-            </button>
-            <button
-              type="button"
-              disabled={!!voted}
-              onClick={() => vote("resolved")}
-              className={`rounded-xl border py-3 text-[10px] font-bold uppercase tracking-widest transition disabled:cursor-default ${
-                voted === "resolved"
-                  ? "border-foreground/50 bg-foreground/10 text-foreground"
-                  : voted
-                  ? "border-border text-muted-foreground/40"
-                  : "border-border text-muted-foreground hover:bg-secondary hover:border-foreground/40"
-              }`}
-            >
-              <span className="block text-lg font-extrabold tabular-nums leading-none mb-0.5">
-                {localCounts?.resolved ?? 0}
-              </span>
-              {t.resolvedV}{voted === "resolved" && " ✓"}
-            </button>
+            {[
+              { kind: "confirm" as const, label: t.confirm, count: localCounts?.confirmed ?? 0, active: "border-success bg-success/10 text-success", base: "border-success/30 text-success hover:bg-success/10" },
+              { kind: "incorrect" as const, label: t.incorrect, count: localCounts?.incorrect ?? 0, active: "border-destructive bg-destructive/10 text-destructive", base: "border-destructive/30 text-destructive hover:bg-destructive/10" },
+              { kind: "resolved" as const, label: t.resolvedV, count: localCounts?.resolved ?? 0, active: "border-foreground/40 bg-foreground/8 text-foreground", base: "border-border text-muted-foreground hover:bg-secondary" },
+            ].map(({ kind, label, count, active, base }) => (
+              <button
+                key={kind}
+                type="button"
+                disabled={!!voted}
+                onClick={() => vote(kind)}
+                className={`rounded-2xl border py-3 text-[10px] font-bold uppercase tracking-widest transition disabled:cursor-default ${
+                  voted === kind ? active : voted ? "border-border text-muted-foreground/40" : base
+                }`}
+              >
+                <span className="block text-xl font-extrabold tabular-nums leading-none mb-0.5">{count}</span>
+                {label}{voted === kind && " ✓"}
+              </button>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Comments list (scrollable) */}
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
-        <p className="text-xs font-bold uppercase tracking-wider text-foreground">{t.discussionHd}</p>
+      {/* Comments */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-2.5">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-primary">{t.discussionHd.replace("💬 ", "")}</p>
         {comments.length === 0 ? (
           <p className="text-xs italic text-muted-foreground">{t.noCommentsYet}</p>
         ) : (
           comments.map((c) => (
-            <div key={c.id} className="rounded-xl border border-border bg-secondary/40 px-3 py-2">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                {c.author_name} · {formatReportTime(c.created_at)}
-              </p>
-              <p className="mt-1 text-sm text-foreground leading-snug">{c.content}</p>
+            <div key={c.id} className="rounded-2xl border border-primary/8 bg-secondary px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-accent">{c.author_name} · {formatReportTime(c.created_at)}</p>
+              <p className="mt-1 text-sm text-primary leading-snug">{c.content}</p>
             </div>
           ))
         )}
       </div>
 
-      {/* Comment form (pinned) */}
-      <div className="shrink-0 border-t border-border bg-secondary/30 px-4 py-3">
+      {/* Comment form */}
+      <div className="shrink-0 border-t border-border bg-background px-5 py-3.5">
         <form onSubmit={submitComment} className="flex gap-2">
           <textarea
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
             rows={2}
             placeholder={t.commentPlaceholder}
-            className="flex-1 resize-none rounded-xl border border-border bg-card px-3 py-2 text-xs outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30 text-foreground"
+            className="flex-1 resize-none rounded-2xl border border-border bg-card px-3 py-2 text-xs text-primary outline-none placeholder:text-primary/40 focus:ring-2 focus:ring-accent/30"
           />
           <button
             type="submit"
             disabled={posting || !commentText.trim()}
-            className="shrink-0 rounded-xl bg-accent px-4 text-[10px] font-bold uppercase tracking-widest text-accent-foreground transition hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="shrink-0 rounded-2xl bg-[var(--color-gold)] px-4 text-[10px] font-bold uppercase tracking-wider text-primary transition hover:brightness-105 disabled:opacity-40"
           >
             {posting ? "…" : t.postComment}
           </button>
@@ -1546,103 +1538,126 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
   );
 }
 
-/* ─── Small components ──────────────────────────────────────── */
+/* ─── District Modal ────────────────────────────────────────── */
+function DistrictModal({
+  district, reports, alerts, onClose,
+}: { district: string; reports: Report[]; alerts: OfficialAlert[]; onClose: () => void }) {
+  const { t } = useLanguage();
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const places = useMemo(() => Array.from(new Set(reports.map((r) => r.place).filter(Boolean) as string[])), [reports]);
+  const [activePlace, setActivePlace] = useState<string | null>(null);
+  const visibleReports = activePlace ? reports.filter((r) => r.place === activePlace) : reports;
 
-function ReportRowItem({ report, flash }: { report: Report; flash: boolean }) {
-  const [open, setOpen] = useState(false);
-  const cat = CATEGORY_META[report.category ?? ""] ?? { emoji: "📌", label: "Other" };
+  const sev = maxSeverity([...reports.map((r) => ({ severity: r.severity })), ...alerts.map((a) => ({ severity: a.severity }))]);
+  const headline = alerts.find((a) => a.severity === "critical")?.disasterType ?? alerts[0]?.disasterType ?? (reports.length > 0 ? "Community reports active" : "No active incidents");
 
   return (
-    <li className={`group border-b border-border/70 last:border-b-0 ${flash ? "bg-accent/5" : ""}`}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="grid w-full grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 text-left transition hover:bg-secondary/60 sm:px-5"
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/30 backdrop-blur-sm p-3 sm:items-center sm:p-4" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative flex w-full max-w-lg flex-col overflow-hidden rounded-[2rem] border border-primary/10 bg-card shadow-[var(--shadow-hero)]"
+        style={{ maxHeight: "88vh" }}
       >
-        <span
-          aria-hidden
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-secondary text-xl"
-          title={cat.label}
-        >
-          {cat.emoji}
-        </span>
-        <span className="hidden w-20 shrink-0 text-sm font-medium tabular-nums text-muted-foreground sm:inline">
-          {formatReportTime(report.created_at)}
-        </span>
-        <span className="min-w-0">
-          <span className="flex min-w-0 items-baseline gap-2">
-            <span className="shrink-0 text-sm font-bold text-foreground">{report.district}</span>
-            {report.place && (
-              <span className="hidden shrink-0 text-sm text-muted-foreground sm:inline">· {report.place}</span>
-            )}
-            <span className="truncate text-base text-foreground">{report.message}</span>
-          </span>
-          <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground sm:hidden">
-            {formatReportTime(report.created_at)}
-            {report.place && <span>· {report.place}</span>}
-          </span>
-        </span>
-        <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${sevBadge(report.severity)}`}>
-          {report.severity}
-        </span>
-      </button>
+        {/* Severity strip */}
+        <div className={`h-1.5 w-full shrink-0 ${sev === "critical" ? "bg-destructive" : sev === "warn" ? "bg-warn" : "bg-success"}`} />
 
-      {open && (
-        <div className="border-t border-border/50 bg-secondary/30 px-3 py-3 sm:px-4">
-          <p className="text-sm leading-relaxed text-foreground text-pretty">{report.message}</p>
-          {report.image_url && (
-            <img src={report.image_url} alt="" className="mt-2 w-full max-h-48 rounded-xl object-cover border border-border" />
+        {/* Header */}
+        <div className="shrink-0 border-b border-border px-5 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">{t.dossierLabel}</p>
+              <h2 className="font-display text-2xl font-bold text-primary mt-0.5">{district}</h2>
+              <p className="text-xs text-muted-foreground">{headline}</p>
+            </div>
+            <div className="flex items-center gap-4 shrink-0">
+              <div className="text-right">
+                <div className={`font-display text-xl font-bold ${sevText(sev)}`}>{alerts.length}</div>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{t.officialLabel}</div>
+              </div>
+              <div className="text-right">
+                <div className="font-display text-xl font-bold text-accent">{reports.length}</div>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{t.crowdLabel}</div>
+              </div>
+              <button type="button" onClick={onClose} className="text-xs font-bold text-muted-foreground hover:text-foreground">✕</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto divide-y divide-border">
+          {/* Official alerts */}
+          {alerts.length > 0 && (
+            <section className="px-5 py-4">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t.officialAdvisories}</p>
+              <div className="space-y-2">
+                {alerts.map((a) => (
+                  <div key={a.id} className={`rounded-2xl border-l-2 py-2.5 pl-3 pr-3 text-xs ${sevBorderL(a.severity)} ${a.severity === "critical" ? "bg-destructive/5" : a.severity === "warn" ? "bg-warn/5" : "bg-success/5"}`}>
+                    <div className={`font-bold ${sevText(a.severity)}`}>{a.severityLabel} · {a.disasterType}</div>
+                    <div className="text-muted-foreground">{a.source}</div>
+                    {a.message && <p className="mt-1 text-foreground/80 line-clamp-2">{a.message}</p>}
+                  </div>
+                ))}
+              </div>
+            </section>
           )}
-          <p className="mt-2 text-xs text-muted-foreground">
-            📍 {report.place ? `${report.place}, ` : ""}{report.district} · {cat.emoji} {cat.label} · {formatReportTime(report.created_at)}
-          </p>
+
+          {/* Reports */}
+          <section className="px-5 py-4">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t.crowdBriefs} ({visibleReports.length})</p>
+            {places.length > 0 && (
+              <div className="no-scrollbar -mx-5 flex gap-1.5 overflow-x-auto px-5 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setActivePlace(null)}
+                  className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold transition ${activePlace === null ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-primary"}`}
+                >
+                  {t.allPlaces}
+                </button>
+                {places.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setActivePlace(p)}
+                    className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold transition ${activePlace === p ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-primary"}`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="space-y-2">
+              {visibleReports.length === 0 ? (
+                <p className="py-6 text-center text-xs italic text-muted-foreground">{t.noCrowdReportsYet}</p>
+              ) : (
+                visibleReports.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setSelectedReport(r)}
+                    className="flex w-full items-start gap-3 rounded-2xl border border-primary/8 bg-background p-3 text-left transition hover:bg-secondary"
+                  >
+                    <span className="mt-0.5 shrink-0 text-lg">{catMeta(r.category).emoji}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className={`font-bold ${sevText(r.severity)}`}>{r.severity.toUpperCase()}</span>
+                        <span>·</span><span>{r.place ?? r.district}</span>
+                        <span className="ml-auto">{formatReportTime(r.created_at)}</span>
+                      </div>
+                      <p className="mt-0.5 text-sm text-primary leading-snug line-clamp-2">{r.message}</p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </section>
         </div>
-      )}
-    </li>
-  );
-}
 
-function ModalReportCard({ report, onClick }: { report: Report; onClick: () => void }) {
-  const cat = CATEGORY_META[report.category ?? ""] ?? { emoji: "📌", label: "Other" };
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex w-full items-start gap-3 rounded-xl border border-border bg-background p-3 text-left transition hover:border-primary/40 hover:bg-secondary/40"
-    >
-      <span className="mt-0.5 shrink-0 text-lg">{cat.emoji}</span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-          <span className={`font-bold ${sevText(report.severity)}`}>{report.severity.toUpperCase()}</span>
-          <span>·</span>
-          <span>{report.place ?? report.district}</span>
-          <span className="ml-auto">{formatReportTime(report.created_at)}</span>
-        </div>
-        <p className="mt-0.5 text-sm text-foreground leading-snug line-clamp-2">{report.message}</p>
+        {selectedReport && (
+          <div className="absolute inset-0 z-10 overflow-hidden rounded-[2rem] border-t-2 border-accent bg-card">
+            <ReportDetailPanel report={selectedReport} onBack={() => setSelectedReport(null)} />
+          </div>
+        )}
       </div>
-    </button>
-  );
-}
-
-function ModalAlertCard({ alert }: { alert: OfficialAlert }) {
-  return (
-    <article className={`rounded-xl border-l-2 py-2 pl-3 pr-3 text-xs ${sevBorderL(alert.severity)} ${
-      alert.severity === "critical" ? "bg-destructive/5" : alert.severity === "warn" ? "bg-warn/5" : "bg-success/5"
-    }`}>
-      <div className={`font-semibold ${sevText(alert.severity)}`}>
-        {alert.severityLabel} · {alert.disasterType}
-      </div>
-      <div className="text-muted-foreground">{alert.source}</div>
-      {alert.message && <p className="mt-1 text-foreground/80 leading-snug line-clamp-2">{alert.message}</p>}
-    </article>
-  );
-}
-
-function DistrictStat({ value, label, color }: { value: number; label: string; color: string }) {
-  return (
-    <div className="text-right">
-      <div className={`font-display text-xl font-bold tabular-nums leading-none ${color}`}>{value}</div>
-      <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</div>
     </div>
   );
 }
