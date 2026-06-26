@@ -104,14 +104,14 @@ const DISTRICTS: District[] = [
   { code: "KL-14", name: "Kasaragod",      slug: "kasaragod",      lat: 12.4996, lon: 74.9869 },
 ];
 
-const CATEGORY_META: Record<string, { emoji: string; label: string }> = {
-  "Flood":             { emoji: "🌊", label: "Flood" },
-  "Landslide":         { emoji: "⛰️", label: "Landslide" },
-  "Road Damage":       { emoji: "🚧", label: "Road" },
-  "Power Outage":      { emoji: "⚡", label: "Power" },
-  "Medical Emergency": { emoji: "🚨", label: "Medical" },
-  "Fire":              { emoji: "🔥", label: "Fire" },
-  "Other":             { emoji: "📌", label: "Other" },
+const CATEGORY_META: Record<string, { emoji: string; labelKey: string }> = {
+  "Flood":             { emoji: "🌊", labelKey: "catFlood" },
+  "Landslide":         { emoji: "⛰️", labelKey: "catLandslide" },
+  "Road Damage":       { emoji: "🚧", labelKey: "catRoad" },
+  "Power Outage":      { emoji: "⚡", labelKey: "catPower" },
+  "Medical Emergency": { emoji: "🚨", labelKey: "catMedical" },
+  "Fire":              { emoji: "🔥", labelKey: "catFire" },
+  "Other":             { emoji: "📌", labelKey: "catOther" },
 };
 
 const KERALA_CENTER = { lat: 10.5, lon: 76.3 };
@@ -202,7 +202,7 @@ function formatReportTime(iso: string) {
 }
 
 function catMeta(c: string | null) {
-  return CATEGORY_META[c ?? ""] ?? { emoji: "📌", label: "Other" };
+  return CATEGORY_META[c ?? ""] ?? { emoji: "📌", labelKey: "catOther" };
 }
 
 function reportInitials(id: string): string {
@@ -355,34 +355,17 @@ function useLocalTime() {
 const WELCOME_KEY = "lk_welcome_done";
 
 /* ─── Loading Screen ────────────────────────────────────────── */
-const LOADING_MESSAGES = [
-  {
-    headline: "Your neighbors are watching out for you.",
-    sub: "Thousands of people across Kerala report what they see in real time.",
-  },
-  {
-    headline: "Connecting to 14 districts…",
-    sub: "Live reports from Trivandrum to Kasaragod are on their way.",
-  },
-  {
-    headline: "Syncing official advisories…",
-    sub: "Loading NDMA · IMD · KSDMA alerts for your area.",
-  },
-  {
-    headline: "Together, we keep Kerala safe.",
-    sub: "Every report you share helps someone near you make a better decision.",
-  },
-  {
-    headline: "Real-time. Community-powered.",
-    sub: "No algorithm, no delay — just neighbors helping neighbors.",
-  },
-  {
-    headline: "Almost there…",
-    sub: "Your live community feed is loading.",
-  },
-];
+const LOADING_MSG_KEYS = [
+  { h: "loadMsg1h", s: "loadMsg1s" },
+  { h: "loadMsg2h", s: "loadMsg2s" },
+  { h: "loadMsg3h", s: "loadMsg3s" },
+  { h: "loadMsg4h", s: "loadMsg4s" },
+  { h: "loadMsg5h", s: "loadMsg5s" },
+  { h: "loadMsg6h", s: "loadMsg6s" },
+] as const;
 
 function LoadingScreen({ fading }: { fading: boolean }) {
+  const { t } = useLanguage();
   const [msgIdx, setMsgIdx] = useState(0);
   const [textVisible, setTextVisible] = useState(true);
 
@@ -390,14 +373,15 @@ function LoadingScreen({ fading }: { fading: boolean }) {
     const id = setInterval(() => {
       setTextVisible(false);
       setTimeout(() => {
-        setMsgIdx((i) => (i + 1) % LOADING_MESSAGES.length);
+        setMsgIdx((i) => (i + 1) % LOADING_MSG_KEYS.length);
         setTextVisible(true);
       }, 350);
     }, 2400);
     return () => clearInterval(id);
   }, []);
 
-  const msg = LOADING_MESSAGES[msgIdx];
+  const keys = LOADING_MSG_KEYS[msgIdx];
+  const msg = { headline: t[keys.h], sub: t[keys.s] };
 
   return (
     <div
@@ -464,7 +448,7 @@ function LoadingScreen({ fading }: { fading: boolean }) {
       {/* Bottom live chip */}
       <div className="absolute bottom-10 flex items-center gap-2 rounded-full border border-primary-foreground/10 bg-primary-foreground/5 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-primary-foreground/50">
         <span className="live-dot" />
-        Loading live data
+        {t.welcomeLoading}
       </div>
 
       <style>{`
@@ -492,6 +476,7 @@ function SiteHeader({
   lang: string;
   toggle: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <header className="sticky top-0 z-40 border-b border-border/50 bg-background/95 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3 sm:px-8 lg:px-10">
@@ -506,8 +491,8 @@ function SiteHeader({
             </div>
             <div className="hidden items-center gap-1.5 text-[11px] font-medium text-muted-foreground sm:flex">
               <span className="live-dot" />
-              {status === "live" ? `${reportsCount} live` : status === "connecting" ? "Connecting…" : "Offline"}
-              {" · "}Community disaster watch
+              {status === "live" ? `${reportsCount} live` : status === "connecting" ? t.statusConnecting : t.statusOffline}
+              {" · "}{t.communityDisasterWatch}
             </div>
           </div>
         </div>
@@ -527,7 +512,7 @@ function SiteHeader({
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--color-gold)] px-4 py-2 text-sm font-bold text-primary shadow-sm transition hover:brightness-105 active:scale-95"
           >
             <span aria-hidden>＋</span>
-            <span>Report</span>
+            <span>{t.reportBtn}</span>
           </button>
         </nav>
       </div>
@@ -614,11 +599,10 @@ export function HomePage() {
                 {reports.length} live reports · {time || "—"}
               </span>
               <h1 className="mt-5 font-display text-4xl font-bold leading-tight tracking-tight text-primary-foreground lg:text-5xl xl:text-[56px]">
-                Namaskaram,{" "}
-                <span className="text-[var(--color-gold)]">Neighbor.</span>
+                {t.heroGreeting}
               </h1>
               <p className="mt-3 max-w-lg text-base leading-relaxed text-primary-foreground/70 lg:text-[15px]">
-                See something on the road, in your area, or near home? Tell your neighbors. They'll do the same for you.
+                {t.heroDesc}
               </p>
               <div className="mt-7 flex flex-wrap items-center gap-3">
                 <button
@@ -626,14 +610,14 @@ export function HomePage() {
                   onClick={() => setReportFlowOpen(true)}
                   className="inline-flex items-center gap-2.5 rounded-2xl bg-[var(--color-gold)] px-7 py-3.5 font-display text-sm font-bold text-primary shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]"
                 >
-                  <span aria-hidden>＋</span> Report an Incident
+                  <span aria-hidden>＋</span> {t.reportIncidentBtn}
                 </button>
                 <button
                   type="button"
                   onClick={() => setDistrictFocus(pulseDistricts[0]?.name ?? null)}
                   className="inline-flex items-center gap-2 rounded-2xl border border-primary-foreground/20 px-6 py-3.5 text-sm font-semibold text-primary-foreground/75 transition hover:bg-primary-foreground/10"
                 >
-                  Browse Districts →
+                  {t.browseDistricts} →
                 </button>
               </div>
             </div>
@@ -642,18 +626,18 @@ export function HomePage() {
             <div className="hidden shrink-0 lg:grid lg:w-64 lg:grid-cols-2 lg:gap-3 xl:w-72">
               <div className="rounded-2xl bg-primary-foreground/10 p-4 text-center backdrop-blur-sm">
                 <div className="font-display text-3xl font-bold tabular-nums text-primary-foreground">{reports.length}</div>
-                <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground/60">Live Reports</div>
+                <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground/60">{t.liveReports}</div>
               </div>
               <div className="rounded-2xl bg-primary-foreground/10 p-4 text-center backdrop-blur-sm">
                 <div className="font-display text-3xl font-bold tabular-nums text-[var(--color-gold)]">
                   {pulseDistricts.filter((d) => d.count > 0).length}
                 </div>
-                <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground/60">Active Districts</div>
+                <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground/60">{t.activeDistricts}</div>
               </div>
               <div className="col-span-2 flex items-center gap-2 rounded-2xl bg-primary-foreground/10 px-4 py-3 backdrop-blur-sm">
                 <span className="live-dot shrink-0" />
                 <span className="text-xs font-semibold text-primary-foreground/70">
-                  {status === "live" ? "Feed updating every 20 seconds" : status === "connecting" ? "Connecting…" : "Feed offline"}
+                  {status === "live" ? t.feedUpdating : status === "connecting" ? t.statusConnecting : t.feedOffline}
                 </span>
               </div>
             </div>
@@ -671,30 +655,30 @@ export function HomePage() {
 
               {/* Live status */}
               <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Live Status</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t.liveStatus}</p>
                 <div className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-2.5">
                   <span className="live-dot shrink-0" />
                   <span className="text-xs font-semibold text-primary">
-                    {status === "live" ? `${reports.length} reports · live` : status === "connecting" ? "Connecting…" : "Offline"}
+                    {status === "live" ? `${reports.length} ${t.reports} · ${t.statusLive}` : status === "connecting" ? t.statusConnecting : t.statusOffline}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-xl border border-border bg-card p-3 text-center">
                     <div className="font-display text-xl font-bold tabular-nums text-primary">{reports.length}</div>
-                    <div className="text-[10px] font-bold uppercase text-muted-foreground">Reports</div>
+                    <div className="text-[10px] font-bold uppercase text-muted-foreground">{t.reports}</div>
                   </div>
                   <div className="rounded-xl border border-border bg-card p-3 text-center">
                     <div className="font-display text-xl font-bold tabular-nums text-accent">
                       {pulseDistricts.filter((d) => d.count > 0).length}
                     </div>
-                    <div className="text-[10px] font-bold uppercase text-muted-foreground">Districts</div>
+                    <div className="text-[10px] font-bold uppercase text-muted-foreground">{t.districtWord}</div>
                   </div>
                 </div>
               </div>
 
               {/* Category nav */}
               <div className="space-y-0.5">
-                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Category</p>
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t.categoryLabel}</p>
                 <button
                   type="button"
                   onClick={() => setFilterCategory("all")}
@@ -703,7 +687,7 @@ export function HomePage() {
                   }`}
                 >
                   <span className="text-base">✦</span>
-                  <span className="font-medium">All Reports</span>
+                  <span className="font-medium">{t.allReports}</span>
                   <span className={`ml-auto text-[11px] font-bold tabular-nums ${filterCategory === "all" ? "text-[var(--color-gold)]" : "text-muted-foreground"}`}>
                     {reports.length}
                   </span>
@@ -721,7 +705,7 @@ export function HomePage() {
                       }`}
                     >
                       <span className="text-base">{v.emoji}</span>
-                      <span className="font-medium">{v.label}</span>
+                      <span className="font-medium">{t[v.labelKey as keyof typeof t] as string}</span>
                       {count > 0 && (
                         <span className={`ml-auto text-[11px] font-bold tabular-nums ${isActive ? "text-[var(--color-gold)]" : "text-accent"}`}>
                           {count}
@@ -734,7 +718,7 @@ export function HomePage() {
 
               {/* District nav */}
               <div className="space-y-0.5">
-                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Districts</p>
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t.districtsTitle.split(" ")[0]}</p>
                 <button
                   type="button"
                   onClick={() => setFilterDistrict("all")}
@@ -742,7 +726,7 @@ export function HomePage() {
                     filterDistrict === "all" ? "bg-primary text-primary-foreground font-semibold" : "text-primary hover:bg-secondary"
                   }`}
                 >
-                  <span className="font-medium">All Kerala</span>
+                  <span className="font-medium">{t.allKerala}</span>
                 </button>
                 {pulseDistricts.map((d) => {
                   const isActive = filterDistrict === d.name;
@@ -775,7 +759,7 @@ export function HomePage() {
                 onClick={() => setReportFlowOpen(true)}
                 className="flex w-full items-center gap-2.5 rounded-xl bg-[var(--color-gold)] px-4 py-3 font-display text-sm font-bold text-primary transition hover:brightness-105 active:scale-[0.98]"
               >
-                <span>＋</span> Report an Incident
+                <span>＋</span> {t.reportIncidentBtn}
               </button>
             </div>
           </div>
@@ -789,7 +773,7 @@ export function HomePage() {
             {alertStatus === "ready" && alerts.filter((a) => a.severity !== "safe").length > 0 && (
               <div className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3">
                 <p className="text-xs font-bold uppercase tracking-wider text-destructive">
-                  ⚠ {alerts.filter((a) => a.severity !== "safe").length} official advisory · NDMA · IMD
+                  ⚠ {alerts.filter((a) => a.severity !== "safe").length} {t.officialAdvisoryBanner}
                 </p>
                 {alerts.filter((a) => a.severity !== "safe").slice(0, 2).map((a) => (
                   <p key={a.id} className="mt-1 text-xs leading-snug text-foreground/75">
@@ -803,12 +787,12 @@ export function HomePage() {
             <div className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:hidden">
               <button type="button" onClick={() => setFilterCategory("all")}
                 className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${filterCategory === "all" ? "bg-primary text-primary-foreground" : "border border-border text-primary"}`}>
-                ✦ All
+                ✦ {t.allFilter}
               </button>
               {Object.entries(CATEGORY_META).map(([k, v]) => (
                 <button key={k} type="button" onClick={() => setFilterCategory(filterCategory === k ? "all" : k)}
                   className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${filterCategory === k ? "bg-primary text-primary-foreground" : "border border-border text-primary"}`}>
-                  {v.emoji} {v.label}
+                  {v.emoji} {t[v.labelKey as keyof typeof t] as string}
                 </button>
               ))}
             </div>
@@ -817,7 +801,7 @@ export function HomePage() {
             <div className="no-scrollbar -mx-4 mb-4 flex gap-1.5 overflow-x-auto px-4 pb-1 lg:hidden">
               <button type="button" onClick={() => setFilterDistrict("all")}
                 className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${filterDistrict === "all" ? "bg-primary text-primary-foreground" : "border border-border text-primary"}`}>
-                All Kerala
+                {t.allKerala}
               </button>
               {pulseDistricts.filter((d) => d.count > 0).map((d) => (
                 <button key={d.code} type="button" onClick={() => setFilterDistrict(filterDistrict === d.name ? "all" : d.name)}
@@ -835,7 +819,7 @@ export function HomePage() {
                   type="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search a place, report, or area…"
+                  placeholder={t.searchFeedPlaceholder}
                   className="w-full rounded-2xl border border-border bg-card py-2.5 pl-9 pr-4 text-sm text-primary placeholder:text-primary/40 shadow-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
                 />
               </label>
@@ -843,16 +827,16 @@ export function HomePage() {
 
             {/* Feed header */}
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-display text-lg font-bold text-primary">Latest from Neighbors</h2>
+              <h2 className="font-display text-lg font-bold text-primary">{t.latestFromNeighbors}</h2>
               <span className="text-xs font-semibold text-muted-foreground">
-                {Math.min(visibleCount, filteredReports.length)} of {filteredReports.length}
+                {Math.min(visibleCount, filteredReports.length)} {t.ofLabel} {filteredReports.length}
               </span>
             </div>
 
             {/* Feed */}
             {filteredReports.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border bg-card px-5 py-14 text-center text-sm text-muted-foreground">
-                Nothing matches these filters.
+                {t.noMatchFilters}
               </div>
             ) : (
               <div className="space-y-3">
@@ -875,7 +859,7 @@ export function HomePage() {
                   onClick={() => setVisibleCount((n) => n + 15)}
                   className="rounded-full border border-[var(--color-gold)]/40 bg-card px-7 py-2.5 text-sm font-bold text-primary shadow-sm transition hover:bg-secondary"
                 >
-                  Load more · {filteredReports.length - visibleCount} remaining
+                  {t.loadMoreRemaining} · {filteredReports.length - visibleCount}
                 </button>
               </div>
             )}
@@ -895,7 +879,7 @@ export function HomePage() {
               {alertStatus === "ready" && alerts.filter((a) => a.severity !== "safe").length > 0 ? (
                 <div className="rounded-2xl border border-destructive/15 bg-destructive/5 p-4">
                   <p className="mb-2.5 text-[10px] font-bold uppercase tracking-wider text-destructive">
-                    ⚠ Official Alerts · {alerts.filter((a) => a.severity !== "safe").length}
+                    ⚠ {t.officialAlertsLabel} · {alerts.filter((a) => a.severity !== "safe").length}
                   </p>
                   <div className="space-y-2">
                     {alerts.filter((a) => a.severity !== "safe").slice(0, 5).map((a) => (
@@ -908,8 +892,8 @@ export function HomePage() {
                 </div>
               ) : (
                 <div className="rounded-2xl border border-success/20 bg-success/5 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-success">✓ No Active Alerts</p>
-                  <p className="mt-1 text-xs text-muted-foreground">No official advisories from NDMA, IMD, or KSDMA at this time.</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-success">✓ {t.noActiveAlerts}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t.noAdvisoriesText}</p>
                 </div>
               )}
 
@@ -922,18 +906,16 @@ export function HomePage() {
                 <div className="flex items-center gap-3">
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--color-gold)] text-lg font-bold text-primary">＋</span>
                   <div>
-                    <div className="font-display text-sm font-bold text-primary-foreground">Report what you see</div>
-                    <div className="text-[11px] text-primary-foreground/60">Help your neighbors stay safe</div>
+                    <div className="font-display text-sm font-bold text-primary-foreground">{t.reportWhatYouSee}</div>
+                    <div className="text-[11px] text-primary-foreground/60">{t.helpNeighborsSafe}</div>
                   </div>
                 </div>
               </button>
 
               {/* App info */}
               <div className="rounded-2xl border border-border bg-card p-4">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">About</p>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  LiveKerala is a community-powered disaster watch platform. Reports are crowd-verified and supplemented with official NDMA · IMD · KSDMA advisories.
-                </p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t.aboutLabel}</p>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{t.aboutDesc}</p>
               </div>
 
             </div>
@@ -952,8 +934,8 @@ export function HomePage() {
           <span className="flex items-center gap-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--color-gold)] text-sm font-bold text-primary">＋</span>
             <span className="leading-tight">
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-primary-foreground/70">Quick post</span>
-              <span className="block text-sm font-semibold">Report what you're seeing</span>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-primary-foreground/70">{t.quickPost}</span>
+              <span className="block text-sm font-semibold">{t.reportWhatYoureSeeing}</span>
             </span>
           </span>
           <span aria-hidden className="text-[var(--color-gold)]">→</span>
@@ -1020,6 +1002,7 @@ function NeighborCard({
   onViewDetail: () => void;
   onViewDistrict: () => void;
 }) {
+  const { t } = useLanguage();
   const cat = catMeta(report.category);
   const initials = reportInitials(report.id);
 
@@ -1045,7 +1028,7 @@ function NeighborCard({
           </div>
         </div>
         <span className="shrink-0 rounded-lg bg-secondary px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
-          <span className="mr-1" aria-hidden>{cat.emoji}</span>{cat.label}
+          <span className="mr-1" aria-hidden>{cat.emoji}</span>{t[cat.labelKey as keyof typeof t] as string}
         </span>
       </header>
 
@@ -1067,7 +1050,7 @@ function NeighborCard({
           onClick={onViewDetail}
           className="ml-auto text-xs font-bold text-[var(--color-gold)] transition hover:underline"
         >
-          View & Vote →
+          {t.viewAndVote}
         </button>
       </footer>
     </article>
@@ -1155,6 +1138,7 @@ function ReportFlowModal({ onClose, onReported }: { onClose: () => void; onRepor
 }
 
 function LocationPickerStep({ onSelect, onClose }: { onSelect: (p: Place) => void; onClose: () => void }) {
+  const { t } = useLanguage();
   const [query, setQuery] = useState("");
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -1162,16 +1146,16 @@ function LocationPickerStep({ onSelect, onClose }: { onSelect: (p: Place) => voi
   const [open, setOpen] = useState(false);
 
   async function detectLocation() {
-    if (!navigator.geolocation) { setGeoError("Geolocation not supported."); return; }
+    if (!navigator.geolocation) { setGeoError(t.geoNotSupported); return; }
     setGeoLoading(true); setGeoError(null);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const place = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
         setGeoLoading(false);
-        if (!place) { setGeoError("Couldn't resolve your location."); return; }
+        if (!place) { setGeoError(t.geoCantResolve); return; }
         onSelect(place);
       },
-      (err) => { setGeoLoading(false); setGeoError(err.message || "Location permission denied."); },
+      (err) => { setGeoLoading(false); setGeoError(err.message || t.geoPermDenied); },
       { enableHighAccuracy: true, timeout: 10000 },
     );
   }
@@ -1182,9 +1166,9 @@ function LocationPickerStep({ onSelect, onClose }: { onSelect: (p: Place) => voi
       <div className="shrink-0 border-b border-border/60 px-6 py-5">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">Step 1 of 2</p>
-            <h2 className="font-display mt-0.5 text-xl font-bold text-primary">Where are you?</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">Search your locality to start reporting</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">{t.step1of2}</p>
+            <h2 className="font-display mt-0.5 text-xl font-bold text-primary">{t.whereAreYou}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t.searchLocalityHint}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground hover:text-foreground">✕</button>
         </div>
@@ -1199,13 +1183,13 @@ function LocationPickerStep({ onSelect, onClose }: { onSelect: (p: Place) => voi
               value={query}
               onFocus={() => setOpen(true)}
               onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-              placeholder="Search your place (e.g. Payyannur, Kakkanad…)"
+              placeholder={t.searchPlaceholder}
               className="w-full rounded-2xl border border-border bg-background py-3 pl-4 pr-4 text-sm text-primary placeholder:text-primary/40 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
             />
             {open && query.trim().length >= 2 && (
               <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
-                {loading && <div className="px-4 py-2 text-xs text-muted-foreground">Searching…</div>}
-                {!loading && results.length === 0 && <div className="px-4 py-2 text-xs text-muted-foreground">No places found in Kerala</div>}
+                {loading && <div className="px-4 py-2 text-xs text-muted-foreground">{t.searchingPlaces}</div>}
+                {!loading && results.length === 0 && <div className="px-4 py-2 text-xs text-muted-foreground">{t.noPlacesFound}</div>}
                 {results.map((p, i) => (
                   <button
                     key={`${p.lat}-${p.lon}-${i}`}
@@ -1227,7 +1211,7 @@ function LocationPickerStep({ onSelect, onClose }: { onSelect: (p: Place) => voi
             disabled={geoLoading}
             className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--color-gold)]/30 bg-[var(--color-gold)]/10 py-3 text-sm font-bold text-primary transition hover:bg-[var(--color-gold)]/20 disabled:opacity-50"
           >
-            📍 {geoLoading ? "Detecting…" : "Use my current location"}
+            📍 {geoLoading ? t.detecting : t.useMyLocation}
           </button>
           {geoError && <p className="text-xs font-semibold text-destructive">{geoError}</p>}
         </div>
@@ -1254,9 +1238,9 @@ function ReportFormStep({ place, onBack, onClose, onReported }: { place: Place; 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = message.trim();
-    if (!category) { setError("Please select a category."); return; }
-    if (!trimmed) { setError("Please describe what happened."); return; }
-    if (imageFile && imageFile.size > 5 * 1024 * 1024) { setError("Image must be under 5 MB."); return; }
+    if (!category) { setError(t.errSelectCategory); return; }
+    if (!trimmed) { setError(t.errDescribeHappened); return; }
+    if (imageFile && imageFile.size > 5 * 1024 * 1024) { setError(t.errImageSize); return; }
     setSubmitting(true); setError(null);
     try {
       const res = await fetch(`${API_BASE}/districts/${place.slug}/reports`, {
@@ -1275,7 +1259,7 @@ function ReportFormStep({ place, onBack, onClose, onReported }: { place: Place; 
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        setError((err as { detail?: string }).detail || "Submission failed.");
+        setError((err as { detail?: string }).detail || t.errSubmissionFailed);
         setSubmitting(false);
         return;
       }
@@ -1288,7 +1272,7 @@ function ReportFormStep({ place, onBack, onClose, onReported }: { place: Place; 
       onClose();
       onReported();
     } catch {
-      setError("Network error. Please try again.");
+      setError(t.errNetworkError);
       setSubmitting(false);
     }
   }
@@ -1299,11 +1283,11 @@ function ReportFormStep({ place, onBack, onClose, onReported }: { place: Place; 
       <div className="shrink-0 border-b border-border/60 px-6 py-5">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">Step 2 of 2</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">{t.step2of2}</p>
             <h2 className="font-display mt-0.5 text-xl font-bold text-primary">{place.name}</h2>
             <p className="text-xs text-muted-foreground">{place.district} · {place.context}</p>
           </div>
-          <button type="button" onClick={onBack} className="text-xs font-bold text-accent hover:underline">← Back</button>
+          <button type="button" onClick={onBack} className="text-xs font-bold text-accent hover:underline">← {t.backToList}</button>
         </div>
       </div>
 
@@ -1323,7 +1307,7 @@ function ReportFormStep({ place, onBack, onClose, onReported }: { place: Place; 
               }`}
             >
               <span className="text-lg leading-none">{v.emoji}</span>
-              <span className="text-[9px] font-bold uppercase tracking-wider">{v.label}</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider">{t[v.labelKey as keyof typeof t] as string}</span>
             </button>
           ))}
         </div>
@@ -1493,7 +1477,7 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
           <button type="button" onClick={onBack} className="text-xs font-bold text-accent hover:underline">← {t.backToList}</button>
           <div className="flex items-center gap-2">
             <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase ${sevBadge(report.severity)}`}>{report.severity}</span>
-            <span className="rounded-lg bg-secondary px-2.5 py-1 text-[10px] font-bold text-primary">{cat.emoji} {cat.label}</span>
+            <span className="rounded-lg bg-secondary px-2.5 py-1 text-[10px] font-bold text-primary">{cat.emoji} {t[cat.labelKey as keyof typeof t] as string}</span>
           </div>
         </div>
       </div>
@@ -1513,7 +1497,7 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
               className="h-52 w-full object-cover transition group-hover:brightness-90"
             />
             <span className="absolute bottom-2 right-2 rounded-lg bg-black/50 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
-              Tap to expand
+              {t.tapToExpand}
             </span>
           </button>
         )}

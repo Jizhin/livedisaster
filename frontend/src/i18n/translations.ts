@@ -308,6 +308,88 @@ export const T = {
     communityVotesLabel: "Community Votes",
     loadingDetail:       "Loading…",
 
+    /* Header */
+    communityDisasterWatch: "Community disaster watch",
+    reportBtn:           "Report",
+
+    /* Hero */
+    heroGreeting:        "Namaskaram, Neighbor.",
+    heroDesc:            "See something on the road, in your area, or near home? Tell your neighbors. They'll do the same for you.",
+    reportIncidentBtn:   "Report an Incident",
+    browseDistricts:     "Browse Districts",
+    activeDistricts:     "Active Districts",
+    feedUpdating:        "Feed updating every 20 seconds",
+    feedOffline:         "Feed offline",
+
+    /* Left sidebar */
+    liveStatus:          "Live Status",
+    allKerala:           "All Kerala",
+
+    /* Feed */
+    searchFeedPlaceholder: "Search a place, report, or area…",
+    latestFromNeighbors: "Latest from Neighbors",
+    noMatchFilters:      "Nothing matches these filters.",
+    loadMoreRemaining:   "Load more",
+    officialAdvisoryBanner: "official advisory · NDMA · IMD",
+
+    /* Right panel */
+    officialAlertsLabel: "Official Alerts",
+    noActiveAlerts:      "No Active Alerts",
+    noAdvisoriesText:    "No official advisories from NDMA, IMD, or KSDMA at this time.",
+    reportWhatYouSee:    "Report what you see",
+    helpNeighborsSafe:   "Help your neighbors stay safe",
+    aboutLabel:          "About",
+    aboutDesc:           "LiveKerala is a community-powered disaster watch platform. Reports are crowd-verified and supplemented with official NDMA · IMD · KSDMA advisories.",
+
+    /* Mobile bar */
+    quickPost:           "Quick post",
+    reportWhatYoureSeeing: "Report what you're seeing",
+
+    /* Location step */
+    step1of2:            "Step 1 of 2",
+    step2of2:            "Step 2 of 2",
+    whereAreYou:         "Where are you?",
+    searchLocalityHint:  "Search your locality to start reporting",
+    searchingPlaces:     "Searching…",
+    noPlacesFound:       "No places found in Kerala",
+    geoNotSupported:     "Geolocation not supported.",
+    geoCantResolve:      "Couldn't resolve your location.",
+    geoPermDenied:       "Location permission denied.",
+
+    /* Report form errors */
+    errSelectCategory:   "Please select a category.",
+    errDescribeHappened: "Please describe what happened.",
+    errImageSize:        "Image must be under 5 MB.",
+    errSubmissionFailed: "Submission failed.",
+    errNetworkError:     "Network error. Please try again.",
+
+    /* Image */
+    tapToExpand:         "Tap to expand",
+    viewAndVote:         "View & Vote →",
+
+    /* Category labels */
+    catFlood:            "Flood",
+    catLandslide:        "Landslide",
+    catRoad:             "Road",
+    catPower:            "Power",
+    catMedical:          "Medical",
+    catFire:             "Fire",
+    catOther:            "Other",
+
+    /* Loading screen */
+    loadMsg1h:           "Your neighbors are watching out for you.",
+    loadMsg1s:           "Thousands of people across Kerala report what they see in real time.",
+    loadMsg2h:           "Connecting to 14 districts…",
+    loadMsg2s:           "Live reports from Trivandrum to Kasaragod are on their way.",
+    loadMsg3h:           "Syncing official advisories…",
+    loadMsg3s:           "Loading NDMA · IMD · KSDMA alerts for your area.",
+    loadMsg4h:           "Together, we keep Kerala safe.",
+    loadMsg4s:           "Every report you share helps someone near you make a better decision.",
+    loadMsg5h:           "Real-time. Community-powered.",
+    loadMsg5s:           "No algorithm, no delay — just neighbors helping neighbors.",
+    loadMsg6h:           "Almost there…",
+    loadMsg6s:           "Your live community feed is loading.",
+
     /* Welcome modal */
     welcomeTag:          "Kerala Live Disaster Watch",
     welcomeHeadline:     "Stay Safe. Stay Informed.",
@@ -647,6 +729,88 @@ export const T = {
     reportDetail:        "റിപ്പോർട്ട് വിശദാംശം",
     communityVotesLabel: "കമ്മ്യൂണിറ്റി വോട്ടുകൾ",
     loadingDetail:       "ലോഡ് ചെയ്യുന്നു…",
+
+    /* Header */
+    communityDisasterWatch: "കമ്മ്യൂണിറ്റി ദുരന്ത നിരീക്ഷണം",
+    reportBtn:           "റിപ്പോർട്ട്",
+
+    /* Hero */
+    heroGreeting:        "നമസ്കാരം, അയൽക്കാരാ.",
+    heroDesc:            "റോഡിലോ, നിങ്ങളുടെ പ്രദേശത്തോ, വീടിനടുത്തോ എന്തെങ്കിലും കണ്ടോ? അയൽക്കാരെ അറിയിക്കൂ. അവർ നിങ്ങൾക്കും അറിയിക്കും.",
+    reportIncidentBtn:   "സംഭവം റിപ്പോർട്ട് ചെയ്യുക",
+    browseDistricts:     "ജില്ലകൾ കാണുക",
+    activeDistricts:     "സജീവ ജില്ലകൾ",
+    feedUpdating:        "ഫീഡ് 20 സെക്കൻഡിൽ അപ്‌ഡേറ്റ് ആകുന്നു",
+    feedOffline:         "ഫീഡ് ഓഫ്‌ലൈൻ",
+
+    /* Left sidebar */
+    liveStatus:          "ലൈവ് സ്ഥിതി",
+    allKerala:           "കേരളം മൊത്തം",
+
+    /* Feed */
+    searchFeedPlaceholder: "ഒരു സ്ഥലം, റിപ്പോർട്ട്, അല്ലെങ്കിൽ പ്രദേശം തിരയുക…",
+    latestFromNeighbors: "അയൽക്കാരിൽ നിന്നുള്ള ഏറ്റവും പുതിയ വിവരങ്ങൾ",
+    noMatchFilters:      "ഈ ഫിൽട്ടറുകളുമായി ഒന്നും പൊരുത്തപ്പെടുന്നില്ല.",
+    loadMoreRemaining:   "കൂടുതൽ ലോഡ് ചെയ്യുക",
+    officialAdvisoryBanner: "ഔദ്യോഗിക ഉപദേശകം · NDMA · IMD",
+
+    /* Right panel */
+    officialAlertsLabel: "ഔദ്യോഗിക അലേർട്ടുകൾ",
+    noActiveAlerts:      "സജീവ അലേർട്ടുകളൊന്നുമില്ല",
+    noAdvisoriesText:    "ഇപ്പോൾ NDMA, IMD, അല്ലെങ്കിൽ KSDMA-ൽ നിന്ന് ഔദ്യോഗിക ഉപദേശകങ്ങളൊന്നുമില്ല.",
+    reportWhatYouSee:    "നിങ്ങൾ കാണുന്നത് റിപ്പോർട്ട് ചെയ്യുക",
+    helpNeighborsSafe:   "അയൽക്കാരെ സുരക്ഷിതമായി നിലനിർത്തൂ",
+    aboutLabel:          "ഞങ്ങളെക്കുറിച്ച്",
+    aboutDesc:           "LiveKerala ഒരു കമ്മ്യൂണിറ്റി ദുരന്ത നിരീക്ഷണ പ്ലാറ്റ്ഫോമാണ്. റിപ്പോർട്ടുകൾ ജനകീയമായി സ്ഥിരീകരിക്കുകയും ഔദ്യോഗിക NDMA · IMD · KSDMA ഉപദേശകങ്ങൾ കൂടി നൽകുകയും ചെയ്യുന്നു.",
+
+    /* Mobile bar */
+    quickPost:           "ദ്രുത പോസ്റ്റ്",
+    reportWhatYoureSeeing: "നിങ്ങൾ കാണുന്നത് റിപ്പോർട്ട് ചെയ്യൂ",
+
+    /* Location step */
+    step1of2:            "ഘട്ടം 1/2",
+    step2of2:            "ഘട്ടം 2/2",
+    whereAreYou:         "നിങ്ങൾ എവിടെയാണ്?",
+    searchLocalityHint:  "റിപ്പോർട്ട് ആരംഭിക്കാൻ നിങ്ങളുടെ പ്രദേശം തിരയുക",
+    searchingPlaces:     "തിരയുന്നു…",
+    noPlacesFound:       "കേരളത്തിൽ ഒരു സ്ഥലവും കണ്ടെത്തിയില്ല",
+    geoNotSupported:     "ജിയോലൊക്കേഷൻ പിന്തുണയ്ക്കുന്നില്ല.",
+    geoCantResolve:      "നിങ്ങളുടെ സ്ഥലം കണ്ടെത്താൻ കഴിഞ്ഞില്ല.",
+    geoPermDenied:       "സ്ഥലം അനുമതി നിഷേധിച്ചു.",
+
+    /* Report form errors */
+    errSelectCategory:   "ദയവായി ഒരു വർഗ്ഗം തിരഞ്ഞെടുക്കുക.",
+    errDescribeHappened: "ദയവായി എന്ത് സംഭവിച്ചെന്ന് വിവരിക്കുക.",
+    errImageSize:        "ചിത്രം 5 MB-ൽ താഴെ ആയിരിക്കണം.",
+    errSubmissionFailed: "സമർപ്പണം പരാജയപ്പെട്ടു.",
+    errNetworkError:     "നെറ്റ്‌വർക്ക് പിശക്. വീണ്ടും ശ്രമിക്കുക.",
+
+    /* Image */
+    tapToExpand:         "വലുതാക്കാൻ ടാപ്പ് ചെയ്യുക",
+    viewAndVote:         "കാണുക & വോട്ട് →",
+
+    /* Category labels */
+    catFlood:            "വെള്ളപ്പൊക്കം",
+    catLandslide:        "ഉരുൾപൊട്ടൽ",
+    catRoad:             "റോഡ്",
+    catPower:            "വൈദ്യുതി",
+    catMedical:          "മെഡിക്കൽ",
+    catFire:             "തീ",
+    catOther:            "മറ്റുള്ളവ",
+
+    /* Loading screen */
+    loadMsg1h:           "നിങ്ങളുടെ അയൽക്കാർ നിങ്ങൾക്കായി ജാഗ്രതയോടെ ഇരിക്കുന്നു.",
+    loadMsg1s:           "ആയിരക്കണക്കിന് ആളുകൾ കേരളത്തിലുടനീളം റിപ്പോർട്ട് ചെയ്യുന്നു.",
+    loadMsg2h:           "14 ജില്ലകളിലേക്ക് ബന്ധിക്കുന്നു…",
+    loadMsg2s:           "തിരുവനന്തപുരം മുതൽ കാസർഗോഡ് വരെ ലൈവ് റിപ്പോർട്ടുകൾ വരുന്നു.",
+    loadMsg3h:           "ഔദ്യോഗിക ഉപദേശകങ്ങൾ സമന്വയിക്കുന്നു…",
+    loadMsg3s:           "നിങ്ങളുടെ പ്രദേശത്തിനായി NDMA · IMD · KSDMA അലേർട്ടുകൾ ലോഡ് ചെയ്യുന്നു.",
+    loadMsg4h:           "ഒന്നിച്ച്, നാം കേരളത്തെ സുരക്ഷിതമാക്കുന്നു.",
+    loadMsg4s:           "നിങ്ങൾ പങ്കുവെക്കുന്ന ഓരോ റിപ്പോർട്ടും ആരെയെങ്കിലും സഹായിക്കുന്നു.",
+    loadMsg5h:           "തത്സമയം. ജനകീയം.",
+    loadMsg5s:           "അൽഗോരിതം ഇല്ല, കാലതാമസം ഇല്ല — അയൽക്കാർ മാത്രം.",
+    loadMsg6h:           "ഏതാണ്ട് തയ്യാർ…",
+    loadMsg6s:           "നിങ്ങളുടെ ലൈവ് കമ്മ്യൂണിറ്റി ഫീഡ് ലോഡ് ആകുന്നു.",
 
     /* Welcome modal */
     welcomeTag:          "കേരള ലൈവ് ദുരന്ത നിരീക്ഷണം",
