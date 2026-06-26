@@ -1122,7 +1122,6 @@ function WelcomeModal({
 
 /* ─── Report Flow Modal (location + form) ────────────────────── */
 function ReportFlowModal({ onClose }: { onClose: () => void }) {
-  const { t } = useLanguage();
   const [step, setStep] = useState<"location" | "form">("location");
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
 
@@ -1132,11 +1131,13 @@ function ReportFlowModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/30 backdrop-blur-sm p-3 sm:items-center sm:p-4"
-      onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm overflow-hidden rounded-[2rem] border border-border bg-card shadow-[var(--shadow-hero)] max-h-[92vh] overflow-y-auto"
+        className="relative flex h-[560px] w-full max-w-sm flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-[var(--shadow-hero)]"
       >
         {step === "location" ? (
           <LocationPickerStep onSelect={handlePlaceSelected} onClose={onClose} />
@@ -1171,54 +1172,60 @@ function LocationPickerStep({ onSelect, onClose }: { onSelect: (p: Place) => voi
   }
 
   return (
-    <div className="p-5 space-y-4">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">Step 1 of 2</p>
-          <h2 className="font-display text-xl font-bold text-primary mt-0.5">Where are you?</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Search your locality to start reporting</p>
+    <div className="flex h-full flex-col">
+      {/* Fixed header */}
+      <div className="shrink-0 border-b border-border/60 px-6 py-5">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">Step 1 of 2</p>
+            <h2 className="font-display mt-0.5 text-xl font-bold text-primary">Where are you?</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">Search your locality to start reporting</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground hover:text-foreground">✕</button>
         </div>
-        <button type="button" onClick={onClose} className="text-xs font-bold text-muted-foreground hover:text-foreground">✕</button>
       </div>
 
-      <div className="space-y-2">
-        <div className="relative">
-          <input
-            type="text"
-            value={query}
-            onFocus={() => setOpen(true)}
-            onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-            placeholder="Search your place (e.g. Payyannur, Kakkanad…)"
-            className="w-full rounded-2xl border border-border bg-background py-3 pl-4 pr-4 text-sm text-primary placeholder:text-primary/40 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
-          />
-          {open && query.trim().length >= 2 && (
-            <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
-              {loading && <div className="px-4 py-2 text-xs text-muted-foreground">Searching…</div>}
-              {!loading && results.length === 0 && <div className="px-4 py-2 text-xs text-muted-foreground">No places found in Kerala</div>}
-              {results.map((p, i) => (
-                <button
-                  key={`${p.lat}-${p.lon}-${i}`}
-                  type="button"
-                  onClick={() => { onSelect(p); setOpen(false); }}
-                  className="w-full border-b border-border/50 px-4 py-3 text-left transition last:border-0 hover:bg-secondary"
-                >
-                  <div className="text-sm font-bold text-primary">{p.name}</div>
-                  <div className="text-xs text-muted-foreground">{p.district} · {p.context}</div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+      {/* Scrollable body */}
+      <div className="no-scrollbar flex-1 overflow-y-auto px-6 py-5">
+        <div className="space-y-3">
+          <div className="relative">
+            <input
+              type="text"
+              value={query}
+              onFocus={() => setOpen(true)}
+              onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+              placeholder="Search your place (e.g. Payyannur, Kakkanad…)"
+              className="w-full rounded-2xl border border-border bg-background py-3 pl-4 pr-4 text-sm text-primary placeholder:text-primary/40 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+            />
+            {open && query.trim().length >= 2 && (
+              <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+                {loading && <div className="px-4 py-2 text-xs text-muted-foreground">Searching…</div>}
+                {!loading && results.length === 0 && <div className="px-4 py-2 text-xs text-muted-foreground">No places found in Kerala</div>}
+                {results.map((p, i) => (
+                  <button
+                    key={`${p.lat}-${p.lon}-${i}`}
+                    type="button"
+                    onClick={() => { onSelect(p); setOpen(false); }}
+                    className="w-full border-b border-border/50 px-4 py-3 text-left transition last:border-0 hover:bg-secondary"
+                  >
+                    <div className="text-sm font-bold text-primary">{p.name}</div>
+                    <div className="text-xs text-muted-foreground">{p.district} · {p.context}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-        <button
-          type="button"
-          onClick={detectLocation}
-          disabled={geoLoading}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--color-gold)]/30 bg-[var(--color-gold)]/10 py-3 text-sm font-bold text-primary transition hover:bg-[var(--color-gold)]/20 disabled:opacity-50"
-        >
-          📍 {geoLoading ? "Detecting…" : "Use my current location"}
-        </button>
-        {geoError && <p className="text-xs font-semibold text-destructive">{geoError}</p>}
+          <button
+            type="button"
+            onClick={detectLocation}
+            disabled={geoLoading}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--color-gold)]/30 bg-[var(--color-gold)]/10 py-3 text-sm font-bold text-primary transition hover:bg-[var(--color-gold)]/20 disabled:opacity-50"
+          >
+            📍 {geoLoading ? "Detecting…" : "Use my current location"}
+          </button>
+          {geoError && <p className="text-xs font-semibold text-destructive">{geoError}</p>}
+        </div>
       </div>
     </div>
   );
@@ -1280,99 +1287,108 @@ function ReportFormStep({ place, onBack, onClose }: { place: Place; onBack: () =
   }
 
   return (
-    <form onSubmit={submit} className="p-5 space-y-4">
-      <div className="flex items-start justify-between">
+    <form onSubmit={submit} className="flex h-full flex-col">
+      {/* Fixed header */}
+      <div className="shrink-0 border-b border-border/60 px-6 py-5">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">Step 2 of 2</p>
+            <h2 className="font-display mt-0.5 text-xl font-bold text-primary">{place.name}</h2>
+            <p className="text-xs text-muted-foreground">{place.district} · {place.context}</p>
+          </div>
+          <button type="button" onClick={onBack} className="text-xs font-bold text-accent hover:underline">← Back</button>
+        </div>
+      </div>
+
+      {/* Scrollable body */}
+      <div className="no-scrollbar flex-1 space-y-4 overflow-y-auto px-6 py-5">
+        {/* Category */}
+        <div className="no-scrollbar -mx-6 flex gap-2 overflow-x-auto px-6 pb-1">
+          {Object.entries(CATEGORY_META).map(([k, v]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setCategory(k)}
+              className={`shrink-0 flex flex-col items-center gap-1 rounded-2xl border px-3 py-2 transition ${
+                category === k
+                  ? "border-[var(--color-gold)]/60 bg-[var(--color-gold)]/15 text-primary"
+                  : "border-primary/10 bg-primary/5 text-primary/70"
+              }`}
+            >
+              <span className="text-lg leading-none">{v.emoji}</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider">{v.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Severity */}
+        <div className="grid grid-cols-3 gap-2">
+          {(["safe", "warn", "critical"] as Severity[]).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSeverity(s)}
+              className={`rounded-2xl border py-2.5 text-xs font-bold uppercase tracking-widest transition ${
+                severity === s
+                  ? s === "critical"
+                    ? "border-destructive bg-destructive/10 text-destructive"
+                    : s === "warn"
+                    ? "border-warn bg-warn/10 text-warn"
+                    : "border-success bg-success/10 text-success"
+                  : "border-border text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+
+        {/* Message */}
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">Step 2 of 2</p>
-          <h2 className="font-display text-xl font-bold text-primary mt-0.5">{place.name}</h2>
-          <p className="text-xs text-muted-foreground">{place.district} · {place.context}</p>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={4}
+            maxLength={500}
+            placeholder={t.describePlaceholder}
+            className="w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm text-primary placeholder:text-primary/40 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+          />
+          <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+            <span className={error ? "font-semibold text-destructive" : ""}>{error ?? t.visiblePublicly}</span>
+            <span>{message.length}/500</span>
+          </div>
         </div>
-        <button type="button" onClick={onBack} className="text-xs font-bold text-accent hover:underline">← Back</button>
+
+        {/* Photo */}
+        {imagePreview ? (
+          <div className="relative">
+            <img src={imagePreview} alt="" className="w-full max-h-40 rounded-2xl border border-border object-cover" />
+            <button type="button" onClick={() => pickImage(null)} className="absolute right-2 top-2 rounded-full border border-border bg-card px-2 py-1 text-[10px] font-bold">
+              {t.removePhoto}
+            </button>
+          </div>
+        ) : (
+          <label className="flex cursor-pointer items-center justify-center rounded-2xl border border-dashed border-[var(--color-gold)]/40 py-5 transition hover:bg-[var(--color-gold)]/5">
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => pickImage(e.target.files?.[0] ?? null)} />
+            <span className="text-xs font-semibold text-muted-foreground">{t.attachPhotoBtn}</span>
+          </label>
+        )}
       </div>
 
-      {/* Category */}
-      <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
-        {Object.entries(CATEGORY_META).map(([k, v]) => (
+      {/* Fixed footer with action buttons */}
+      <div className="shrink-0 border-t border-border/60 px-6 py-4">
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="flex-1 rounded-2xl border border-border py-3 text-sm font-semibold text-primary transition hover:bg-secondary">
+            {t.cancel}
+          </button>
           <button
-            key={k}
-            type="button"
-            onClick={() => setCategory(k)}
-            className={`shrink-0 flex flex-col items-center gap-1 rounded-2xl border px-3 py-2 transition ${
-              category === k
-                ? "border-[var(--color-gold)]/60 bg-[var(--color-gold)]/15 text-primary"
-                : "border-primary/10 bg-primary/5 text-primary/70"
-            }`}
+            type="submit"
+            disabled={submitting}
+            className="flex-1 rounded-2xl bg-[var(--color-gold)] py-3 text-sm font-bold text-primary transition hover:brightness-105 disabled:opacity-50"
           >
-            <span className="text-lg leading-none">{v.emoji}</span>
-            <span className="text-[9px] font-bold uppercase tracking-wider">{v.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Severity */}
-      <div className="grid grid-cols-3 gap-2">
-        {(["safe", "warn", "critical"] as Severity[]).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setSeverity(s)}
-            className={`rounded-2xl border py-2.5 text-xs font-bold uppercase tracking-widest transition ${
-              severity === s
-                ? s === "critical"
-                  ? "border-destructive bg-destructive/10 text-destructive"
-                  : s === "warn"
-                  ? "border-warn bg-warn/10 text-warn"
-                  : "border-success bg-success/10 text-success"
-                : "border-border text-muted-foreground hover:border-foreground/30"
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
-
-      {/* Message */}
-      <div>
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={3}
-          maxLength={500}
-          placeholder={t.describePlaceholder}
-          className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-primary resize-none placeholder:text-primary/40 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
-        />
-        <div className="flex justify-between mt-1 text-xs text-muted-foreground">
-          <span className={error ? "text-destructive font-semibold" : ""}>{error ?? t.visiblePublicly}</span>
-          <span>{message.length}/500</span>
-        </div>
-      </div>
-
-      {/* Photo */}
-      {imagePreview ? (
-        <div className="relative">
-          <img src={imagePreview} alt="" className="w-full max-h-40 rounded-2xl object-cover border border-border" />
-          <button type="button" onClick={() => pickImage(null)} className="absolute right-2 top-2 rounded-full border border-border bg-card px-2 py-1 text-[10px] font-bold">
-            {t.removePhoto}
+            {submitting ? t.submitting : t.submitReportBtn}
           </button>
         </div>
-      ) : (
-        <label className="flex cursor-pointer items-center justify-center rounded-2xl border border-dashed border-[var(--color-gold)]/40 py-5 hover:bg-[var(--color-gold)]/5 transition">
-          <input type="file" accept="image/*" className="hidden" onChange={(e) => pickImage(e.target.files?.[0] ?? null)} />
-          <span className="text-xs font-semibold text-muted-foreground">{t.attachPhotoBtn}</span>
-        </label>
-      )}
-
-      <div className="flex gap-3 pt-1">
-        <button type="button" onClick={onClose} className="flex-1 rounded-2xl border border-border py-3 text-sm font-semibold text-primary transition hover:bg-secondary">
-          {t.cancel}
-        </button>
-        <button
-          type="submit"
-          disabled={submitting}
-          className="flex-1 rounded-2xl bg-[var(--color-gold)] py-3 text-sm font-bold text-primary transition hover:brightness-105 disabled:opacity-50"
-        >
-          {submitting ? t.submitting : t.submitReportBtn}
-        </button>
       </div>
     </form>
   );
