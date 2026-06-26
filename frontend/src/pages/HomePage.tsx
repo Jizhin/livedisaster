@@ -284,7 +284,10 @@ function useLiveReports(limit = 50) {
   const [reports, setReports] = useState<Report[]>([]);
   const [status, setStatus] = useState<"connecting" | "live" | "offline">("connecting");
   const [flashId, setFlashId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const prevIdsRef = useRef<Set<string>>(new Set());
+
+  const refresh = () => setRefreshKey((k) => k + 1);
 
   useEffect(() => {
     let active = true;
@@ -310,9 +313,9 @@ function useLiveReports(limit = 50) {
     fetchReports();
     const interval = setInterval(fetchReports, 20000);
     return () => { active = false; clearInterval(interval); };
-  }, [limit]);
+  }, [limit, refreshKey]);
 
-  return { reports, status, flashId };
+  return { reports, status, flashId, refresh };
 }
 
 function useKeralaAlerts() {
@@ -349,7 +352,7 @@ function useLocalTime() {
 }
 
 /* ─── Module-level welcome flag ──────────────────────────────── */
-let _welcomeDismissed = false;
+const WELCOME_KEY = "lk_welcome_done";
 
 /* ─── Loading Screen ────────────────────────────────────────── */
 const LOADING_MESSAGES = [
@@ -536,7 +539,7 @@ function SiteHeader({
 export function HomePage() {
   const { lang, t, toggle } = useLanguage();
   const time = useLocalTime();
-  const { reports, status, flashId } = useLiveReports(50);
+  const { reports, status, flashId, refresh: refreshFeed } = useLiveReports(50);
   const { alerts, status: alertStatus } = useKeralaAlerts();
 
   const [filterDistrict, setFilterDistrict] = useState("all");
@@ -547,14 +550,14 @@ export function HomePage() {
   const [reportFlowOpen, setReportFlowOpen] = useState(false);
   const [districtFocus, setDistrictFocus] = useState<string | null>(null);
   const [detailReport, setDetailReport] = useState<Report | null>(null);
-  const [welcomeOpen, setWelcomeOpen] = useState(() => !_welcomeDismissed);
+  const [welcomeOpen, setWelcomeOpen] = useState(() => !localStorage.getItem(WELCOME_KEY));
   const [loadingPhase, setLoadingPhase] = useState<"hidden" | "active" | "fading">("hidden");
   const [loadingMinPassed, setLoadingMinPassed] = useState(false);
 
   useEffect(() => { setVisibleCount(15); }, [filterDistrict, filterCategory, searchQuery]);
 
   function dismissWelcome() {
-    _welcomeDismissed = true;
+    localStorage.setItem(WELCOME_KEY, "1");
     setWelcomeOpen(false);
     setLoadingMinPassed(false);
     setLoadingPhase("active");
@@ -965,7 +968,7 @@ export function HomePage() {
       )}
 
       {reportFlowOpen && (
-        <ReportFlowModal onClose={() => setReportFlowOpen(false)} />
+        <ReportFlowModal onClose={() => setReportFlowOpen(false)} onReported={refreshFeed} />
       )}
 
       {districtFocus && (
@@ -1121,7 +1124,7 @@ function WelcomeModal({
 }
 
 /* ─── Report Flow Modal (location + form) ────────────────────── */
-function ReportFlowModal({ onClose }: { onClose: () => void }) {
+function ReportFlowModal({ onClose, onReported }: { onClose: () => void; onReported: () => void }) {
   const [step, setStep] = useState<"location" | "form">("location");
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
 
@@ -1142,7 +1145,7 @@ function ReportFlowModal({ onClose }: { onClose: () => void }) {
         {step === "location" ? (
           <LocationPickerStep onSelect={handlePlaceSelected} onClose={onClose} />
         ) : selectedPlace ? (
-          <ReportFormStep place={selectedPlace} onBack={() => setStep("location")} onClose={onClose} />
+          <ReportFormStep place={selectedPlace} onBack={() => setStep("location")} onClose={onClose} onReported={onReported} />
         ) : null}
       </div>
     </div>
@@ -1231,7 +1234,7 @@ function LocationPickerStep({ onSelect, onClose }: { onSelect: (p: Place) => voi
   );
 }
 
-function ReportFormStep({ place, onBack, onClose }: { place: Place; onBack: () => void; onClose: () => void }) {
+function ReportFormStep({ place, onBack, onClose, onReported }: { place: Place; onBack: () => void; onClose: () => void; onReported: () => void }) {
   const { t } = useLanguage();
   const [severity, setSeverity] = useState<Severity>("warn");
   const [category, setCategory] = useState("Flood");
@@ -1280,6 +1283,7 @@ function ReportFormStep({ place, onBack, onClose }: { place: Place; onBack: () =
         await fetch(`${API_BASE}/reports/${created.id}/images`, { method: "POST", body: fd });
       }
       onClose();
+      onReported();
     } catch {
       setError("Network error. Please try again.");
       setSubmitting(false);
@@ -1397,11 +1401,10 @@ function ReportFormStep({ place, onBack, onClose }: { place: Place; onBack: () =
 /* ─── Standalone Detail Modal ────────────────────────────────── */
 function StandaloneDetailModal({ report, onClose }: { report: Report; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/30 backdrop-blur-sm p-3 sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-sm p-4" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-sm overflow-hidden rounded-[2rem] border border-primary/10 bg-card shadow-[var(--shadow-hero)] flex flex-col"
-        style={{ maxHeight: "88vh" }}
+        className="relative flex h-[600px] w-full max-w-md flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-[var(--shadow-hero)]"
       >
         <ReportDetailPanel report={report} onBack={onClose} />
       </div>
@@ -1462,89 +1465,90 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
     : report.image_url;
 
   return (
-    <div className="flex flex-col overflow-hidden" style={{ maxHeight: "88vh" }}>
-      {/* Header */}
-      <div className="shrink-0 border-b border-border px-5 py-3.5">
+    <div className="flex h-full flex-col">
+      {/* Sticky header */}
+      <div className="shrink-0 border-b border-border/60 px-5 py-3.5">
         <div className="flex items-center justify-between">
           <button type="button" onClick={onBack} className="text-xs font-bold text-accent hover:underline">← {t.backToList}</button>
           <div className="flex items-center gap-2">
-            <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase ${sevBadge(report.severity)}`}>
-              {report.severity}
-            </span>
-            <span className="rounded-lg bg-secondary px-2.5 py-1 text-[10px] font-bold text-primary">
-              {cat.emoji} {cat.label}
-            </span>
+            <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase ${sevBadge(report.severity)}`}>{report.severity}</span>
+            <span className="rounded-lg bg-secondary px-2.5 py-1 text-[10px] font-bold text-primary">{cat.emoji} {cat.label}</span>
           </div>
         </div>
       </div>
 
-      {/* Location + message (fixed) */}
-      <div className="shrink-0 border-b border-border px-5 py-4 space-y-2">
-        <p className="text-xs font-semibold text-accent">
-          📍 {report.place ? `${report.place}, ` : ""}{report.district} · {formatReportTime(report.created_at)}
-        </p>
-        <p className="text-base leading-relaxed text-primary">{report.message}</p>
-        {imgUrl && <img src={imgUrl} alt="" className="w-full max-h-36 rounded-2xl object-cover border border-border mt-2" />}
-      </div>
+      {/* Scrollable body */}
+      <div className="no-scrollbar flex-1 overflow-y-auto">
+        {/* Location + message */}
+        <div className="border-b border-border/60 px-5 py-4">
+          <p className="text-xs font-semibold text-accent">
+            📍 {report.place ? `${report.place}, ` : ""}{report.district} · {formatReportTime(report.created_at)}
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-primary">{report.message}</p>
+          {imgUrl && <img src={imgUrl} alt="" className="mt-3 w-full max-h-36 rounded-2xl border border-border object-cover" />}
+        </div>
 
-      {/* Votes */}
-      <div className="shrink-0 border-b border-border px-5 py-4">
-        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-wider text-primary">{t.communityVotesLabel}</p>
-        {loading ? (
-          <p className="animate-pulse text-xs text-muted-foreground">{t.loadingDetail}</p>
-        ) : (
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { kind: "confirm" as const, label: t.confirm, count: localCounts?.confirmed ?? 0, active: "border-success bg-success/10 text-success", base: "border-success/30 text-success hover:bg-success/10" },
-              { kind: "incorrect" as const, label: t.incorrect, count: localCounts?.incorrect ?? 0, active: "border-destructive bg-destructive/10 text-destructive", base: "border-destructive/30 text-destructive hover:bg-destructive/10" },
-              { kind: "resolved" as const, label: t.resolvedV, count: localCounts?.resolved ?? 0, active: "border-foreground/40 bg-foreground/8 text-foreground", base: "border-border text-muted-foreground hover:bg-secondary" },
-            ].map(({ kind, label, count, active, base }) => (
-              <button
-                key={kind}
-                type="button"
-                disabled={!!voted}
-                onClick={() => vote(kind)}
-                className={`rounded-2xl border py-3 text-[10px] font-bold uppercase tracking-widest transition disabled:cursor-default ${
-                  voted === kind ? active : voted ? "border-border text-muted-foreground/40" : base
-                }`}
-              >
-                <span className="block text-xl font-extrabold tabular-nums leading-none mb-0.5">{count}</span>
-                {label}{voted === kind && " ✓"}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Comments */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-2.5">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-primary">{t.discussionHd.replace("💬 ", "")}</p>
-        {comments.length === 0 ? (
-          <p className="text-xs italic text-muted-foreground">{t.noCommentsYet}</p>
-        ) : (
-          comments.map((c) => (
-            <div key={c.id} className="rounded-2xl border border-primary/8 bg-secondary px-4 py-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-accent">{c.author_name} · {formatReportTime(c.created_at)}</p>
-              <p className="mt-1 text-sm text-primary leading-snug">{c.content}</p>
+        {/* Votes */}
+        <div className="border-b border-border/60 px-5 py-4">
+          <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t.communityVotesLabel}</p>
+          {loading ? (
+            <p className="animate-pulse text-xs text-muted-foreground">{t.loadingDetail}</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { kind: "confirm" as const, label: t.confirm, count: localCounts?.confirmed ?? 0, active: "border-success bg-success/10 text-success", base: "border-success/20 text-success hover:bg-success/10" },
+                { kind: "incorrect" as const, label: t.incorrect, count: localCounts?.incorrect ?? 0, active: "border-destructive bg-destructive/10 text-destructive", base: "border-destructive/20 text-destructive hover:bg-destructive/10" },
+                { kind: "resolved" as const, label: t.resolvedV, count: localCounts?.resolved ?? 0, active: "border-foreground/30 bg-secondary text-foreground", base: "border-border text-muted-foreground hover:bg-secondary" },
+              ].map(({ kind, label, count, active, base }) => (
+                <button
+                  key={kind}
+                  type="button"
+                  disabled={!!voted}
+                  onClick={() => vote(kind)}
+                  className={`rounded-2xl border py-3 text-[10px] font-bold uppercase tracking-wider transition disabled:cursor-default ${
+                    voted === kind ? active : voted ? "border-border text-muted-foreground/30" : base
+                  }`}
+                >
+                  <span className="block text-2xl font-extrabold tabular-nums leading-none">{count}</span>
+                  <span className="mt-0.5 block text-[9px]">{label}{voted === kind && " ✓"}</span>
+                </button>
+              ))}
             </div>
-          ))
-        )}
+          )}
+        </div>
+
+        {/* Comments */}
+        <div className="px-5 py-4">
+          <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t.discussionHd.replace("💬 ", "")}</p>
+          {comments.length === 0 ? (
+            <p className="text-xs italic text-muted-foreground">{t.noCommentsYet}</p>
+          ) : (
+            <div className="space-y-2">
+              {comments.map((c) => (
+                <div key={c.id} className="rounded-xl border border-border bg-secondary px-4 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent">{c.author_name} · {formatReportTime(c.created_at)}</p>
+                  <p className="mt-1 text-xs leading-snug text-primary">{c.content}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Comment form */}
-      <div className="shrink-0 border-t border-border bg-background px-5 py-3.5">
-        <form onSubmit={submitComment} className="flex gap-2">
-          <textarea
+      {/* Pinned comment form */}
+      <div className="shrink-0 border-t border-border/60 bg-card px-5 py-3">
+        <form onSubmit={submitComment} className="flex items-center gap-2">
+          <input
+            type="text"
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
-            rows={2}
             placeholder={t.commentPlaceholder}
-            className="flex-1 resize-none rounded-2xl border border-border bg-card px-3 py-2 text-xs text-primary outline-none placeholder:text-primary/40 focus:ring-2 focus:ring-accent/30"
+            className="flex-1 rounded-2xl border border-border bg-background px-4 py-2.5 text-sm text-primary placeholder:text-primary/40 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
           />
           <button
             type="submit"
             disabled={posting || !commentText.trim()}
-            className="shrink-0 rounded-2xl bg-[var(--color-gold)] px-4 text-[10px] font-bold uppercase tracking-wider text-primary transition hover:brightness-105 disabled:opacity-40"
+            className="shrink-0 rounded-2xl bg-[var(--color-gold)] px-4 py-2.5 text-xs font-bold text-primary transition hover:brightness-105 disabled:opacity-40"
           >
             {posting ? "…" : t.postComment}
           </button>
