@@ -379,7 +379,7 @@ function SiteHeader({
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-5 py-3 sm:px-10">
         <div className="flex items-center gap-2.5">
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary font-display text-lg font-bold text-primary-foreground">
             L
@@ -439,6 +439,9 @@ export function HomePage() {
   const [filterDistrict, setFilterDistrict] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(15);
+
+  useEffect(() => { setVisibleCount(15); }, [filterDistrict, filterCategory, searchQuery]);
 
   function dismissWelcome() {
     _welcomeDismissed = true;
@@ -477,7 +480,7 @@ export function HomePage() {
         toggle={toggle}
       />
 
-      <main className="mx-auto max-w-6xl px-4 pb-20 pt-6 sm:px-6 sm:pt-10">
+      <main className="mx-auto max-w-[1440px] px-5 pb-20 pt-8 sm:px-10 sm:pt-12">
 
         {/* ── Hero ── */}
         <section className="mb-8">
@@ -485,11 +488,11 @@ export function HomePage() {
             <span className="live-dot" />
             Live across 14 districts · {time || "—"}
           </p>
-          <h1 className="font-display text-3xl font-semibold leading-tight tracking-tight text-balance text-foreground sm:text-5xl">
+          <h1 className="font-display text-4xl font-semibold leading-tight tracking-tight text-balance text-foreground sm:text-6xl">
             What's happening across{" "}
             <span className="text-accent">Kerala</span>, right now.
           </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
             <span className="font-semibold text-foreground">{reports.length} reports</span>{" "}
             in the last 24 hours. Confirm what you've seen or report an incident from your area.
           </p>
@@ -546,7 +549,7 @@ export function HomePage() {
         </div>
 
         {/* ── Main 2-col grid ── */}
-        <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
 
           {/* Left: chips + feed */}
           <div className="min-w-0">
@@ -598,9 +601,9 @@ export function HomePage() {
 
             {/* Feed header */}
             <div className="mt-4 flex items-center justify-between">
-              <h2 className="font-display text-xl font-semibold">Latest updates</h2>
-              <span className="text-xs font-medium text-muted-foreground">
-                {filteredReports.length} shown · newest first
+              <h2 className="font-display text-2xl font-semibold">Latest updates</h2>
+              <span className="text-sm font-medium text-muted-foreground">
+                {Math.min(visibleCount, filteredReports.length)} of {filteredReports.length} · newest first
               </span>
             </div>
 
@@ -611,11 +614,24 @@ export function HomePage() {
                   No reports match these filters.
                 </p>
               ) : (
-                <ul>
-                  {filteredReports.map((r) => (
-                    <ReportRowItem key={r.id} report={r} flash={flashId === r.id} />
-                  ))}
-                </ul>
+                <>
+                  <ul>
+                    {filteredReports.slice(0, visibleCount).map((r) => (
+                      <ReportRowItem key={r.id} report={r} flash={flashId === r.id} />
+                    ))}
+                  </ul>
+                  {visibleCount < filteredReports.length && (
+                    <div className="border-t border-border px-4 py-4 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setVisibleCount((n) => n + 15)}
+                        className="rounded-full border border-border bg-background px-6 py-2 text-sm font-semibold text-foreground transition hover:bg-secondary hover:border-foreground/40"
+                      >
+                        Load more · {filteredReports.length - visibleCount} remaining
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -1541,32 +1557,32 @@ function ReportRowItem({ report, flash }: { report: Report; flash: boolean }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="grid w-full grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 text-left transition hover:bg-secondary/60 sm:px-4"
+        className="grid w-full grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 text-left transition hover:bg-secondary/60 sm:px-5"
       >
         <span
           aria-hidden
-          className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-secondary text-base"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-secondary text-xl"
           title={cat.label}
         >
           {cat.emoji}
         </span>
-        <span className="hidden w-14 shrink-0 text-xs font-medium tabular-nums text-muted-foreground sm:inline">
+        <span className="hidden w-20 shrink-0 text-sm font-medium tabular-nums text-muted-foreground sm:inline">
           {formatReportTime(report.created_at)}
         </span>
         <span className="min-w-0">
           <span className="flex min-w-0 items-baseline gap-2">
-            <span className="shrink-0 text-xs font-semibold text-foreground">{report.district}</span>
+            <span className="shrink-0 text-sm font-bold text-foreground">{report.district}</span>
             {report.place && (
-              <span className="hidden shrink-0 text-[11px] text-muted-foreground sm:inline">· {report.place}</span>
+              <span className="hidden shrink-0 text-sm text-muted-foreground sm:inline">· {report.place}</span>
             )}
-            <span className="truncate text-sm text-foreground">{report.message}</span>
+            <span className="truncate text-base text-foreground">{report.message}</span>
           </span>
-          <span className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground sm:hidden">
+          <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground sm:hidden">
             {formatReportTime(report.created_at)}
             {report.place && <span>· {report.place}</span>}
           </span>
         </span>
-        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${sevBadge(report.severity)}`}>
+        <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${sevBadge(report.severity)}`}>
           {report.severity}
         </span>
       </button>
