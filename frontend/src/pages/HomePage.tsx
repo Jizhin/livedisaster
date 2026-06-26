@@ -1010,6 +1010,7 @@ function WorldMap({
       zoom: 2,
       attributionControl: false,
       zoomControl: true,
+      scrollWheelZoom: false,
     });
     L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
       subdomains: "abcd",
