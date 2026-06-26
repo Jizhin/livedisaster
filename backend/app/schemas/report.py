@@ -52,6 +52,19 @@ class ReportDetail(ReportRead):
     comments: list[CommentRead] = []
 
 
+class ReportCreateGlobal(ORMModel):
+    """Used by the worldwide /api/reports endpoint — country is required, no district slug needed."""
+    reporter_name: str = Field(default="Anonymous", min_length=1, max_length=80)
+    content: str = Field(min_length=1, max_length=500)
+    severity: str = Field(default="warn", pattern=r"^(safe|warn|critical)$")
+    category: str | None = Field(default=None, max_length=40)
+    latitude: float | None = None
+    longitude: float | None = None
+    locality: str | None = None
+    country: str = Field(min_length=1, max_length=80)
+    state: str | None = None
+
+
 class ReportModeration(ORMModel):
     is_approved: bool
     status: ReportStatus | None = None

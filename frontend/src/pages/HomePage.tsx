@@ -56,8 +56,8 @@ type Place = {
   context: string;
   lat: number;
   lon: number;
-  district: string;
-  slug: string;
+  country: string;
+  city: string | null;
 };
 
 type ApiReport = {
@@ -71,6 +71,7 @@ type ApiReport = {
   content: string;
   severity: string;
   category: string | null;
+  country: string | null;
   images: Array<{ file_path: string }>;
 };
 
@@ -87,22 +88,6 @@ type ApiReportDetail = ApiReport & {
 
 /* ─── Constants ─────────────────────────────────────────────── */
 
-const DISTRICTS: District[] = [
-  { code: "KL-01", name: "Trivandrum",     slug: "trivandrum",     lat: 8.5241,  lon: 76.9366 },
-  { code: "KL-02", name: "Kollam",         slug: "kollam",         lat: 8.8932,  lon: 76.6141 },
-  { code: "KL-03", name: "Pathanamthitta", slug: "pathanamthitta", lat: 9.2648,  lon: 76.787  },
-  { code: "KL-04", name: "Alappuzha",      slug: "alappuzha",      lat: 9.4981,  lon: 76.3388 },
-  { code: "KL-05", name: "Kottayam",       slug: "kottayam",       lat: 9.5916,  lon: 76.5222 },
-  { code: "KL-06", name: "Idukki",         slug: "idukki",         lat: 9.85,    lon: 76.97   },
-  { code: "KL-07", name: "Ernakulam",      slug: "ernakulam",      lat: 9.9816,  lon: 76.2999 },
-  { code: "KL-08", name: "Thrissur",       slug: "thrissur",       lat: 10.5276, lon: 76.2144 },
-  { code: "KL-09", name: "Palakkad",       slug: "palakkad",       lat: 10.7867, lon: 76.6548 },
-  { code: "KL-10", name: "Malappuram",     slug: "malappuram",     lat: 11.041,  lon: 76.0788 },
-  { code: "KL-11", name: "Kozhikode",      slug: "kozhikode",      lat: 11.2588, lon: 75.7804 },
-  { code: "KL-12", name: "Wayanad",        slug: "wayanad",        lat: 11.6854, lon: 76.132  },
-  { code: "KL-13", name: "Kannur",         slug: "kannur",         lat: 11.8745, lon: 75.3704 },
-  { code: "KL-14", name: "Kasaragod",      slug: "kasaragod",      lat: 12.4996, lon: 74.9869 },
-];
 
 const CATEGORY_META: Record<string, { emoji: string; labelKey: string }> = {
   "Flood":             { emoji: "🌊", labelKey: "catFlood" },
@@ -114,7 +99,6 @@ const CATEGORY_META: Record<string, { emoji: string; labelKey: string }> = {
   "Other":             { emoji: "📌", labelKey: "catOther" },
 };
 
-const KERALA_CENTER = { lat: 10.5, lon: 76.3 };
 const SEVERITY_RANK: Record<Severity, number> = { safe: 0, warn: 1, critical: 2 };
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8000/api";
 const UPLOADS_ORIGIN = API_BASE.replace(/\/api$/, "");
@@ -129,50 +113,20 @@ function maxSeverity(items: Array<{ severity: Severity }>): Severity {
   return best;
 }
 
-function haversine(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
-  const R = 6371;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLon = ((b.lon - a.lon) * Math.PI) / 180;
-  const la1 = (a.lat * Math.PI) / 180;
-  const la2 = (b.lat * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-
-function resolveDistrict(f: PhotonFeature): District {
-  const p = f.properties;
-  const candidates = [p.district, p.county, p.city, p.state].filter(Boolean) as string[];
-  for (const c of candidates) {
-    const hit = DISTRICTS.find(
-      (d) =>
-        c.toLowerCase().includes(d.name.toLowerCase()) ||
-        d.name.toLowerCase().includes(c.toLowerCase()),
-    );
-    if (hit) return hit;
-  }
-  const [lon, lat] = f.geometry.coordinates;
-  let best = DISTRICTS[0];
-  let bestDist = Infinity;
-  for (const d of DISTRICTS) {
-    const dist = haversine({ lat, lon }, d);
-    if (dist < bestDist) { bestDist = dist; best = d; }
-  }
-  return best;
-}
-
 function toPlace(f: PhotonFeature): Place {
   const p = f.properties;
   const [lon, lat] = f.geometry.coordinates;
-  const district = resolveDistrict(f);
-  const ctxParts = [p.city, p.county, p.state].filter(Boolean) as string[];
+  const country = p.country ?? "Unknown";
+  const city = p.city ?? p.county ?? null;
+  const ctxParts = [p.city, p.county, p.state, p.country].filter(Boolean) as string[];
   const context = Array.from(new Set(ctxParts)).join(" · ");
   return {
-    name: p.name ?? "Unknown",
-    context: context || "Kerala, India",
+    name: p.name ?? city ?? "Unknown location",
+    context: context || country,
     lat,
     lon,
-    district: district.name,
-    slug: district.slug,
+    country,
+    city,
   };
 }
 
@@ -180,7 +134,7 @@ function mapApiReport(r: ApiReport): Report {
   const firstImage = r.images?.[0]?.file_path ?? null;
   return {
     id: String(r.id),
-    district: r.district_name ?? "",
+    district: r.district_name ?? r.country ?? "",
     place: r.locality ?? null,
     lat: r.latitude ?? null,
     lon: r.longitude ?? null,
@@ -236,16 +190,11 @@ function usePhotonSearch(query: string) {
     setLoading(true);
     const ctrl = new AbortController();
     const id = setTimeout(() => {
-      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${KERALA_CENTER.lat}&lon=${KERALA_CENTER.lon}&limit=8`;
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8`;
       fetch(url, { signal: ctrl.signal })
         .then((r) => r.json())
         .then((data: { features: PhotonFeature[] }) => {
-          const features = (data.features ?? []).filter((f) => {
-            const s = (f.properties.state ?? "").toLowerCase();
-            const c = (f.properties.country ?? "").toLowerCase();
-            return s.includes("kerala") || (c.includes("india") && s === "");
-          });
-          setResults(features.map(toPlace));
+          setResults((data.features ?? []).map(toPlace));
         })
         .catch((e) => { if (e.name !== "AbortError") console.error(e); })
         .finally(() => setLoading(false));
@@ -396,15 +345,15 @@ function LoadingScreen({ fading }: { fading: boolean }) {
 
       <div className="relative flex w-full max-w-xs flex-col items-center text-center">
         {/* Logo mark */}
-        <div className="grid h-16 w-16 place-items-center rounded-full bg-[var(--color-gold)] font-display text-2xl font-bold text-primary shadow-xl shadow-black/30 ring-4 ring-[var(--color-gold)]/30 mb-5">
-          L
+        <div className="grid h-16 w-16 place-items-center rounded-full bg-[var(--color-gold)] font-display text-xl font-bold text-primary shadow-xl shadow-black/30 ring-4 ring-[var(--color-gold)]/30 mb-5">
+          DW
         </div>
 
         <div className="font-display text-2xl font-bold text-primary-foreground">
-          Live<span className="text-[var(--color-gold)]">Kerala</span>
+          Disaster<span className="text-[var(--color-gold)]">Watch</span>
         </div>
         <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary-foreground/50">
-          Community · Live · Safe
+          Community · Live · Global
         </p>
 
         {/* Animated pulse dots */}
@@ -482,12 +431,12 @@ function SiteHeader({
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3 sm:px-8 lg:px-10">
         {/* Logo */}
         <div className="flex min-w-0 items-center gap-3">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary font-display text-base font-bold text-primary-foreground ring-2 ring-[var(--color-gold)]/40">
-            L
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary font-display text-xs font-bold text-primary-foreground ring-2 ring-[var(--color-gold)]/40">
+            DW
           </div>
           <div className="min-w-0">
             <div className="font-display text-lg font-bold tracking-tight text-primary">
-              Live<span className="text-[var(--color-gold)]">Kerala</span>
+              Disaster<span className="text-[var(--color-gold)]">Watch</span>
             </div>
             <div className="hidden items-center gap-1.5 text-[11px] font-medium text-muted-foreground sm:flex">
               <span className="live-dot" />
@@ -569,10 +518,14 @@ export function HomePage() {
       .filter((r) => !q || r.message.toLowerCase().includes(q) || (r.place ?? "").toLowerCase().includes(q));
   }, [reports, filterDistrict, filterCategory, searchQuery]);
 
-  const pulseDistricts = useMemo(() => {
+  const liveLocations = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const r of reports) counts.set(r.district, (counts.get(r.district) ?? 0) + 1);
-    return DISTRICTS.map((d) => ({ ...d, count: counts.get(d.name) ?? 0 }))
+    for (const r of reports) {
+      const loc = r.district || "Unknown";
+      counts.set(loc, (counts.get(loc) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count);
   }, [reports]);
 
@@ -616,7 +569,7 @@ export function HomePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDistrictFocus(pulseDistricts[0]?.name ?? null)}
+                  onClick={() => setDistrictFocus(liveLocations[0]?.name ?? null)}
                   className="inline-flex items-center gap-2 rounded-2xl border border-primary-foreground/20 px-6 py-3.5 text-sm font-semibold text-primary-foreground/75 transition hover:bg-primary-foreground/10"
                 >
                   {t.browseDistricts} →
@@ -632,9 +585,9 @@ export function HomePage() {
               </div>
               <div className="rounded-2xl bg-primary-foreground/10 p-4 text-center backdrop-blur-sm">
                 <div className="font-display text-3xl font-bold tabular-nums text-[var(--color-gold)]">
-                  {pulseDistricts.filter((d) => d.count > 0).length}
+                  {liveLocations.length}
                 </div>
-                <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground/60">{t.activeDistricts}</div>
+                <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground/60">{t.activeLocations}</div>
               </div>
               <div className="col-span-2 flex items-center gap-2 rounded-2xl bg-primary-foreground/10 px-4 py-3 backdrop-blur-sm">
                 <span className="live-dot shrink-0" />
@@ -671,9 +624,9 @@ export function HomePage() {
                   </div>
                   <div className="rounded-xl border border-border bg-card p-3 text-center">
                     <div className="font-display text-xl font-bold tabular-nums text-accent">
-                      {pulseDistricts.filter((d) => d.count > 0).length}
+                      {liveLocations.length}
                     </div>
-                    <div className="text-[10px] font-bold uppercase text-muted-foreground">{t.districtWord}</div>
+                    <div className="text-[10px] font-bold uppercase text-muted-foreground">{t.locationsWord}</div>
                   </div>
                 </div>
               </div>
@@ -718,9 +671,9 @@ export function HomePage() {
                 })}
               </div>
 
-              {/* District nav */}
+              {/* Location nav */}
               <div className="space-y-0.5">
-                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t.districtsTitle.split(" ")[0]}</p>
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t.locationsNavLabel}</p>
                 <button
                   type="button"
                   onClick={() => setFilterDistrict("all")}
@@ -730,22 +683,22 @@ export function HomePage() {
                 >
                   <span className="font-medium">{t.allKerala}</span>
                 </button>
-                {pulseDistricts.map((d) => {
-                  const isActive = filterDistrict === d.name;
+                {liveLocations.map((loc) => {
+                  const isActive = filterDistrict === loc.name;
                   return (
                     <button
-                      key={d.code}
+                      key={loc.name}
                       type="button"
-                      onClick={() => setFilterDistrict(isActive ? "all" : d.name)}
+                      onClick={() => setFilterDistrict(isActive ? "all" : loc.name)}
                       className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition ${
                         isActive ? "bg-primary text-primary-foreground font-semibold" : "text-primary hover:bg-secondary"
                       }`}
                     >
-                      <span className="font-medium">{d.name}</span>
+                      <span className="font-medium">{loc.name}</span>
                       <span className={`text-[11px] font-bold tabular-nums ${
-                        isActive ? "text-[var(--color-gold)]" : d.count > 0 ? "text-accent" : "text-muted-foreground/25"
+                        isActive ? "text-[var(--color-gold)]" : "text-accent"
                       }`}>
-                        {d.count > 0 ? d.count : "—"}
+                        {loc.count}
                       </span>
                     </button>
                   );
@@ -805,10 +758,10 @@ export function HomePage() {
                 className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${filterDistrict === "all" ? "bg-primary text-primary-foreground" : "border border-border text-primary"}`}>
                 {t.allKerala}
               </button>
-              {pulseDistricts.filter((d) => d.count > 0).map((d) => (
-                <button key={d.code} type="button" onClick={() => setFilterDistrict(filterDistrict === d.name ? "all" : d.name)}
-                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${filterDistrict === d.name ? "bg-primary text-primary-foreground" : "border border-border text-primary"}`}>
-                  {d.name} <span className="text-accent font-bold">{d.count}</span>
+              {liveLocations.map((loc) => (
+                <button key={loc.name} type="button" onClick={() => setFilterDistrict(filterDistrict === loc.name ? "all" : loc.name)}
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${filterDistrict === loc.name ? "bg-primary text-primary-foreground" : "border border-border text-primary"}`}>
+                  {loc.name} <span className="text-accent font-bold">{loc.count}</span>
                 </button>
               ))}
             </div>
@@ -1200,7 +1153,7 @@ function LocationPickerStep({ onSelect, onClose }: { onSelect: (p: Place) => voi
                     className="w-full border-b border-border/50 px-4 py-3 text-left transition last:border-0 hover:bg-secondary"
                   >
                     <div className="text-sm font-bold text-primary">{p.name}</div>
-                    <div className="text-xs text-muted-foreground">{p.district} · {p.context}</div>
+                    <div className="text-xs text-muted-foreground">{p.context}</div>
                   </button>
                 ))}
               </div>
@@ -1245,7 +1198,7 @@ function ReportFormStep({ place, onBack, onClose, onReported }: { place: Place; 
     if (imageFile && imageFile.size > 5 * 1024 * 1024) { setError(t.errImageSize); return; }
     setSubmitting(true); setError(null);
     try {
-      const res = await fetch(`${API_BASE}/districts/${place.slug}/reports`, {
+      const res = await fetch(`${API_BASE}/reports`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1253,10 +1206,11 @@ function ReportFormStep({ place, onBack, onClose, onReported }: { place: Place; 
           content: trimmed,
           severity,
           category,
-          location_attached: true,
           latitude: place.lat,
           longitude: place.lon,
           locality: place.name,
+          country: place.country,
+          state: null,
         }),
       });
       if (!res.ok) {
@@ -1287,7 +1241,7 @@ function ReportFormStep({ place, onBack, onClose, onReported }: { place: Place; 
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-accent">{t.step2of2}</p>
             <h2 className="font-display mt-0.5 text-xl font-bold text-primary">{place.name}</h2>
-            <p className="text-xs text-muted-foreground">{place.district} · {place.context}</p>
+            <p className="text-xs text-muted-foreground">{place.context}</p>
           </div>
           <button type="button" onClick={onBack} className="text-xs font-bold text-accent hover:underline">← {t.backToList}</button>
         </div>
@@ -1601,7 +1555,7 @@ function DistrictModal({
   const visibleReports = activePlace ? reports.filter((r) => r.place === activePlace) : reports;
 
   const sev = maxSeverity([...reports.map((r) => ({ severity: r.severity })), ...alerts.map((a) => ({ severity: a.severity }))]);
-  const headline = alerts.find((a) => a.severity === "critical")?.disasterType ?? alerts[0]?.disasterType ?? (reports.length > 0 ? "Community reports active" : "No active incidents");
+  const headline = alerts.find((a) => a.severity === "critical")?.disasterType ?? alerts[0]?.disasterType ?? (reports.length > 0 ? t.communityReportsActive : t.noActiveIncidents);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/30 backdrop-blur-sm p-3 sm:items-center sm:p-4" onClick={onClose}>

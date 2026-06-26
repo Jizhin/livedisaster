@@ -284,8 +284,8 @@ export const T = {
     step1Location:       "Step 1 · Choose Location",
     step2Label:          "Step 2",
     submitForLocation:   "Submit a report for",
-    communityPowered:    "Community-powered + Official feeds (NDMA Sachet · IMD · KSDMA) · Kerala Live Disaster Watch",
-    dossierLabel:        "Dossier · Kerala Disaster Watch",
+    communityPowered:    "Community-powered · Real-time · Global · DisasterWatch",
+    dossierLabel:        "Dossier · DisasterWatch",
     officialAdvisories:  "Official Advisories",
     noOfficialAdvisory:  "No official advisories are active for",
     crowdBriefs:         "Crowd Reports",
@@ -309,24 +309,29 @@ export const T = {
     loadingDetail:       "Loading…",
 
     /* Page title */
-    pageTitle:           "LiveKerala — Kerala Community Disaster Watch",
+    pageTitle:           "DisasterWatch — Community Disaster Reports",
 
     /* Header */
-    communityDisasterWatch: "Community disaster watch",
+    communityDisasterWatch: "Community Disaster Watch",
     reportBtn:           "Report",
 
     /* Hero */
     heroGreeting:        "Something Happened Nearby?",
-    heroDesc:            "See something on the road, in your area, or near home? Tell your neighbors. They'll do the same for you.",
+    heroDesc:            "See something on the road, in your area, or near home? Tell the world. Your report helps someone nearby make a better decision.",
     reportIncidentBtn:   "Report an Incident",
-    browseDistricts:     "Browse Districts",
-    activeDistricts:     "Active Districts",
+    browseDistricts:     "Browse Locations",
+    activeDistricts:     "Active Locations",
+    activeLocations:     "Active Locations",
+    locationsWord:       "Locations",
+    locationsNavLabel:   "Locations",
+    communityReportsActive: "Community reports active",
+    noActiveIncidents:   "No active incidents",
     feedUpdating:        "Feed updating every 20 seconds",
     feedOffline:         "Feed offline",
 
     /* Left sidebar */
     liveStatus:          "Live Status",
-    allKerala:           "All Kerala",
+    allKerala:           "All Locations",
 
     /* Feed */
     searchFeedPlaceholder: "Search a place, report, or area…",
@@ -342,7 +347,7 @@ export const T = {
     reportWhatYouSee:    "Report what you see",
     helpNeighborsSafe:   "Help your neighbors stay safe",
     aboutLabel:          "About",
-    aboutDesc:           "LiveKerala is a community-powered disaster watch platform. Reports are crowd-verified and supplemented with official NDMA · IMD · KSDMA advisories.",
+    aboutDesc:           "DisasterWatch is a community-powered global disaster reporting platform. Anyone, anywhere can report and verify incidents in real time.",
 
     /* Mobile bar */
     quickPost:           "Quick post",
@@ -382,8 +387,8 @@ export const T = {
     /* Loading screen */
     loadMsg1h:           "Your neighbors are watching out for you.",
     loadMsg1s:           "Thousands of people across Kerala report what they see in real time.",
-    loadMsg2h:           "Connecting to 14 districts…",
-    loadMsg2s:           "Live reports from Trivandrum to Kasaragod are on their way.",
+    loadMsg2h:           "Connecting worldwide…",
+    loadMsg2s:           "Live reports from around the world are on their way.",
     loadMsg3h:           "Syncing official advisories…",
     loadMsg3s:           "Loading NDMA · IMD · KSDMA alerts for your area.",
     loadMsg4h:           "Together, we keep Kerala safe.",
@@ -396,7 +401,7 @@ export const T = {
     /* Welcome modal */
     welcomeTag:          "Kerala Live Disaster Watch",
     welcomeHeadline:     "Stay Safe. Stay Informed.",
-    welcomeSub:          "A real-time community platform for reporting floods, landslides, road damage, power outages and other incidents across Kerala.",
+    welcomeSub:          "A real-time community platform for reporting floods, landslides, road damage, power outages and other incidents — anywhere in the world.",
     welcomeStep1Title:   "Search your location",
     welcomeStep1Desc:    "Type your area or tap Auto to detect your current position.",
     welcomeStep2Title:   "Report an incident",
@@ -709,8 +714,8 @@ export const T = {
     step1Location:       "ഘട്ടം 1 · സ്ഥലം തിരഞ്ഞെടുക്കുക",
     step2Label:          "ഘട്ടം 2",
     submitForLocation:   "ഒരു റിപ്പോർട്ട് സമർപ്പിക്കുക:",
-    communityPowered:    "ജനകീയ + ഔദ്യോഗിക ഫീഡുകൾ (NDMA Sachet · IMD · KSDMA) · കേരള ലൈവ് ദുരന്ത നിരീക്ഷണം",
-    dossierLabel:        "ദൊസ്സിയർ · കേരള ദുരന്ത നിരീക്ഷണം",
+    communityPowered:    "ജനകീയം · തത്സമയം · ലോകവ്യാപകം · DisasterWatch",
+    dossierLabel:        "ദൊസ്സിയർ · DisasterWatch",
     officialAdvisories:  "ഔദ്യോഗിക ഉപദേശകങ്ങൾ",
     noOfficialAdvisory:  "ഇതിൽ ഔദ്യോഗിക ഉപദേശകങ്ങളൊന്നും സജീവമല്ല",
     crowdBriefs:         "ജനകീയ റിപ്പോർട്ടുകൾ",
@@ -734,7 +739,7 @@ export const T = {
     loadingDetail:       "ലോഡ് ചെയ്യുന്നു…",
 
     /* Page title */
-    pageTitle:           "LiveKerala — കേരള കമ്മ്യൂണിറ്റി ദുരന്ത നിരീക്ഷണം",
+    pageTitle:           "DisasterWatch — കമ്മ്യൂണിറ്റി ദുരന്ത റിപ്പോർട്ടുകൾ",
 
     /* Header */
     communityDisasterWatch: "കമ്മ്യൂണിറ്റി ദുരന്ത നിരീക്ഷണം",
@@ -742,16 +747,21 @@ export const T = {
 
     /* Hero */
     heroGreeting:        "അടുത്തു വല്ലതും സംഭവിച്ചോ?",
-    heroDesc:            "റോഡിലോ, നിങ്ങളുടെ പ്രദേശത്തോ, വീടിനടുത്തോ എന്തെങ്കിലും കണ്ടോ? അയൽക്കാരെ അറിയിക്കൂ. അവർ നിങ്ങൾക്കും അറിയിക്കും.",
+    heroDesc:            "റോഡിലോ, നിങ്ങളുടെ പ്രദേശത്തോ, വീടിനടുത്തോ എന്തെങ്കിലും കണ്ടോ? ലോകത്തെ അറിയിക്കൂ. നിങ്ങളുടെ റിപ്പോർട്ട് ആരെയെങ്കിലും സഹായിക്കും.",
     reportIncidentBtn:   "സംഭവം റിപ്പോർട്ട് ചെയ്യുക",
-    browseDistricts:     "ജില്ലകൾ കാണുക",
-    activeDistricts:     "സജീവ ജില്ലകൾ",
+    browseDistricts:     "സ്ഥലങ്ങൾ കാണുക",
+    activeDistricts:     "സജീവ സ്ഥലങ്ങൾ",
+    activeLocations:     "സജീവ സ്ഥലങ്ങൾ",
+    locationsWord:       "സ്ഥലങ്ങൾ",
+    locationsNavLabel:   "സ്ഥലങ്ങൾ",
+    communityReportsActive: "കമ്മ്യൂണിറ്റി റിപ്പോർട്ടുകൾ സജീവം",
+    noActiveIncidents:   "സജീവ സംഭവങ്ങളൊന്നുമില്ല",
     feedUpdating:        "ഫീഡ് 20 സെക്കൻഡിൽ അപ്‌ഡേറ്റ് ആകുന്നു",
     feedOffline:         "ഫീഡ് ഓഫ്‌ലൈൻ",
 
     /* Left sidebar */
     liveStatus:          "ലൈവ് സ്ഥിതി",
-    allKerala:           "കേരളം മൊത്തം",
+    allKerala:           "എല്ലാ സ്ഥലങ്ങളും",
 
     /* Feed */
     searchFeedPlaceholder: "ഒരു സ്ഥലം, റിപ്പോർട്ട്, അല്ലെങ്കിൽ പ്രദേശം തിരയുക…",
@@ -767,7 +777,7 @@ export const T = {
     reportWhatYouSee:    "നിങ്ങൾ കാണുന്നത് റിപ്പോർട്ട് ചെയ്യുക",
     helpNeighborsSafe:   "അയൽക്കാരെ സുരക്ഷിതമായി നിലനിർത്തൂ",
     aboutLabel:          "ഞങ്ങളെക്കുറിച്ച്",
-    aboutDesc:           "LiveKerala ഒരു കമ്മ്യൂണിറ്റി ദുരന്ത നിരീക്ഷണ പ്ലാറ്റ്ഫോമാണ്. റിപ്പോർട്ടുകൾ ജനകീയമായി സ്ഥിരീകരിക്കുകയും ഔദ്യോഗിക NDMA · IMD · KSDMA ഉപദേശകങ്ങൾ കൂടി നൽകുകയും ചെയ്യുന്നു.",
+    aboutDesc:           "DisasterWatch ഒരു ലോകവ്യാപക കമ്മ്യൂണിറ്റി ദുരന്ത റിപ്പോർട്ടിംഗ് പ്ലാറ്റ്ഫോമാണ്. ആർക്കും, എവിടെ നിന്നും, തത്സമയം സംഭവങ്ങൾ റിപ്പോർട്ടു ചെയ്യാം.",
 
     /* Mobile bar */
     quickPost:           "ദ്രുത പോസ്റ്റ്",
@@ -807,8 +817,8 @@ export const T = {
     /* Loading screen */
     loadMsg1h:           "നിങ്ങളുടെ അയൽക്കാർ നിങ്ങൾക്കായി ജാഗ്രതയോടെ ഇരിക്കുന്നു.",
     loadMsg1s:           "ആയിരക്കണക്കിന് ആളുകൾ കേരളത്തിലുടനീളം റിപ്പോർട്ട് ചെയ്യുന്നു.",
-    loadMsg2h:           "14 ജില്ലകളിലേക്ക് ബന്ധിക്കുന്നു…",
-    loadMsg2s:           "തിരുവനന്തപുരം മുതൽ കാസർഗോഡ് വരെ ലൈവ് റിപ്പോർട്ടുകൾ വരുന്നു.",
+    loadMsg2h:           "ലോകമൊട്ടുക്ക് ബന്ധിക്കുന്നു…",
+    loadMsg2s:           "ലോകമെമ്പാടുനിന്നും ലൈവ് റിപ്പോർട്ടുകൾ വരുന്നു.",
     loadMsg3h:           "ഔദ്യോഗിക ഉപദേശകങ്ങൾ സമന്വയിക്കുന്നു…",
     loadMsg3s:           "നിങ്ങളുടെ പ്രദേശത്തിനായി NDMA · IMD · KSDMA അലേർട്ടുകൾ ലോഡ് ചെയ്യുന്നു.",
     loadMsg4h:           "ഒന്നിച്ച്, നാം കേരളത്തെ സുരക്ഷിതമാക്കുന്നു.",
@@ -821,7 +831,7 @@ export const T = {
     /* Welcome modal */
     welcomeTag:          "കേരള ലൈവ് ദുരന്ത നിരീക്ഷണം",
     welcomeHeadline:     "സുരക്ഷിതരായിരിക്കൂ. അറിഞ്ഞിരിക്കൂ.",
-    welcomeSub:          "കേരളത്തിലുടനീളം വെള്ളപ്പൊക്കം, ഉരുൾപൊട്ടൽ, റോഡ് നാശം, വൈദ്യുതി തടസം തുടങ്ങിയ സംഭവങ്ങൾ റിപ്പോർട്ട് ചെയ്യാനുള്ള കമ്മ്യൂണിറ്റി പ്ലാറ്റ്ഫോം.",
+    welcomeSub:          "ലോകത്തെവിടെ നിന്നും വെള്ളപ്പൊക്കം, ഉരുൾപൊട്ടൽ, റോഡ് നാശം, വൈദ്യുതി തടസം തുടങ്ങിയ സംഭവങ്ങൾ റിപ്പോർട്ട് ചെയ്യാനുള്ള ലോകവ്യാപക കമ്മ്യൂണിറ്റി പ്ലാറ്റ്ഫോം.",
     welcomeStep1Title:   "നിങ്ങളുടെ സ്ഥലം തിരയുക",
     welcomeStep1Desc:    "നിങ്ങളുടെ പ്രദേശം ടൈപ്പ് ചെയ്യുക അല്ലെങ്കിൽ Auto ടാപ്പ് ചെയ്ത് സ്ഥലം കണ്ടെത്തുക.",
     welcomeStep2Title:   "സംഭവം റിപ്പോർട്ട് ചെയ്യുക",

@@ -7,7 +7,7 @@ from app.crud import reports as report_crud
 from app.crud import verifications as verification_crud
 from app.models.report import Report
 from app.schemas.comment import CommentCreate
-from app.schemas.report import ReportCreate, ReportDetail, ReportRead
+from app.schemas.report import ReportCreate, ReportCreateGlobal, ReportDetail, ReportRead
 from app.schemas.verification import VerificationCreate, VerificationCounts
 
 _feed_cache: tuple[float, list[ReportRead]] | None = None
@@ -61,6 +61,26 @@ def district_feed(db: Session, district_slug: str, sort: str = "newest", date_fi
     if not district:
         raise AppError("District not found", 404)
     return _serialize_reports_batch(db, report_crud.list_for_district(db, district.id, sort, date_filter))
+
+
+def create_report_global(db: Session, payload: ReportCreateGlobal) -> ReportRead:
+    """Create a report for any location worldwide using country as the grouping bucket."""
+    district = district_crud.get_or_create_by_name(db, payload.country)
+    report_data = ReportCreate(
+        reporter_name=payload.reporter_name,
+        content=payload.content,
+        severity=payload.severity,
+        category=payload.category,
+        location_attached=True,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        locality=payload.locality,
+        country=payload.country,
+        state=payload.state,
+    )
+    report = report_crud.create(db, district.id, report_data)
+    invalidate_feed_cache()
+    return _serialize_report(db, report)
 
 
 def create_report(db: Session, district_slug: str, payload: ReportCreate) -> ReportRead:

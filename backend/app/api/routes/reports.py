@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query
 from app.api.deps import DbSession
-from app.schemas.report import ReportCreate, ReportDetail, ReportRead
+from app.schemas.report import ReportCreate, ReportCreateGlobal, ReportDetail, ReportRead
 from app.services import reports as report_service
 
 router = APIRouter()
@@ -15,6 +15,12 @@ def recent_reports(db: DbSession, limit: int = Query(default=6, le=50)) -> list[
 def reports_feed(db: DbSession, limit: int = Query(default=40, le=50)) -> list[ReportRead]:
     """Live feed of most recent community reports across all districts."""
     return report_service.feed_all_reports(db, limit)
+
+
+@router.post("/reports", response_model=ReportRead, status_code=201)
+def create_global_report(payload: ReportCreateGlobal, db: DbSession) -> ReportRead:
+    """Submit a report from anywhere in the world."""
+    return report_service.create_report_global(db, payload)
 
 
 @router.post("/districts/{district_slug}/reports", response_model=ReportRead, status_code=201)
