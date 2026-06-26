@@ -539,6 +539,8 @@ export function HomePage() {
   const [loadingPhase, setLoadingPhase] = useState<"hidden" | "active" | "fading">("hidden");
   const [loadingMinPassed, setLoadingMinPassed] = useState(false);
 
+  useEffect(() => { document.title = t.pageTitle; }, [t.pageTitle]);
+
   useEffect(() => { setVisibleCount(15); }, [filterDistrict, filterCategory, searchQuery]);
 
   function dismissWelcome() {

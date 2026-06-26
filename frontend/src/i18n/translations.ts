@@ -308,6 +308,9 @@ export const T = {
     communityVotesLabel: "Community Votes",
     loadingDetail:       "Loading…",
 
+    /* Page title */
+    pageTitle:           "Something Happened Nearby — LiveKerala",
+
     /* Header */
     communityDisasterWatch: "Community disaster watch",
     reportBtn:           "Report",
@@ -729,6 +732,9 @@ export const T = {
     reportDetail:        "റിപ്പോർട്ട് വിശദാംശം",
     communityVotesLabel: "കമ്മ്യൂണിറ്റി വോട്ടുകൾ",
     loadingDetail:       "ലോഡ് ചെയ്യുന്നു…",
+
+    /* Page title */
+    pageTitle:           "നിങ്ങളുടെ അടുത്തെവിടെയെങ്കിലും എന്തെങ്കിലും സംഭവിച്ചോ? — LiveKerala",
 
     /* Header */
     communityDisasterWatch: "കമ്മ്യൂണിറ്റി ദുരന്ത നിരീക്ഷണം",
