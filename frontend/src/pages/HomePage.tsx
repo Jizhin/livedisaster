@@ -562,25 +562,17 @@ export function HomePage() {
     setLoadingMinPassed(false);
     setLoadingPhase("active");
     setTimeout(() => setLoadingMinPassed(true), 2200);
-    // Hard cap: dismiss loading screen after 5s regardless of API state
-    setTimeout(() => {
-      setLoadingPhase((p) => {
-        if (p === "active") {
-          setTimeout(() => setLoadingPhase((p2) => (p2 === "fading" ? "hidden" : p2)), 750);
-          return "fading";
-        }
-        return p;
-      });
-    }, 5000);
   }
 
+  // Dismiss loading screen once reports are ready AND minimum time has passed.
+  // Alerts load independently in the background — don't block on them.
   useEffect(() => {
-    if (loadingPhase === "active" && loadingMinPassed && status === "live" && alertStatus !== "loading") {
+    if (loadingPhase === "active" && loadingMinPassed && status === "live") {
       setLoadingPhase("fading");
       const t = setTimeout(() => setLoadingPhase("hidden"), 750);
       return () => clearTimeout(t);
     }
-  }, [loadingPhase, loadingMinPassed, status, alertStatus]);
+  }, [loadingPhase, loadingMinPassed, status]);
 
   const filteredReports = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
