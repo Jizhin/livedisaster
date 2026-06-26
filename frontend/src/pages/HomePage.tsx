@@ -1542,25 +1542,28 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
 
       {/* Pinned comment form */}
       <div className="shrink-0 border-t border-border bg-card px-4 py-3">
-        <form onSubmit={submitComment}>
-          <div className="flex items-end gap-2 rounded-2xl border border-border bg-white px-4 py-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20">
-            <textarea
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (commentText.trim()) submitComment(e as unknown as React.FormEvent); }}}
-              rows={2}
-              placeholder={t.commentPlaceholder}
-              className="flex-1 resize-none bg-transparent text-sm text-primary placeholder:text-primary/35 focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={posting}
-              className="mb-0.5 shrink-0 rounded-xl bg-[var(--color-gold)] px-3.5 py-1.5 text-[11px] font-bold text-primary transition hover:brightness-105 disabled:opacity-50"
-            >
-              {posting ? "…" : t.postComment}
-            </button>
-          </div>
-          <p className="mt-1.5 px-1 text-[10px] text-muted-foreground/60">Press Enter to post · Shift+Enter for new line</p>
+        <form onSubmit={submitComment} className="flex items-end gap-2">
+          <textarea
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (commentText.trim()) submitComment(e as unknown as React.FormEvent); }}}
+            rows={2}
+            placeholder={t.commentPlaceholder}
+            className="no-scrollbar flex-1 resize-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm text-primary placeholder:text-primary/40 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
+          />
+          <button
+            type="submit"
+            disabled={posting}
+            className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--color-gold)] text-primary transition hover:brightness-105 disabled:opacity-40"
+          >
+            {posting ? (
+              <span className="text-xs">…</span>
+            ) : (
+              <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+              </svg>
+            )}
+          </button>
         </form>
       </div>
     </div>
