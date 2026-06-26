@@ -562,6 +562,16 @@ export function HomePage() {
     setLoadingMinPassed(false);
     setLoadingPhase("active");
     setTimeout(() => setLoadingMinPassed(true), 2200);
+    // Hard cap: dismiss loading screen after 5s regardless of API state
+    setTimeout(() => {
+      setLoadingPhase((p) => {
+        if (p === "active") {
+          setTimeout(() => setLoadingPhase((p2) => (p2 === "fading" ? "hidden" : p2)), 750);
+          return "fading";
+        }
+        return p;
+      });
+    }, 5000);
   }
 
   useEffect(() => {
@@ -1521,7 +1531,10 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
         <div className="px-5 py-4">
           <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t.discussionHd.replace("💬 ", "")}</p>
           {comments.length === 0 ? (
-            <p className="text-xs italic text-muted-foreground">{t.noCommentsYet}</p>
+            <div className="rounded-xl border border-dashed border-border bg-secondary/50 px-4 py-5 text-center">
+              <p className="text-xs text-muted-foreground">{t.noCommentsYet}</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground/60">Be the first to share an update below</p>
+            </div>
           ) : (
             <div className="space-y-2">
               {comments.map((c) => (
@@ -1536,22 +1549,26 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
       </div>
 
       {/* Pinned comment form */}
-      <div className="shrink-0 border-t border-border/60 bg-card px-5 py-3">
-        <form onSubmit={submitComment} className="flex items-center gap-2">
-          <input
-            type="text"
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            placeholder={t.commentPlaceholder}
-            className="flex-1 rounded-2xl border border-border bg-background px-4 py-2.5 text-sm text-primary placeholder:text-primary/40 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
-          />
-          <button
-            type="submit"
-            disabled={posting || !commentText.trim()}
-            className="shrink-0 rounded-2xl bg-[var(--color-gold)] px-4 py-2.5 text-xs font-bold text-primary transition hover:brightness-105 disabled:opacity-40"
-          >
-            {posting ? "…" : t.postComment}
-          </button>
+      <div className="shrink-0 border-t border-border bg-card px-4 py-3">
+        <form onSubmit={submitComment}>
+          <div className="flex items-end gap-2 rounded-2xl border border-border bg-white px-4 py-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20">
+            <textarea
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (commentText.trim()) submitComment(e as unknown as React.FormEvent); }}}
+              rows={2}
+              placeholder={t.commentPlaceholder}
+              className="flex-1 resize-none bg-transparent text-sm text-primary placeholder:text-primary/35 focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={posting}
+              className="mb-0.5 shrink-0 rounded-xl bg-[var(--color-gold)] px-3.5 py-1.5 text-[11px] font-bold text-primary transition hover:brightness-105 disabled:opacity-50"
+            >
+              {posting ? "…" : t.postComment}
+            </button>
+          </div>
+          <p className="mt-1.5 px-1 text-[10px] text-muted-foreground/60">Press Enter to post · Shift+Enter for new line</p>
         </form>
       </div>
     </div>
