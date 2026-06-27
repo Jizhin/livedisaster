@@ -386,9 +386,10 @@ function SiteHeader({
 }) {
   const { t } = useLanguage();
   return (
-    <header className="relative z-30 border-b border-border shrink-0 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-r from-primary/8 via-transparent to-primary/8" />
-      <div className="absolute inset-0 bg-card/90 backdrop-blur-md" />
+    <header className="relative z-30 shrink-0">
+      <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/8 to-primary/15" />
+      <div className="absolute inset-0 bg-card/65 backdrop-blur-2xl" />
+      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
       <div className="relative px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
         {/* Brand */}
         <div className="flex items-center gap-3">
@@ -446,11 +447,12 @@ function SiteHeader({
 
 /* ─── Floating Search ────────────────────────────────────────── */
 function FloatingSearch({
-  onPick, onLocate, locating,
+  onPick, onLocate, locating, onClear,
 }: {
   onPick: (place: Place) => void;
   onLocate: () => void;
   locating: boolean;
+  onClear?: () => void;
 }) {
   const [q, setQ] = useState("");
   const { results, loading } = usePhotonSearch(q);
@@ -465,18 +467,30 @@ function FloatingSearch({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  function clearSearch() {
+    setQ("");
+    setOpen(false);
+    onClear?.();
+  }
+
   return (
     <div ref={boxRef} className="relative w-full">
-      <div className="flex items-center gap-2 rounded-2xl bg-card shadow-xl border border-border pl-4 pr-2 py-2">
+      <div className="flex items-center gap-2 rounded-2xl bg-card/90 backdrop-blur-md shadow-xl border border-border/60 pl-4 pr-2 py-2">
         <span className="text-muted-foreground shrink-0 text-sm">⌕</span>
         <input
           value={q}
-          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); if (!e.target.value) onClear?.(); }}
           onFocus={() => results.length > 0 && setOpen(true)}
           placeholder="Search a city, street or place worldwide"
           className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground py-1 text-primary min-w-0"
         />
         {loading && <span className="text-[11px] text-muted-foreground animate-pulse shrink-0">···</span>}
+        {q && !loading && (
+          <button onClick={clearSearch}
+            className="shrink-0 h-5 w-5 rounded-full bg-muted text-muted-foreground hover:bg-secondary hover:text-primary text-xs flex items-center justify-center transition">
+            ✕
+          </button>
+        )}
         <button
           onClick={onLocate}
           disabled={locating}
@@ -490,7 +504,7 @@ function FloatingSearch({
       </div>
 
       {open && results.length > 0 && (
-        <div className="absolute z-[1000] left-0 right-0 mt-2 rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
+        <div className="absolute z-[2000] left-0 right-0 mt-2 rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
           {results.map((p, i) => (
             <button
               key={`${p.lat}-${p.lon}-${i}`}
@@ -567,6 +581,7 @@ export function HomePage() {
   const { alerts, status: alertStatus } = useKeralaAlerts();
 
   const [flyTo, setFlyTo] = useState<[number, number] | null>(null);
+  const [mapResetView, setMapResetView] = useState(0);
   const [locating, setLocating] = useState(false);
   const [pickedLocation, setPickedLocation] = useState<Place | null>(null);
   const [filterSeverity, setFilterSeverity] = useState<"all" | Severity>("all");
@@ -638,10 +653,21 @@ export function HomePage() {
     setMapPickLoading(true);
     const place = await reverseGeocode(lat, lon);
     setMapPickLoading(false);
-    if (place) {
-      setMapPickPlace(place);
-      setReportFlowOpen(true);
-    }
+    const finalPlace: Place = place ?? {
+      name: `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
+      context: "Selected location",
+      lat, lon,
+      country: "Unknown",
+      city: null,
+    };
+    setMapPickPlace(finalPlace);
+    setReportFlowOpen(true);
+  }
+
+  function handleSearchClear() {
+    setFlyTo(null);
+    setPickedLocation(null);
+    setMapResetView((n) => n + 1);
   }
 
   function closeReportModal() {
@@ -726,7 +752,7 @@ export function HomePage() {
         <main className="flex-1 relative">
           {/* Floating search bar */}
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1500] w-[min(520px,calc(100%-2rem))]">
-            <FloatingSearch onPick={handlePickPlace} onLocate={handleLocate} locating={locating} />
+            <FloatingSearch onPick={handlePickPlace} onLocate={handleLocate} locating={locating} onClear={handleSearchClear} />
             {pickedLocation && (
               <div className="mt-2 mx-auto w-fit text-[11px] bg-card/95 backdrop-blur border border-border rounded-full px-3 py-1 shadow-lg text-muted-foreground flex items-center gap-1.5">
                 <span>📍</span>
@@ -762,6 +788,7 @@ export function HomePage() {
             onMapPick={handleMapPick}
             pickReset={mapPickReset}
             flyTo={flyTo}
+            resetView={mapResetView}
           />
 
           {/* ── Mobile bottom sheet ── */}
@@ -834,12 +861,14 @@ function WorldMap({
   onMapPick,
   pickReset,
   flyTo,
+  resetView,
 }: {
   reports: Report[];
   onSelectReport: (r: Report) => void;
   onMapPick?: (lat: number, lon: number) => void;
   pickReset?: number;
   flyTo?: [number, number] | null;
+  resetView?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -849,6 +878,7 @@ function WorldMap({
   const onMapPickRef = useRef(onMapPick);
   onMapPickRef.current = onMapPick;
   const flyToPrevRef = useRef<[number, number] | null>(null);
+  const resetViewPrevRef = useRef(0);
 
   useEffect(() => {
     const L = (window as any).L;
@@ -856,8 +886,8 @@ function WorldMap({
     const map = L.map(containerRef.current, {
       center: [20, 0], zoom: 2, attributionControl: false, zoomControl: true, scrollWheelZoom: false,
     });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      subdomains: "abcd", maxZoom: 19,
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png", {
+      subdomains: "abcd", maxZoom: 19, detectRetina: true,
     }).addTo(map);
     L.control.attribution({ prefix: false }).addTo(map);
     layerRef.current = L.layerGroup().addTo(map);
@@ -921,6 +951,15 @@ function WorldMap({
     const zoom = Math.max(mapRef.current.getZoom(), 13);
     mapRef.current.flyTo(flyTo, zoom, { duration: 0.8 });
   }, [flyTo]);
+
+  useEffect(() => {
+    if (!resetView || !mapRef.current) return;
+    if (resetView === resetViewPrevRef.current) return;
+    resetViewPrevRef.current = resetView;
+    flyToPrevRef.current = null;
+    fitDoneRef.current = false;
+    mapRef.current.flyTo([20, 0], 2, { duration: 1.2 });
+  }, [resetView]);
 
   return <div ref={containerRef} className="absolute inset-0" />;
 }
