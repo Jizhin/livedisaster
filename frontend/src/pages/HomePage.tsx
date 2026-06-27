@@ -486,6 +486,9 @@ export function HomePage() {
   const [detailReport, setDetailReport] = useState<Report | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"feed" | "map">("feed");
+  const [mapPickPlace, setMapPickPlace] = useState<Place | null>(null);
+  const [mapPickLoading, setMapPickLoading] = useState(false);
+  const [mapPickReset, setMapPickReset] = useState(0);
   const [welcomeOpen, setWelcomeOpen] = useState(() => !sessionStorage.getItem(WELCOME_KEY));
   const [loadingPhase, setLoadingPhase] = useState<"hidden" | "active" | "fading">("hidden");
   const [loadingMinPassed, setLoadingMinPassed] = useState(false);
@@ -530,6 +533,22 @@ export function HomePage() {
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count);
   }, [reports]);
+
+  async function handleMapPick(lat: number, lon: number) {
+    setMapPickLoading(true);
+    const place = await reverseGeocode(lat, lon);
+    setMapPickLoading(false);
+    if (place) {
+      setMapPickPlace(place);
+      setReportFlowOpen(true);
+    }
+  }
+
+  function closeReportModal() {
+    setReportFlowOpen(false);
+    setMapPickPlace(null);
+    setMapPickReset((n) => n + 1);
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -750,8 +769,26 @@ export function HomePage() {
 
         {/* ── MAP VIEW (full-width, desktop toggle) ── */}
         {viewMode === "map" && (
-          <div className="flex-1 sticky top-[61px] h-[calc(100vh-61px)] overflow-hidden">
-            <WorldMap reports={filteredReports} onSelectReport={setDetailReport} />
+          <div className="flex-1 sticky top-[61px] h-[calc(100vh-61px)] overflow-hidden relative">
+            <WorldMap
+              reports={filteredReports}
+              onSelectReport={setDetailReport}
+              onMapPick={handleMapPick}
+              pickReset={mapPickReset}
+            />
+            {/* Loading overlay while geocoding */}
+            {mapPickLoading && (
+              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[500] flex items-center gap-2 rounded-full bg-card border border-border px-4 py-2 text-sm font-semibold shadow-lg">
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                Finding location…
+              </div>
+            )}
+            {/* Hint text */}
+            {!mapPickLoading && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[500] pointer-events-none rounded-full bg-card/85 backdrop-blur border border-border px-4 py-1.5 text-xs text-muted-foreground shadow">
+                Click anywhere on the map to report an incident
+              </div>
+            )}
           </div>
         )}
 
@@ -950,7 +987,11 @@ export function HomePage() {
       )}
 
       {reportFlowOpen && (
-        <ReportFlowModal onClose={() => setReportFlowOpen(false)} onReported={refreshFeed} />
+        <ReportFlowModal
+          onClose={closeReportModal}
+          onReported={refreshFeed}
+          initialPlace={mapPickPlace ?? undefined}
+        />
       )}
 
       {districtFocus && (
@@ -979,8 +1020,18 @@ export function HomePage() {
               ✕
             </button>
           </div>
-          <div className="flex-1 min-h-0">
-            <WorldMap reports={reports} onSelectReport={(r) => { setMapOpen(false); setDetailReport(r); }} />
+          <div className="flex-1 min-h-0 relative">
+            <WorldMap
+              reports={reports}
+              onSelectReport={(r) => { setMapOpen(false); setDetailReport(r); }}
+              onMapPick={async (lat, lon) => { setMapOpen(false); await handleMapPick(lat, lon); }}
+              pickReset={mapPickReset}
+            />
+            {!mapPickLoading && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[500] pointer-events-none rounded-full bg-card/85 backdrop-blur border border-border px-4 py-1.5 text-xs text-muted-foreground shadow">
+                Tap map to report an incident
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -994,14 +1045,21 @@ export function HomePage() {
 function WorldMap({
   reports,
   onSelectReport,
+  onMapPick,
+  pickReset,
 }: {
   reports: Report[];
   onSelectReport: (r: Report) => void;
+  onMapPick?: (lat: number, lon: number) => void;
+  pickReset?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const layerRef = useRef<any>(null);
   const fitDoneRef = useRef(false);
+  const pendingPinRef = useRef<any>(null);
+  const onMapPickRef = useRef(onMapPick);
+  onMapPickRef.current = onMapPick;
 
   useEffect(() => {
     const L = (window as any).L;
@@ -1020,11 +1078,23 @@ function WorldMap({
     L.control.attribution({ prefix: false }).addTo(map);
     layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
+
+    map.on("click", (e: any) => {
+      if (!onMapPickRef.current) return;
+      const { lat, lng } = e.latlng;
+      if (pendingPinRef.current) { pendingPinRef.current.remove(); pendingPinRef.current = null; }
+      pendingPinRef.current = L.circleMarker([lat, lng], {
+        radius: 11, fillColor: "#3b82f6", color: "#fff", weight: 3, fillOpacity: 0.9,
+      }).bindTooltip("📍 Finding location…", { permanent: false }).addTo(map);
+      onMapPickRef.current(lat, lng);
+    });
+
     return () => {
       map.remove();
       mapRef.current = null;
       layerRef.current = null;
       fitDoneRef.current = false;
+      pendingPinRef.current = null;
     };
   }, []);
 
@@ -1059,6 +1129,12 @@ function WorldMap({
       } catch {}
     }
   }, [reports, onSelectReport]);
+
+  // Clear pending pin when pick is confirmed/cancelled
+  useEffect(() => {
+    if (pickReset === undefined) return;
+    if (pendingPinRef.current) { pendingPinRef.current.remove(); pendingPinRef.current = null; }
+  }, [pickReset]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }
@@ -1199,9 +1275,17 @@ function WelcomeModal({
 }
 
 /* ─── Report Flow Modal (location + form) ────────────────────── */
-function ReportFlowModal({ onClose, onReported }: { onClose: () => void; onReported: () => void }) {
-  const [step, setStep] = useState<"location" | "form">("location");
-  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+function ReportFlowModal({
+  onClose,
+  onReported,
+  initialPlace,
+}: {
+  onClose: () => void;
+  onReported: () => void;
+  initialPlace?: Place;
+}) {
+  const [step, setStep] = useState<"location" | "form">(initialPlace ? "form" : "location");
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(initialPlace ?? null);
 
   function handlePlaceSelected(p: Place) {
     setSelectedPlace(p);
