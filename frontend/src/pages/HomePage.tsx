@@ -314,7 +314,7 @@ function LoadingScreen({ fading }: { fading: boolean }) {
 
   return (
     <div
-      className={`fixed inset-0 z-[70] flex flex-col items-center justify-center bg-primary px-8 transition-opacity duration-700 ${
+      className={`fixed inset-0 z-[9000] flex flex-col items-center justify-center bg-primary px-8 transition-opacity duration-700 ${
         fading ? "opacity-0 pointer-events-none" : "opacity-100"
       }`}
     >
@@ -579,9 +579,7 @@ export function HomePage() {
   const [mapPickReset, setMapPickReset] = useState(0);
 
   const [welcomeOpen, setWelcomeOpen] = useState(() => !sessionStorage.getItem(WELCOME_KEY));
-  const [loadingPhase, setLoadingPhase] = useState<"hidden" | "active" | "fading">(() =>
-    sessionStorage.getItem(WELCOME_KEY) ? "active" : "hidden"
-  );
+  const [loadingPhase, setLoadingPhase] = useState<"hidden" | "active" | "fading">("hidden");
   const [loadingMinPassed, setLoadingMinPassed] = useState(false);
 
   useEffect(() => { document.title = t.pageTitle; }, [t.pageTitle]);
@@ -725,9 +723,9 @@ export function HomePage() {
         </aside>
 
         {/* ── Map area ── */}
-        <main className="flex-1 relative overflow-hidden">
+        <main className="flex-1 relative">
           {/* Floating search bar */}
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400] w-[min(520px,calc(100%-2rem))]">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1500] w-[min(520px,calc(100%-2rem))]">
             <FloatingSearch onPick={handlePickPlace} onLocate={handleLocate} locating={locating} />
             {pickedLocation && (
               <div className="mt-2 mx-auto w-fit text-[11px] bg-card/95 backdrop-blur border border-border rounded-full px-3 py-1 shadow-lg text-muted-foreground flex items-center gap-1.5">
@@ -745,7 +743,7 @@ export function HomePage() {
 
           {/* Geocoding spinner */}
           {mapPickLoading && (
-            <div className="absolute bottom-[calc(40vh+1.5rem)] lg:bottom-10 left-1/2 -translate-x-1/2 z-[500] flex items-center gap-2 rounded-full bg-card border border-border px-4 py-2 text-sm font-semibold shadow-lg">
+            <div className="absolute bottom-[calc(40vh+1.5rem)] lg:bottom-10 left-1/2 -translate-x-1/2 z-[1500] flex items-center gap-2 rounded-full bg-card border border-border px-4 py-2 text-sm font-semibold shadow-lg">
               <span className="h-3 w-3 animate-spin rounded-full border-2 border-accent border-t-transparent" />
               Finding location…
             </div>
@@ -753,7 +751,7 @@ export function HomePage() {
 
           {/* Hint */}
           {!mapPickLoading && (
-            <div className="hidden lg:block absolute bottom-4 left-1/2 -translate-x-1/2 z-[500] pointer-events-none rounded-full bg-card/85 backdrop-blur border border-border px-4 py-1.5 text-xs text-muted-foreground shadow">
+            <div className="hidden lg:block absolute bottom-4 left-1/2 -translate-x-1/2 z-[1500] pointer-events-none rounded-full bg-card/85 backdrop-blur border border-border px-4 py-1.5 text-xs text-muted-foreground shadow">
               Click anywhere on the map to report an incident
             </div>
           )}
@@ -767,7 +765,7 @@ export function HomePage() {
           />
 
           {/* ── Mobile bottom sheet ── */}
-          <div className="lg:hidden absolute bottom-0 left-0 right-0 z-[400] max-h-[40vh] overflow-y-auto bg-card border-t border-border rounded-t-2xl shadow-xl">
+          <div className="lg:hidden absolute bottom-0 left-0 right-0 z-[1500] max-h-[40vh] overflow-y-auto bg-card border-t border-border rounded-t-2xl shadow-xl">
             <div className="sticky top-0 bg-card px-4 pt-3 pb-2 border-b border-border/60 flex items-center justify-between">
               <div className="font-display font-semibold text-sm text-primary">
                 {filteredReports.length} incident{filteredReports.length !== 1 ? "s" : ""}
@@ -924,7 +922,7 @@ function WorldMap({
     mapRef.current.flyTo(flyTo, zoom, { duration: 0.8 });
   }, [flyTo]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return <div ref={containerRef} className="absolute inset-0" />;
 }
 
 /* ─── Welcome Modal ─────────────────────────────────────────── */
@@ -939,7 +937,7 @@ function WelcomeModal({
     { icon: "🗺️", title: t.welcomeStep3Title, desc: t.welcomeStep3Desc },
   ];
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-foreground/30 backdrop-blur-sm sm:items-center p-4">
+    <div className="fixed inset-0 z-[9000] flex items-end justify-center bg-foreground/30 backdrop-blur-sm sm:items-center p-4">
       <div className="w-full max-w-sm overflow-hidden rounded-[2rem] border border-border bg-card shadow-[var(--shadow-hero)]">
         <div className={`h-1.5 w-full ${dataReady ? "bg-success" : "bg-[var(--color-gold)] animate-pulse"}`} />
         <div className="p-6 space-y-4">
@@ -992,7 +990,7 @@ function ReportFlowModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-foreground/40 backdrop-blur-sm p-0 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[9000] flex items-end sm:items-center justify-center bg-foreground/40 backdrop-blur-sm p-0 sm:p-4" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
         className="relative flex h-[min(580px,calc(100dvh-env(safe-area-inset-bottom)))] sm:h-[min(560px,calc(100dvh-2rem))] w-full sm:max-w-sm flex-col overflow-hidden rounded-t-[2rem] sm:rounded-[2rem] border border-border bg-card shadow-[var(--shadow-hero)]"
@@ -1220,7 +1218,7 @@ function ReportFormStep({ place, onBack, onClose, onReported }: { place: Place; 
 /* ─── Standalone Detail Modal ────────────────────────────────── */
 function StandaloneDetailModal({ report, onClose }: { report: Report; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[9000] flex items-center justify-center bg-foreground/40 backdrop-blur-sm p-4" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
         className="relative flex max-h-[min(640px,calc(100dvh-2rem))] w-full max-w-md flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-[var(--shadow-hero)]"
@@ -1288,7 +1286,7 @@ function ReportDetailPanel({ report, onBack }: { report: Report; onBack: () => v
   return (
     <>
       {imgExpanded && imgUrl && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-4" onClick={() => setImgExpanded(false)}>
+        <div className="fixed inset-0 z-[9500] flex items-center justify-center bg-black/90 p-4" onClick={() => setImgExpanded(false)}>
           <img src={imgUrl} alt="" className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl" />
           <button type="button" onClick={() => setImgExpanded(false)}
             className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/20 text-white hover:bg-white/30">✕</button>
@@ -1400,7 +1398,7 @@ function DistrictModal({
   const headline = alerts.find((a) => a.severity === "critical")?.disasterType ?? alerts[0]?.disasterType ?? (reports.length > 0 ? t.communityReportsActive : t.noActiveIncidents);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/30 backdrop-blur-sm p-3 sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[9000] flex items-end justify-center bg-foreground/30 backdrop-blur-sm p-3 sm:items-center sm:p-4" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
         className="relative flex w-full max-w-lg flex-col overflow-hidden rounded-[2rem] border border-primary/10 bg-card shadow-[var(--shadow-hero)]"
