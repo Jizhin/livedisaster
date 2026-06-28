@@ -79,9 +79,14 @@ const SEV = {
 };
 
 const TILE_LAYERS = {
-  streets:   { url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",  sub: "abcd", maxZ: 19, attr: "© OpenStreetMap, © CARTO", label: "Streets",   icon: "🗺" },
-  terrain:   { url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",                        sub: "abc",  maxZ: 17, attr: "© OpenStreetMap, SRTM | OpenTopoMap (CC-BY-SA)", label: "Terrain",   icon: "⛰" },
-  satellite: { url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", sub: null, maxZ: 18, attr: "Tiles © Esri", label: "Satellite", icon: "🛰" },
+  streets:   { url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",  sub: "abcd", maxZ: 19, attr: "© OpenStreetMap, © CARTO", label: "Streets",   icon: "🗺", labels: null },
+  terrain:   { url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",                        sub: "abc",  maxZ: 17, attr: "© OpenStreetMap, SRTM | OpenTopoMap (CC-BY-SA)", label: "Terrain",   icon: "⛰", labels: null },
+  satellite: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    sub: null, maxZ: 18, attr: "Tiles © Esri | © OpenStreetMap", label: "Satellite", icon: "🛰",
+    // Place-name labels overlay (Esri hybrid) shown on top of imagery
+    labels: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+  },
 } as const;
 type TileKey = keyof typeof TILE_LAYERS;
 
@@ -508,6 +513,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
   const resetViewPrevRef = useRef(0);
 
   const [activeLayer, setActiveLayer] = useState<TileKey>("satellite");
+  const labelsRef = useRef<any>(null);
   const [searchQ, setSearchQ] = useState("");
   const { results: searchResults, loading: searchLoading } = usePhotonSearch(searchQ);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -537,8 +543,9 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     tileRef.current = L.tileLayer(cfg.url, {
       subdomains: cfg.sub ?? [], maxZoom: cfg.maxZ, attribution: cfg.attr,
     }).addTo(map);
+    // Labels overlay for initial satellite view
+    labelsRef.current = L.tileLayer(cfg.labels!, { maxZoom: cfg.maxZ, opacity: 1 }).addTo(map);
 
-    L.control.zoom({ position: "bottomright" }).addTo(map);
     L.control.attribution({ prefix: false, position: "bottomright" }).addTo(map);
 
     layerRef.current = L.layerGroup().addTo(map);
@@ -557,7 +564,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
 
     return () => {
       map.remove();
-      mapRef.current = null; layerRef.current = null; tileRef.current = null;
+      mapRef.current = null; layerRef.current = null; tileRef.current = null; labelsRef.current = null;
       fitDoneRef.current = false; pendingPinRef.current = null;
     };
   }, []);
@@ -566,11 +573,17 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
   useEffect(() => {
     const L = (window as any).L;
     if (!mapRef.current || !tileRef.current || !L) return;
+    // Remove old base + labels
     tileRef.current.remove();
+    if (labelsRef.current) { labelsRef.current.remove(); labelsRef.current = null; }
     const cfg = TILE_LAYERS[activeLayer];
     tileRef.current = L.tileLayer(cfg.url, {
       subdomains: cfg.sub ?? [], maxZoom: cfg.maxZ, attribution: cfg.attr,
     }).addTo(mapRef.current);
+    // Add place-name labels on top for satellite
+    if (cfg.labels) {
+      labelsRef.current = L.tileLayer(cfg.labels, { maxZoom: cfg.maxZ, opacity: 1 }).addTo(mapRef.current);
+    }
   }, [activeLayer]);
 
   // Markers
@@ -728,6 +741,20 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
           </span>
         ))}
         <span className="text-muted-foreground">· {locatedCount} live</span>
+      </div>
+
+      {/* Zoom controls — bottom right */}
+      <div className="absolute bottom-10 right-4 z-[500] flex flex-col rounded-xl border border-border bg-white/95 shadow-float backdrop-blur overflow-hidden">
+        <button
+          onClick={() => mapRef.current?.zoomIn()}
+          className="flex h-10 w-10 items-center justify-center text-xl font-light text-foreground hover:bg-secondary transition-colors border-b border-border"
+          title="Zoom in"
+        >+</button>
+        <button
+          onClick={() => mapRef.current?.zoomOut()}
+          className="flex h-10 w-10 items-center justify-center text-xl font-light text-foreground hover:bg-secondary transition-colors"
+          title="Zoom out"
+        >−</button>
       </div>
     </div>
   );
