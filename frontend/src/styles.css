@@ -44,56 +44,70 @@
   --color-critical:                var(--destructive);
   --color-critical-foreground:     var(--destructive-foreground);
 
-  --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
-  --font-sans:    "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Sora", "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:    "Manrope", "Figtree", ui-sans-serif, system-ui, sans-serif;
   --font-mono:    "JetBrains Mono", ui-monospace, monospace;
+
+  --color-surface:          var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-warning:          var(--warn);
+  --color-warning-foreground: var(--warn-foreground);
+  --color-info:             var(--info);
+  --color-sky:              var(--sky);
+  --color-peach:            var(--peach);
 
   --shadow-card: 0 1px 0 0 color-mix(in oklab, var(--foreground) 5%, transparent),
     0 10px 30px -18px color-mix(in oklab, var(--foreground) 25%, transparent);
   --shadow-hero: 0 20px 40px -24px color-mix(in oklab, var(--primary) 55%, transparent);
+  --shadow-float: 0 10px 40px -10px oklch(0.55 0.12 240 / 0.18), 0 2px 8px -2px oklch(0.55 0.12 240 / 0.08);
+  --shadow-soft:  0 4px 16px -4px oklch(0.55 0.12 240 / 0.12);
 }
 
 :root {
-  --radius: 1rem;
+  --radius: 0.875rem;
 
-  /* Warm cream paper */
-  --background:             oklch(0.965 0.025 88);
-  --foreground:             oklch(0.27 0.06 160);
-  --surface:                oklch(0.945 0.03 88);
-  --surface-foreground:     oklch(0.27 0.06 160);
-  --card:                   oklch(0.995 0.008 90);
-  --card-foreground:        oklch(0.27 0.06 160);
+  /* Sky white — disaster-dashboard light theme */
+  --background:             oklch(0.985 0.01 230);
+  --foreground:             oklch(0.22 0.04 240);
+  --surface:                oklch(1 0 0);
+  --surface-foreground:     oklch(0.22 0.04 240);
+  --card:                   oklch(1 0 0);
+  --card-foreground:        oklch(0.22 0.04 240);
 
-  /* Deep emerald primary */
-  --primary:                oklch(0.32 0.075 160);
-  --primary-foreground:     oklch(0.97 0.025 88);
+  /* Sky-400 blue primary */
+  --primary:                oklch(0.74 0.13 232);
+  --primary-foreground:     oklch(0.22 0.06 240);
 
-  --secondary:              oklch(0.93 0.04 90);
-  --secondary-foreground:   oklch(0.27 0.06 160);
+  --secondary:              oklch(0.96 0.02 230);
+  --secondary-foreground:   oklch(0.30 0.05 240);
 
-  --muted:                  oklch(0.94 0.025 88);
-  --muted-foreground:       oklch(0.48 0.055 160);
+  --muted:                  oklch(0.96 0.012 230);
+  --muted-foreground:       oklch(0.52 0.03 240);
 
-  /* Temple gold */
+  /* Temple gold (kept for report buttons) */
   --gold:                   oklch(0.78 0.13 82);
-  --gold-foreground:        oklch(0.27 0.06 160);
+  --gold-foreground:        oklch(0.22 0.04 240);
 
-  /* Fresh green accent */
-  --accent:                 oklch(0.5 0.11 158);
-  --accent-foreground:      oklch(0.97 0.025 88);
+  /* Peach accent */
+  --accent:                 oklch(0.86 0.07 25);
+  --accent-foreground:      oklch(0.30 0.08 25);
 
-  --destructive:            oklch(0.58 0.2 27);
-  --destructive-foreground: oklch(0.99 0.005 88);
+  --destructive:            oklch(0.65 0.22 22);
+  --destructive-foreground: oklch(0.99 0 0);
 
-  --success:                oklch(0.55 0.13 158);
-  --success-foreground:     oklch(0.99 0.005 88);
+  --success:                oklch(0.68 0.16 155);
+  --success-foreground:     oklch(0.99 0 0);
 
-  --warn:                   oklch(0.78 0.16 78);
-  --warn-foreground:        oklch(0.27 0.06 160);
+  --warn:                   oklch(0.78 0.16 65);
+  --warn-foreground:        oklch(0.22 0.04 240);
 
-  --border:                 oklch(0.88 0.03 88);
-  --input:                  oklch(0.91 0.025 88);
-  --ring:                   oklch(0.5 0.11 158);
+  --info:                   oklch(0.70 0.13 232);
+  --sky:                    oklch(0.94 0.04 230);
+  --peach:                  oklch(0.92 0.06 25);
+
+  --border:                 oklch(0.90 0.02 230);
+  --input:                  oklch(0.92 0.02 230);
+  --ring:                   oklch(0.74 0.13 232 / 60%);
 }
 
 @layer base {
@@ -104,9 +118,15 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
+  body {
+    background-image:
+      radial-gradient(1200px 600px at 10% -10%, oklch(0.88 0.08 230 / 0.55), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, oklch(0.92 0.07 25 / 0.45), transparent 55%);
+    background-attachment: fixed;
+  }
   h1, h2, h3, h4 {
     font-family: var(--font-display);
-    letter-spacing: -0.015em;
+    letter-spacing: -0.02em;
   }
 }
 
@@ -126,15 +146,37 @@
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 999px;
-  background: var(--color-gold);
-  box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-gold) 60%, transparent);
+  background: var(--color-success);
+  box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-success) 60%, transparent);
   animation: live-pulse 1.8s ease-out infinite;
 }
 
 @keyframes live-pulse {
-  0%   { box-shadow: 0 0 0 0    color-mix(in oklab, var(--color-gold) 55%, transparent); }
-  70%  { box-shadow: 0 0 0 10px color-mix(in oklab, var(--color-gold) 0%,  transparent); }
-  100% { box-shadow: 0 0 0 0    color-mix(in oklab, var(--color-gold) 0%,  transparent); }
+  0%   { box-shadow: 0 0 0 0    color-mix(in oklab, var(--color-success) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 10px color-mix(in oklab, var(--color-success) 0%,  transparent); }
+  100% { box-shadow: 0 0 0 0    color-mix(in oklab, var(--color-success) 0%,  transparent); }
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0px rgba(239,68,68,0.5); }
+  70%  { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+  100% { box-shadow: 0 0 0 0px rgba(239,68,68,0); }
+}
+
+@keyframes float-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@utility float-in { animation: float-in 0.5s ease-out both; }
+@utility shadow-float { box-shadow: var(--shadow-float); }
+@utility shadow-soft  { box-shadow: var(--shadow-soft); }
+
+@utility font-mono-sm {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 @utility pill {
@@ -155,9 +197,9 @@
 }
 
 /* ─── Google Fonts ─── */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Figtree:wght@400;500;600;700&family=Noto+Sans+Malayalam:wght@400;600;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=Figtree:wght@400;500;600;700&family=Noto+Sans+Malayalam:wght@400;600;700;900&display=swap');
 
-/* ─── Leaflet tooltip override ─── */
+/* ─── Leaflet overrides ─── */
 .leaflet-tooltip {
   background: #0f172a;
   border: 1px solid rgba(255,255,255,0.12);
@@ -169,7 +211,14 @@
   pointer-events: none;
 }
 .leaflet-tooltip::before { border-top-color: #0f172a; }
-.leaflet-container { font-family: inherit; }
+.leaflet-container { font-family: var(--font-sans); }
+.leaflet-popup-content-wrapper {
+  border-radius: 14px;
+  box-shadow: 0 10px 40px -10px rgba(15,23,42,0.22), 0 2px 8px -2px rgba(15,23,42,0.1);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+.leaflet-popup-tip { box-shadow: none; }
+.leaflet-popup-content { margin: 0; }
 
 /* ═══════════════════════════════════════════════════════════════
    EXISTING lkp-* STYLES (unchanged below this line)
