@@ -307,6 +307,44 @@ function LoadingScreen({ fading, waking }: { fading: boolean; waking: boolean })
   );
 }
 
+/* ─── Connecting Banner ─────────────────────────────────────── */
+const CONNECT_MSGS = [
+  { icon: "🌍", text: "Your eyes on the ground keep communities safe. We're syncing the live feed…" },
+  { icon: "🤝", text: "Every report you share helps someone nearby make a better decision." },
+  { icon: "📡", text: "Pulling live data from around the world. Hang tight — this takes a moment." },
+  { icon: "🛡", text: "Together, we build a more resilient world. Connecting to the live network…" },
+  { icon: "💬", text: "Thousands of community members report what they see in real time. Loading…" },
+  { icon: "⚡", text: "Real-time. Community-powered. No algorithm, no delay. Connecting…" },
+];
+
+function ConnectingBanner() {
+  const [idx, setIdx] = useState(() => Math.floor(Math.random() * CONNECT_MSGS.length));
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => { setIdx(i => (i + 1) % CONNECT_MSGS.length); setVisible(true); }, 400);
+    }, 3500);
+    return () => clearInterval(id);
+  }, []);
+  const msg = CONNECT_MSGS[idx];
+  return (
+    <div className="w-full bg-gradient-to-r from-primary/10 via-sky-50 to-accent/10 border-b border-primary/20 px-4 py-3">
+      <div className="mx-auto flex max-w-[1400px] items-center justify-center gap-3"
+        style={{ opacity: visible ? 1 : 0, transition: "opacity 0.35s ease" }}>
+        <span className="text-lg shrink-0">{msg.icon}</span>
+        <p className="text-sm font-medium text-foreground/80 text-center">{msg.text}</p>
+        <span className="shrink-0 flex items-center gap-1">
+          {[0,1,2].map(i => (
+            <span key={i} className="h-1.5 w-1.5 rounded-full bg-primary"
+              style={{ animation: `live-pulse 1.4s ease-out ${i * 0.2}s infinite` }} />
+          ))}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Site Nav ──────────────────────────────────────────────── */
 function SiteNav({ onReport, reportsCount, status }: {
   onReport: () => void;
@@ -813,15 +851,8 @@ export function HomePage() {
     <div className="flex min-h-screen flex-col bg-background">
       <SiteNav onReport={() => setReportFlowOpen(true)} reportsCount={reports.length} status={status} />
 
-      {/* Waking banner — visible on repeat visits when loading screen is hidden */}
-      {waking && loadingPhase === "hidden" && (
-        <div className="w-full border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-sm">
-          <span className="inline-flex items-center gap-2 text-amber-700 font-medium">
-            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-            Server is waking up after inactivity — data will load shortly (30–60 s on first request)…
-          </span>
-        </div>
-      )}
+      {/* Connecting banner — motivational ticker while API is warming up */}
+      {waking && loadingPhase === "hidden" && <ConnectingBanner />}
 
       {/* ── HERO ────────────────────────────────────────────── */}
       <section className="mx-auto w-full max-w-[1400px] px-4 pt-10 pb-8">
