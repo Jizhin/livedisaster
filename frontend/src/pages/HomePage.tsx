@@ -780,7 +780,7 @@ function WelcomeModal({ dataReady, t, onDismiss }: { dataReady: boolean; t: Retu
 export function HomePage() {
   const { t } = useLanguage();
   useKeepAlive();
-  const { reports, status, waking, flashId, refresh } = useLiveReports(60);
+  const { reports, status, waking, flashId, refresh } = useLiveReports(50);
   const { alerts, status: alertStatus } = useKeralaAlerts();
 
   const [activeSeverities, setActiveSeverities] = useState<Set<Severity>>(() => new Set(["critical", "warn", "safe"] as Severity[]));
