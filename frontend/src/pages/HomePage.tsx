@@ -163,18 +163,30 @@ function useReportDetail(reportId: string | null) {
 function useLiveReports(limit = 50) {
   const [reports, setReports] = useState<Report[]>([]);
   const [status, setStatus] = useState<"connecting" | "live" | "offline">("connecting");
+  const [waking, setWaking] = useState(false);
   const [flashId, setFlashId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const prevIdsRef = useRef<Set<string>>(new Set());
+  const liveRef = useRef(false);
   const refresh = useCallback(() => setRefreshKey(k => k + 1), []);
+
   useEffect(() => {
     let active = true;
-    async function fetchReports() {
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
+    liveRef.current = false;
+
+    // Show "waking up" hint after 3s if still not live
+    const wakingTimer = setTimeout(() => {
+      if (active && !liveRef.current) setWaking(true);
+    }, 3000);
+
+    async function fetchOnce(): Promise<boolean> {
       try {
         const res = await fetch(`${API_BASE}/reports/feed?limit=${limit}`);
         if (!res.ok) throw new Error(`${res.status}`);
         const raw: ApiReport[] = await res.json();
-        if (!active) return;
+        if (!active) return false;
         const mapped = raw.map(mapApiReport);
         const newOnes = mapped.filter(r => !prevIdsRef.current.has(r.id));
         if (newOnes.length > 0 && prevIdsRef.current.size > 0) {
@@ -184,13 +196,38 @@ function useLiveReports(limit = 50) {
         prevIdsRef.current = new Set(mapped.map(r => r.id));
         setReports(mapped);
         setStatus("live");
-      } catch { if (active) setStatus("offline"); }
+        setWaking(false);
+        liveRef.current = true;
+        attempt = 0;
+        return true;
+      } catch {
+        if (active) setStatus(prevIdsRef.current.size > 0 ? "offline" : "connecting");
+        return false;
+      }
     }
-    fetchReports();
-    const interval = setInterval(fetchReports, 20000);
-    return () => { active = false; clearInterval(interval); };
+
+    async function fetchWithRetry() {
+      const ok = await fetchOnce();
+      if (!ok && active) {
+        attempt++;
+        // 5s → 10s → 15s → 20s → 30s max backoff
+        const delay = Math.min(5000 * attempt, 30000);
+        retryTimer = setTimeout(fetchWithRetry, delay);
+      }
+    }
+
+    fetchWithRetry();
+    const interval = setInterval(() => { if (active) fetchOnce(); }, 20000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+      clearTimeout(wakingTimer);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [limit, refreshKey]);
-  return { reports, status, flashId, refresh };
+
+  return { reports, status, waking, flashId, refresh };
 }
 
 function useKeralaAlerts() {
@@ -217,7 +254,7 @@ const LOADING_MSG_KEYS = [
   { h: "loadMsg5h", s: "loadMsg5s" }, { h: "loadMsg6h", s: "loadMsg6s" },
 ] as const;
 
-function LoadingScreen({ fading }: { fading: boolean }) {
+function LoadingScreen({ fading, waking }: { fading: boolean; waking: boolean }) {
   const { t } = useLanguage();
   const [idx, setIdx] = useState(0);
   const [vis, setVis] = useState(true);
@@ -244,17 +281,26 @@ function LoadingScreen({ fading }: { fading: boolean }) {
             <span key={i} className="rounded-full bg-primary" style={{ width: i===2?"0.625rem":"0.375rem", height: i===2?"0.625rem":"0.375rem", opacity: i===2?1:0.4, animation:`live-pulse 1.6s ease-out ${i*0.15}s infinite` }} />
           ))}
         </div>
-        <div className="min-h-[5rem] transition-opacity duration-300" style={{ opacity: vis ? 1 : 0 }}>
-          <p className="font-display text-[18px] font-bold leading-snug text-white">{t[keys.h as keyof typeof t] as string}</p>
-          <p className="mt-2.5 text-sm leading-relaxed text-white/60">{t[keys.s as keyof typeof t] as string}</p>
-        </div>
+        {waking ? (
+          <div className="min-h-[5rem]">
+            <p className="font-display text-[18px] font-bold leading-snug text-amber-300">Server is waking up…</p>
+            <p className="mt-2.5 text-sm leading-relaxed text-white/60">
+              The server was idle and is starting back up.<br />This takes about 30–60 seconds on Render's free tier.
+            </p>
+          </div>
+        ) : (
+          <div className="min-h-[5rem] transition-opacity duration-300" style={{ opacity: vis ? 1 : 0 }}>
+            <p className="font-display text-[18px] font-bold leading-snug text-white">{t[keys.h as keyof typeof t] as string}</p>
+            <p className="mt-2.5 text-sm leading-relaxed text-white/60">{t[keys.s as keyof typeof t] as string}</p>
+          </div>
+        )}
         <div className="mt-8 h-1 w-48 overflow-hidden rounded-full bg-white/10">
           <div className="h-full rounded-full bg-primary" style={{ animation: "loading-bar 2.4s ease-in-out infinite" }} />
         </div>
       </div>
       <div className="absolute bottom-10 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-white/40">
-        <span className="live-dot" />
-        {t.welcomeLoading}
+        <span className={waking ? "h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" : "live-dot"} />
+        {waking ? "Retrying connection…" : t.welcomeLoading}
       </div>
       <style>{`@keyframes loading-bar { 0%{width:0%;margin-left:0%} 50%{width:60%;margin-left:20%} 100%{width:0%;margin-left:100%} }`}</style>
     </div>
@@ -685,7 +731,7 @@ function WelcomeModal({ dataReady, t, onDismiss }: { dataReady: boolean; t: Retu
 /* ─── Home Page ─────────────────────────────────────────────── */
 export function HomePage() {
   const { t } = useLanguage();
-  const { reports, status, flashId, refresh } = useLiveReports(60);
+  const { reports, status, waking, flashId, refresh } = useLiveReports(60);
   const { alerts, status: alertStatus } = useKeralaAlerts();
 
   const [activeSeverities, setActiveSeverities] = useState<Set<Severity>>(() => new Set(["critical", "warn", "safe"] as Severity[]));
@@ -1056,7 +1102,7 @@ export function HomePage() {
         />
       )}
       {detailReport && <StandaloneDetailModal report={detailReport} onClose={() => setDetailReport(null)} />}
-      {loadingPhase !== "hidden" && <LoadingScreen fading={loadingPhase === "fading"} />}
+      {loadingPhase !== "hidden" && <LoadingScreen fading={loadingPhase === "fading"} waking={waking} />}
     </div>
   );
 }
