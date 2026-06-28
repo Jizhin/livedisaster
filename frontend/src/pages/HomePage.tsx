@@ -482,7 +482,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     const map = L.map(containerRef.current, {
       center: [15, 30], zoom: 3,
       attributionControl: false, zoomControl: false,
-      scrollWheelZoom: true, worldCopyJump: true,
+      scrollWheelZoom: false, worldCopyJump: true,
     });
 
     const cfg = TILE_LAYERS.streets;
@@ -813,6 +813,16 @@ export function HomePage() {
     <div className="flex min-h-screen flex-col bg-background">
       <SiteNav onReport={() => setReportFlowOpen(true)} reportsCount={reports.length} status={status} />
 
+      {/* Waking banner — visible on repeat visits when loading screen is hidden */}
+      {waking && loadingPhase === "hidden" && (
+        <div className="w-full border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-sm">
+          <span className="inline-flex items-center gap-2 text-amber-700 font-medium">
+            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            Server is waking up after inactivity — data will load shortly (30–60 s on first request)…
+          </span>
+        </div>
+      )}
+
       {/* ── HERO ────────────────────────────────────────────── */}
       <section className="mx-auto w-full max-w-[1400px] px-4 pt-10 pb-8">
         <div className="grid gap-10 md:grid-cols-[1.1fr_0.9fr]">
@@ -865,13 +875,22 @@ export function HomePage() {
                 <span className="text-[11px] text-muted-foreground">latest updates</span>
               </div>
               <div className="space-y-2">
-                {(reports.length > 0 ? reports : []).slice(0, 3).map(r => (
-                  <IncidentCard key={r.id} report={r} compact flash={flashId === r.id} onSelect={() => setDetailReport(r)} />
-                ))}
-                {reports.length === 0 && (
-                  <div className="py-8 text-center text-sm text-muted-foreground">
-                    {status === "connecting" ? "Connecting to live feed…" : "No reports yet"}
+                {status !== "live" ? (
+                  <div className="space-y-2">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="rounded-2xl border border-border bg-card/60 p-3 animate-pulse">
+                        <div className="flex gap-2 mb-2"><div className="h-4 w-14 rounded-full bg-secondary" /><div className="h-4 w-10 rounded-full bg-secondary" /></div>
+                        <div className="h-3 bg-secondary rounded w-full mb-1" />
+                        <div className="h-3 bg-secondary rounded w-2/3" />
+                      </div>
+                    ))}
                   </div>
+                ) : reports.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">No reports yet</div>
+                ) : (
+                  reports.slice(0, 3).map(r => (
+                    <IncidentCard key={r.id} report={r} compact flash={flashId === r.id} onSelect={() => setDetailReport(r)} />
+                  ))
                 )}
               </div>
             </div>
@@ -945,6 +964,20 @@ export function HomePage() {
               <span className="ml-auto text-[11px] text-muted-foreground">{filteredReports.length}</span>
             </div>
             <div className="overflow-y-auto no-scrollbar flex-1">
+              {status !== "live" && filteredReports.length === 0 && (
+                <div className="p-3 space-y-2">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="flex gap-2 p-2 animate-pulse">
+                      <div className="h-12 w-12 rounded-lg bg-secondary shrink-0" />
+                      <div className="flex-1 space-y-1.5 pt-1">
+                        <div className="h-2.5 bg-secondary rounded w-2/3" />
+                        <div className="h-2.5 bg-secondary rounded w-full" />
+                        <div className="h-2.5 bg-secondary rounded w-1/2" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {filteredReports.slice(0, 20).map(r => (
                 <button key={r.id} onClick={() => {
                   setDetailReport(r);
@@ -997,7 +1030,21 @@ export function HomePage() {
           </div>
           <button onClick={refresh} className="text-xs font-medium text-primary hover:underline">↻ Refresh</button>
         </div>
-        {filteredReports.length === 0 ? (
+        {status !== "live" ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[1,2,3,4,5,6].map(i => (
+              <div key={i} className="rounded-2xl border border-border bg-card overflow-hidden animate-pulse">
+                <div className="h-36 bg-secondary" />
+                <div className="p-4 space-y-2">
+                  <div className="flex gap-2"><div className="h-5 w-16 rounded-full bg-secondary" /><div className="h-5 w-12 rounded-full bg-secondary" /></div>
+                  <div className="h-4 bg-secondary rounded w-full" />
+                  <div className="h-4 bg-secondary rounded w-3/4" />
+                  <div className="h-3 bg-secondary rounded w-1/2 mt-1" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredReports.length === 0 ? (
           <div className="rounded-2xl border border-border bg-card py-16 text-center">
             <p className="text-4xl mb-3">🛡</p>
             <p className="font-semibold text-foreground">No reports yet</p>
