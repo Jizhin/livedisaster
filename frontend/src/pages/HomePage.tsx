@@ -230,6 +230,16 @@ function useLiveReports(limit = 50) {
   return { reports, status, waking, flashId, refresh };
 }
 
+// Ping /health every 10 min so Render never hits 15-min inactivity sleep
+function useKeepAlive() {
+  useEffect(() => {
+    const ping = () => fetch(`${UPLOADS_ORIGIN}/health`).catch(() => {});
+    ping();
+    const id = setInterval(ping, 10 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+}
+
 function useKeralaAlerts() {
   const [alerts, setAlerts] = useState<OfficialAlert[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -769,6 +779,7 @@ function WelcomeModal({ dataReady, t, onDismiss }: { dataReady: boolean; t: Retu
 /* ─── Home Page ─────────────────────────────────────────────── */
 export function HomePage() {
   const { t } = useLanguage();
+  useKeepAlive();
   const { reports, status, waking, flashId, refresh } = useLiveReports(60);
   const { alerts, status: alertStatus } = useKeralaAlerts();
 
