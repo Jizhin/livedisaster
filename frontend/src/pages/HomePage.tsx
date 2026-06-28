@@ -507,7 +507,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
   const flyToPrevRef = useRef<[number, number] | null>(null);
   const resetViewPrevRef = useRef(0);
 
-  const [activeLayer, setActiveLayer] = useState<TileKey>("streets");
+  const [activeLayer, setActiveLayer] = useState<TileKey>("satellite");
   const [searchQ, setSearchQ] = useState("");
   const { results: searchResults, loading: searchLoading } = usePhotonSearch(searchQ);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -533,7 +533,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
       scrollWheelZoom: false, worldCopyJump: true,
     });
 
-    const cfg = TILE_LAYERS.streets;
+    const cfg = TILE_LAYERS.satellite;
     tileRef.current = L.tileLayer(cfg.url, {
       subdomains: cfg.sub ?? [], maxZoom: cfg.maxZ, attribution: cfg.attr,
     }).addTo(map);
