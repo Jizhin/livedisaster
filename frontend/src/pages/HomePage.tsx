@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { createRoot } from "react-dom/client";
 import { useLanguage } from "../i18n/LanguageContext";
 import {
   Camera, Search, MessageCircle, ArrowRight, Filter, X,
@@ -711,8 +713,7 @@ function AlertCard({ alert }: { alert: OfficialAlert }) {
 }
 
 /* ─── Marker Bubble ─────────────────────────────────────────── */
-function MarkerBubble({ report, x, y, onClose }: { report: Report; x: number; y: number; onClose: () => void }) {
-  const { t } = useLanguage();
+function MarkerBubble({ report, t, onClose }: { report: Report; t: ReturnType<typeof useLanguage>["t"]; onClose: () => void }) {
   const { data, loading } = useReportDetail(report.id);
   const [localCounts, setLocalCounts] = useState<{ confirmed: number; incorrect: number; resolved: number } | null>(null);
   const [voted, setVoted] = useState<string | null>(null);
@@ -768,108 +769,99 @@ function MarkerBubble({ report, x, y, onClose }: { report: Report; x: number; y:
 
   return (
     <>
-      {imgExpanded && imgUrl && (
+      {/* Full-screen image — portal to body to escape Leaflet pane transforms */}
+      {imgExpanded && imgUrl && createPortal(
         <div className="fixed inset-0 z-[9500] flex items-center justify-center bg-black/90 p-4" onClick={() => setImgExpanded(false)}>
           <img src={imgUrl} alt="" className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl" />
           <button onClick={() => setImgExpanded(false)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/20 text-white hover:bg-white/30">✕</button>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Bubble card — positioned above the marker click point */}
-      <div
-        style={{ position: "absolute", left: x, top: y, transform: "translate(-50%, -100%)" }}
-        className="z-[9000] w-[300px] max-w-[calc(100vw-2rem)] float-in"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-float">
-          {/* Severity bar */}
-          <div className={`h-1 w-full ${sev.bar}`} />
+      {/* Card — Leaflet positions this via its popup mechanism */}
+      <div className="overflow-hidden rounded-2xl bg-card float-in" style={{ width: 300 }}>
+        {/* Severity bar */}
+        <div className={`h-1 w-full ${sev.bar}`} />
 
-          {/* Image strip */}
-          {imgUrl && !imgError && (
-            <button onClick={() => setImgExpanded(true)} className="block w-full overflow-hidden h-24 bg-secondary">
-              <img src={imgUrl} alt="" onError={() => setImgError(true)} className="w-full h-full object-cover hover:brightness-90 transition" />
-            </button>
-          )}
+        {/* Image strip */}
+        {imgUrl && !imgError && (
+          <button onClick={() => setImgExpanded(true)} className="block w-full overflow-hidden h-24 bg-secondary">
+            <img src={imgUrl} alt="" onError={() => setImgError(true)} className="w-full h-full object-cover hover:brightness-90 transition" />
+          </button>
+        )}
 
-          {/* Header */}
-          <div className="flex items-start gap-2 px-3 pt-3 pb-1">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1 flex-wrap">
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${sev.text}`}>{sev.label}</span>
-                <span className="text-muted-foreground/40 text-[10px]">·</span>
-                <span className="text-[10px] text-muted-foreground">{cat.emoji} {t[cat.labelKey as keyof typeof t] as string}</span>
-                <span className="text-muted-foreground/40 text-[10px]">·</span>
-                <span className="text-[10px] text-muted-foreground">{formatReportTime(report.created_at)}</span>
-              </div>
-              <p className="font-display text-sm font-bold text-foreground mt-0.5 leading-snug">
-                {report.place ? `${report.place} · ${report.district}` : report.district}
-              </p>
+        {/* Header */}
+        <div className="flex items-start gap-2 px-3 pt-3 pb-1">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${sev.text}`}>{sev.label}</span>
+              <span className="text-muted-foreground/40 text-[10px]">·</span>
+              <span className="text-[10px] text-muted-foreground">{cat.emoji} {t[cat.labelKey as keyof typeof t] as string}</span>
+              <span className="text-muted-foreground/40 text-[10px]">·</span>
+              <span className="text-[10px] text-muted-foreground">{formatReportTime(report.created_at)}</span>
             </div>
-            <button onClick={onClose}
-              className="shrink-0 grid h-6 w-6 place-items-center rounded-full bg-secondary text-muted-foreground hover:bg-border transition-colors">
-              <X className="h-3 w-3" />
-            </button>
+            <p className="font-display text-sm font-bold text-foreground mt-0.5 leading-snug">
+              {report.place ? `${report.place} · ${report.district}` : report.district}
+            </p>
           </div>
-
-          {/* Message */}
-          <div className="px-3 pt-0.5 pb-3 border-b border-border/60">
-            <p className="text-[13px] leading-relaxed text-foreground">{report.message}</p>
-          </div>
-
-          {/* Vote row */}
-          <div className="flex border-b border-border/60">
-            {loading ? (
-              <div className="flex-1 h-9 animate-pulse bg-secondary/50" />
-            ) : localCounts ? (
-              (([
-                { kind: "confirm" as const, icon: "👍", count: localCounts.confirmed, active: "bg-emerald-50 text-emerald-700" },
-                { kind: "incorrect" as const, icon: "👎", count: localCounts.incorrect, active: "bg-red-50 text-red-700" },
-                { kind: "resolved" as const, icon: "✓", count: localCounts.resolved, active: "bg-blue-50 text-blue-700" },
-                { kind: null, icon: "👁", count: data?.views_count ?? 0, active: "" },
-              ] as Array<{ kind: "confirm" | "incorrect" | "resolved" | null; icon: string; count: number; active: string }>)).map(({ kind, icon, count, active }) => (
-                <button key={String(kind)} onClick={() => kind && vote(kind)} disabled={!kind || !!voted}
-                  className={`flex-1 flex flex-col items-center justify-center py-1.5 gap-0.5 text-[10px] font-bold border-r border-border/40 last:border-r-0 transition-colors disabled:cursor-default ${voted === kind ? active : !kind ? "text-muted-foreground/50" : "text-muted-foreground hover:bg-secondary"}`}>
-                  <span className="text-sm leading-none">{icon}</span>
-                  <span>{count}</span>
-                </button>
-              ))
-            ) : null}
-          </div>
-
-          {/* Comment input */}
-          <div className="px-3 py-2">
-            <form onSubmit={submitComment} className="flex items-center gap-2">
-              <input value={commentText} onChange={e => setCommentText(e.target.value)}
-                placeholder="Add a note…"
-                className="flex-1 min-w-0 rounded-full border border-border bg-secondary px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/25"
-              />
-              <button type="submit" disabled={posting || !commentText.trim()}
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-foreground text-background hover:opacity-90 disabled:opacity-30 transition-opacity">
-                {posting ? <span className="text-[10px]">…</span> : <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>}
-              </button>
-            </form>
-            {comments.length > 0 && (
-              <button onClick={() => setShowComments(v => !v)} className="mt-1 text-[10px] font-medium text-primary hover:underline">
-                {showComments ? "Hide" : `${comments.length} comment${comments.length !== 1 ? "s" : ""}`}
-              </button>
-            )}
-            {showComments && (
-              <div className="mt-1.5 space-y-1 max-h-24 overflow-y-auto">
-                {comments.map(c => (
-                  <div key={c.id} className="rounded-lg bg-secondary px-2.5 py-1.5">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-primary">{c.author_name}</p>
-                    <p className="text-[11px] leading-snug text-foreground mt-0.5">{c.content}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <button onClick={onClose}
+            className="shrink-0 grid h-6 w-6 place-items-center rounded-full bg-secondary text-muted-foreground hover:bg-border transition-colors">
+            <X className="h-3 w-3" />
+          </button>
         </div>
 
-        {/* Arrow pointing down to the marker */}
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full" style={{ filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.08))" }}>
-          <div style={{ width: 0, height: 0, borderLeft: "10px solid transparent", borderRight: "10px solid transparent", borderTop: "10px solid white" }} />
+        {/* Message */}
+        <div className="px-3 pt-0.5 pb-3 border-b border-border/60">
+          <p className="text-[13px] leading-relaxed text-foreground">{report.message}</p>
+        </div>
+
+        {/* Vote row */}
+        <div className="flex border-b border-border/60">
+          {loading ? (
+            <div className="flex-1 h-9 animate-pulse bg-secondary/50" />
+          ) : localCounts ? (
+            (([
+              { kind: "confirm" as const, icon: "👍", count: localCounts.confirmed, active: "bg-emerald-50 text-emerald-700" },
+              { kind: "incorrect" as const, icon: "👎", count: localCounts.incorrect, active: "bg-red-50 text-red-700" },
+              { kind: "resolved" as const, icon: "✓", count: localCounts.resolved, active: "bg-blue-50 text-blue-700" },
+              { kind: null, icon: "👁", count: data?.views_count ?? 0, active: "" },
+            ] as Array<{ kind: "confirm" | "incorrect" | "resolved" | null; icon: string; count: number; active: string }>)).map(({ kind, icon, count, active }) => (
+              <button key={String(kind)} onClick={() => kind && vote(kind)} disabled={!kind || !!voted}
+                className={`flex-1 flex flex-col items-center justify-center py-1.5 gap-0.5 text-[10px] font-bold border-r border-border/40 last:border-r-0 transition-colors disabled:cursor-default ${voted === kind ? active : !kind ? "text-muted-foreground/50" : "text-muted-foreground hover:bg-secondary"}`}>
+                <span className="text-sm leading-none">{icon}</span>
+                <span>{count}</span>
+              </button>
+            ))
+          ) : null}
+        </div>
+
+        {/* Comment input */}
+        <div className="px-3 py-2">
+          <form onSubmit={submitComment} className="flex items-center gap-2">
+            <input value={commentText} onChange={e => setCommentText(e.target.value)}
+              placeholder="Add a note…"
+              className="flex-1 min-w-0 rounded-full border border-border bg-secondary px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/25"
+            />
+            <button type="submit" disabled={posting || !commentText.trim()}
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-foreground text-background hover:opacity-90 disabled:opacity-30 transition-opacity">
+              {posting ? <span className="text-[10px]">…</span> : <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>}
+            </button>
+          </form>
+          {comments.length > 0 && (
+            <button onClick={() => setShowComments(v => !v)} className="mt-1 text-[10px] font-medium text-primary hover:underline">
+              {showComments ? "Hide" : `${comments.length} comment${comments.length !== 1 ? "s" : ""}`}
+            </button>
+          )}
+          {showComments && (
+            <div className="mt-1.5 space-y-1 max-h-24 overflow-y-auto">
+              {comments.map(c => (
+                <div key={c.id} className="rounded-lg bg-secondary px-2.5 py-1.5">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-primary">{c.author_name}</p>
+                  <p className="text-[11px] leading-snug text-foreground mt-0.5">{c.content}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -905,8 +897,9 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
   const [searchQ, setSearchQ] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [markerPopup, setMarkerPopup] = useState<{ report: Report; lat: number; lon: number } | null>(null);
-  const [mapTick, setMapTick] = useState(0);
+  const { t } = useLanguage();
+  const tRef = useRef(t);
+  useEffect(() => { tRef.current = t; }, [t]);
   const { results: searchResults, loading: searchLoading } = usePhotonSearch(searchQ);
 
   // Map init
@@ -930,8 +923,6 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 
-    map.on("click", () => { setMarkerPopup(null); });
-    map.on("moveend zoomend", () => setMapTick(t => t + 1));
     map.on("click", (e: any) => {
       if (!onMapPickRef.current) return;
       const { lat, lng } = e.latlng;
@@ -991,6 +982,9 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     const L = (window as any).L;
     if (!L || !mapRef.current || !layerRef.current) return;
     layerRef.current.clearLayers();
+
+    const popupRoots: ReturnType<typeof createRoot>[] = [];
+
     const located = reports.filter(r => r.lat !== null && r.lon !== null);
     located.forEach(r => {
       const sc = SEV[r.severity];
@@ -1004,14 +998,41 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
             <span style="color:white;font-weight:700;font-size:14px;transform:rotate(45deg);display:block;">!</span>
           </div>
         </div>`,
-        iconSize: [34, 34], iconAnchor: [17, 34], popupAnchor: [0, -32],
+        iconSize: [34, 34], iconAnchor: [17, 34], popupAnchor: [0, -38],
       });
+
       const marker = L.marker([r.lat, r.lon], { icon });
-      marker.on("click", () => {
-        setMarkerPopup({ report: r, lat: r.lat!, lon: r.lon! });
+
+      // Native Leaflet popup — Leaflet owns all coordinate math
+      const container = document.createElement("div");
+      const root = createRoot(container);
+      popupRoots.push(root);
+
+      const leafletPopup = L.popup({
+        closeButton: false,
+        className: "lk-popup",
+        minWidth: 300,
+        maxWidth: 300,
+        autoPan: true,
+        autoPanPaddingTopLeft: L.point(10, 60),
+        autoPanPaddingBottomRight: L.point(10, 10),
+      }).setContent(container);
+
+      marker.bindPopup(leafletPopup);
+
+      marker.on("popupopen", () => {
+        root.render(
+          <MarkerBubble
+            report={r}
+            t={tRef.current}
+            onClose={() => marker.closePopup()}
+          />
+        );
       });
+
       layerRef.current.addLayer(marker);
     });
+
     if (located.length > 0 && !fitDoneRef.current) {
       try {
         const bounds = L.latLngBounds(located.map((r: Report) => [r.lat, r.lon]));
@@ -1019,6 +1040,10 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
         fitDoneRef.current = true;
       } catch {}
     }
+
+    return () => {
+      popupRoots.forEach(root => { try { root.unmount(); } catch {} });
+    };
   }, [reports, onSelectReport]);
 
   // pickReset
@@ -1044,7 +1069,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     if (!flyTo || !mapRef.current) return;
     if (flyToPrevRef.current?.[0] === flyTo[0] && flyToPrevRef.current?.[1] === flyTo[1]) return;
     flyToPrevRef.current = flyTo;
-    setMarkerPopup(null);
+    mapRef.current.closePopup();
     mapRef.current.flyTo(flyTo, Math.max(mapRef.current.getZoom(), 13), { duration: 0.8 });
   }, [flyTo]);
 
@@ -1056,14 +1081,6 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     flyToPrevRef.current = null; fitDoneRef.current = false;
     mapRef.current.flyTo([15, 30], 3, { duration: 1.2 });
   }, [resetView]);
-
-  // Dismiss bubble on page scroll
-  useEffect(() => {
-    if (!markerPopup) return;
-    const close = () => setMarkerPopup(null);
-    window.addEventListener("scroll", close, { passive: true });
-    return () => window.removeEventListener("scroll", close);
-  }, [markerPopup]);
 
   // Ctrl+scroll to zoom
   useEffect(() => {
@@ -1196,19 +1213,6 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
         ))}
       </div>
 
-      {/* Marker bubble popup — absolute within outerRef, coords from latLngToContainerPoint */}
-      {markerPopup && mapRef.current && (() => {
-        void mapTick;
-        const pt = mapRef.current.latLngToContainerPoint([markerPopup.lat, markerPopup.lon]);
-        return (
-          <MarkerBubble
-            report={markerPopup.report}
-            x={Math.round(pt.x) + 1}
-            y={Math.round(pt.y) - 9}
-            onClose={() => setMarkerPopup(null)}
-          />
-        );
-      })()}
     </div>
   );
 }
