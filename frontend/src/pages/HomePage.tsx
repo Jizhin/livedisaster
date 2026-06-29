@@ -88,7 +88,7 @@ const TILE_LAYERS = {
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     sub: null, maxZ: 18, attr: "Tiles © Esri | © OpenStreetMap", label: "Satellite", icon: "🛰",
-    labels: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+    labels: "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png",
   },
 } as const;
 type TileKey = keyof typeof TILE_LAYERS;
@@ -589,7 +589,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     }).addTo(mapRef.current);
     if (cfg.labels) {
       labelsRef.current = L.tileLayer(cfg.labels, {
-        pane: "labelsPane", maxZoom: 19, opacity: 1,
+        pane: "labelsPane", subdomains: "abcd", maxZoom: 19, opacity: 1,
       }).addTo(mapRef.current);
     }
   }, [activeLayer]);
