@@ -87,8 +87,8 @@ const TILE_LAYERS = {
   terrain:   { url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",                        sub: "abc",  maxZ: 17, attr: "© OpenStreetMap, SRTM | OpenTopoMap (CC-BY-SA)", label: "Terrain",   icon: "⛰", labels: null },
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    sub: null, maxZ: 18, attr: "Tiles © Esri | © OpenStreetMap", label: "Satellite", icon: "🛰",
-    labels: "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png",
+    sub: null, maxZ: 18, attr: "Tiles © Esri © OpenStreetMap contributors", label: "Satellite", icon: "🛰",
+    labels: null,
   },
 } as const;
 type TileKey = keyof typeof TILE_LAYERS;
@@ -524,8 +524,8 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
   const flyToPrevRef = useRef<[number, number] | null>(null);
   const resetViewPrevRef = useRef(0);
 
-  const [activeLayer, setActiveLayer] = useState<TileKey>("streets");
-  const labelsRef = useRef<any>(null);
+  const [activeLayer, setActiveLayer] = useState<TileKey>("satellite");
+  const labelsRef = useRef<any[]>([]);
   const [searchQ, setSearchQ] = useState("");
   const { results: searchResults, loading: searchLoading } = usePhotonSearch(searchQ);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -574,7 +574,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
 
     return () => {
       map.remove();
-      mapRef.current = null; layerRef.current = null; tileRef.current = null; labelsRef.current = null;
+      mapRef.current = null; layerRef.current = null; tileRef.current = null; labelsRef.current = [];
       fitDoneRef.current = false; pendingPinRef.current = null; searchPinRef.current = null;
     };
   }, []);
@@ -584,15 +584,26 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     const L = (window as any).L;
     if (!mapRef.current || !L) return;
     if (tileRef.current) { tileRef.current.remove(); tileRef.current = null; }
-    if (labelsRef.current) { labelsRef.current.remove(); labelsRef.current = null; }
+    labelsRef.current.forEach(l => { try { l.remove(); } catch {} });
+    labelsRef.current = [];
     const cfg = TILE_LAYERS[activeLayer];
     tileRef.current = L.tileLayer(cfg.url, {
       subdomains: cfg.sub ?? [], maxZoom: cfg.maxZ, attribution: cfg.attr,
     }).addTo(mapRef.current);
-    if (cfg.labels) {
-      labelsRef.current = L.tileLayer(cfg.labels, {
-        pane: "labelsPane", subdomains: "abcd", maxZoom: 19, opacity: 1,
-      }).addTo(mapRef.current);
+    // Satellite: stack Esri Transportation (roads) + Esri Boundaries+Places (labels)
+    if (activeLayer === "satellite") {
+      [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      ].forEach(url => {
+        labelsRef.current.push(
+          L.tileLayer(url, { pane: "labelsPane", maxZoom: 19, opacity: 1 }).addTo(mapRef.current)
+        );
+      });
+    } else if (cfg.labels) {
+      labelsRef.current.push(
+        L.tileLayer(cfg.labels, { pane: "labelsPane", subdomains: "abcd", maxZoom: 19, opacity: 1 }).addTo(mapRef.current)
+      );
     }
   }, [activeLayer]);
 
