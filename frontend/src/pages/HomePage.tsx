@@ -579,48 +579,47 @@ function IncidentCard({ report, compact = false, flash = false, onSelect }: {
 
   return (
     <article onClick={onSelect}
-      className={`group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-float flex flex-col h-full ${flash ? "ring-2 ring-primary/30" : ""}`}>
+      className={`group cursor-pointer overflow-hidden rounded-xl border border-border bg-card transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-float flex flex-col h-full ${flash ? "ring-2 ring-primary/30" : ""}`}>
 
-      {/* Fixed-height image area — always present so all cards are the same size */}
-      <div className="relative h-24 w-full overflow-hidden shrink-0">
+      {/* Image area */}
+      <div className="relative h-20 w-full overflow-hidden shrink-0">
         {report.image_url && !imgErr ? (
           <img src={report.image_url} alt="" onError={() => setImgErr(true)}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
         ) : (
-          <div className={`h-full w-full flex items-center justify-center text-3xl select-none ${sev.chip}`}>
+          <div className={`h-full w-full flex items-center justify-center text-2xl select-none ${sev.chip}`}>
             {cat.emoji}
           </div>
         )}
-        <div className="absolute left-2.5 top-2.5">
-          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold bg-white/95 backdrop-blur ${sev.chip}`}>
-            <span className={`inline-block h-1.5 w-1.5 rounded-full mr-1 ${sev.dot}`} />{sev.label}
+        <div className="absolute left-2 top-2">
+          <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-semibold bg-white/95 backdrop-blur ${sev.chip}`}>
+            <span className={`inline-block h-1.5 w-1.5 rounded-full mr-0.5 ${sev.dot}`} />{sev.label}
           </span>
         </div>
       </div>
 
       {/* Body */}
-      <div className="flex flex-col flex-1 p-3">
-        <div className="flex items-center gap-1.5">
-          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
+      <div className="flex flex-col flex-1 p-2.5">
+        <div className="flex items-center gap-1">
+          <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] text-muted-foreground truncate">
             {cat.emoji} {t[cat.labelKey as keyof typeof t] as string}
           </span>
-          <span className="ml-auto text-[10px] text-muted-foreground shrink-0">{formatReportTime(report.created_at)}</span>
+          <span className="ml-auto text-[9px] text-muted-foreground shrink-0">{formatReportTime(report.created_at)}</span>
         </div>
-        <p className="mt-1.5 text-sm leading-snug text-foreground line-clamp-2 flex-1">{report.message}</p>
-        <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <MapPin className="h-3 w-3 shrink-0" />
-          <span className="truncate text-[11px]">{report.place ? `${report.place} · ${report.district}` : report.district}</span>
+        <p className="mt-1 text-xs leading-snug text-foreground line-clamp-2 flex-1">{report.message}</p>
+        <div className="mt-1.5 flex items-center gap-1 text-muted-foreground">
+          <MapPin className="h-2.5 w-2.5 shrink-0" />
+          <span className="truncate text-[9px]">{report.place ? `${report.place} · ${report.district}` : report.district}</span>
         </div>
-        <div className="mt-2 flex items-center justify-between border-t border-border/60 pt-2">
-          <div className="flex items-center gap-1.5 min-w-0">
+        <div className="mt-1.5 flex items-center justify-between border-t border-border/60 pt-1.5">
+          <div className="flex items-center gap-1 min-w-0">
             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${report.id}`} alt=""
-              className="h-6 w-6 shrink-0 rounded-full border border-border bg-secondary object-cover" />
-            <div className="truncate text-[10px] font-semibold text-foreground">Community member</div>
+              className="h-5 w-5 shrink-0 rounded-full border border-border bg-secondary object-cover" />
+            <div className="truncate text-[9px] font-semibold text-foreground">Community member</div>
           </div>
-          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-            <span className="inline-flex items-center gap-0.5"><ThumbsUp className="h-2.5 w-2.5 text-emerald-500" />0</span>
-            <span className="inline-flex items-center gap-0.5"><CheckCircle2 className="h-2.5 w-2.5 text-blue-500" />0</span>
-            <span className="inline-flex items-center gap-0.5"><MessageSquare className="h-2.5 w-2.5" />0</span>
+          <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
+            <span className="inline-flex items-center gap-0.5"><ThumbsUp className="h-2 w-2 text-emerald-500" />0</span>
+            <span className="inline-flex items-center gap-0.5"><MessageSquare className="h-2 w-2" />0</span>
           </div>
         </div>
       </div>
@@ -1086,6 +1085,13 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     mapRef.current.flyTo([15, 30], 3, { duration: 1.2 });
   }, [resetView]);
 
+  // Close popup when page is scrolled (popup can overflow map bounds)
+  useEffect(() => {
+    const close = () => mapRef.current?.closePopup();
+    window.addEventListener("scroll", close, { passive: true });
+    return () => window.removeEventListener("scroll", close);
+  }, []);
+
   // Ctrl+scroll to zoom
   useEffect(() => {
     const el = outerRef.current;
@@ -1547,15 +1553,14 @@ export function HomePage() {
         </div>
         <div className="mt-5">
         {status !== "live" ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[1,2,3,4,5,6].map(i => (
-              <div key={i} className="rounded-2xl border border-border bg-card overflow-hidden animate-pulse">
-                <div className="h-36 bg-secondary" />
-                <div className="p-4 space-y-2">
-                  <div className="flex gap-2"><div className="h-5 w-16 rounded-full bg-secondary" /><div className="h-5 w-12 rounded-full bg-secondary" /></div>
-                  <div className="h-4 bg-secondary rounded w-full" />
-                  <div className="h-4 bg-secondary rounded w-3/4" />
-                  <div className="h-3 bg-secondary rounded w-1/2 mt-1" />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[1,2,3,4,5,6,7,8].map(i => (
+              <div key={i} className="rounded-xl border border-border bg-card overflow-hidden animate-pulse">
+                <div className="h-20 bg-secondary" />
+                <div className="p-3 space-y-2">
+                  <div className="flex gap-2"><div className="h-4 w-14 rounded-full bg-secondary" /><div className="h-4 w-10 rounded-full bg-secondary" /></div>
+                  <div className="h-3 bg-secondary rounded w-full" />
+                  <div className="h-3 bg-secondary rounded w-3/4" />
                 </div>
               </div>
             ))}
@@ -1571,8 +1576,8 @@ export function HomePage() {
             </button>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-stretch">
-            {filteredReports.slice(0, 6).map(r => (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
+            {filteredReports.slice(0, 8).map(r => (
               <IncidentCard key={r.id} report={r} flash={flashId === r.id} onSelect={() => setDetailReport(r)} />
             ))}
           </div>
