@@ -84,8 +84,8 @@ const TILE_LAYERS = {
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     sub: null, maxZ: 18, attr: "Tiles © Esri | © OpenStreetMap", label: "Satellite", icon: "🛰",
-    // Place-name labels overlay (Esri hybrid) shown on top of imagery
-    labels: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+    // CartoDB labels-only layer — comprehensive local names, roads, POIs
+    labels: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png",
   },
 } as const;
 type TileKey = keyof typeof TILE_LAYERS;
@@ -544,7 +544,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
       subdomains: cfg.sub ?? [], maxZoom: cfg.maxZ, attribution: cfg.attr,
     }).addTo(map);
     // Labels overlay for initial satellite view
-    labelsRef.current = L.tileLayer(cfg.labels!, { maxZoom: cfg.maxZ, opacity: 1 }).addTo(map);
+    labelsRef.current = L.tileLayer(cfg.labels!, { subdomains: "abcd", maxZoom: cfg.maxZ, opacity: 1 }).addTo(map);
 
     L.control.attribution({ prefix: false, position: "bottomright" }).addTo(map);
 
@@ -582,7 +582,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     }).addTo(mapRef.current);
     // Add place-name labels on top for satellite
     if (cfg.labels) {
-      labelsRef.current = L.tileLayer(cfg.labels, { maxZoom: cfg.maxZ, opacity: 1 }).addTo(mapRef.current);
+      labelsRef.current = L.tileLayer(cfg.labels, { subdomains: "abcd", maxZoom: cfg.maxZ, opacity: 1 }).addTo(mapRef.current);
     }
   }, [activeLayer]);
 
@@ -974,74 +974,61 @@ export function HomePage() {
           <span className="text-sm text-muted-foreground">{filteredReports.filter(r => r.lat).length} incidents plotted</span>
         </div>
         <div className="relative h-[640px] w-full overflow-visible">
-          {/* Left floating filter panel */}
-          <div className="absolute bottom-4 left-4 z-[450] w-[min(280px,calc(100%-2rem))] md:bottom-auto md:top-20">
-            <div className="rounded-2xl border border-border bg-white/95 p-4 shadow-float backdrop-blur pointer-events-auto">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">🔽 Filters</span>
-                <button onClick={resetFilters} className="text-[11px] font-medium text-primary hover:underline">Reset</button>
+          {/* Left floating filter panel — compact */}
+          <div className="absolute left-3 top-20 z-[450]">
+            <div className="rounded-xl border border-border bg-white/95 p-3 shadow-float backdrop-blur w-[200px]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Filters</span>
+                <button onClick={resetFilters} className="text-[10px] font-semibold text-primary hover:underline">Reset</button>
               </div>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Severity</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(["critical","warn","safe"] as Severity[]).map(s => {
-                      const sv = SEV[s];
-                      return (
-                        <button key={s} onClick={() => toggleSeverity(s)}
-                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-all ${activeSeverities.has(s) ? sv.chip : "border-border text-muted-foreground bg-transparent"}`}>
-                          <span className={`h-2 w-2 rounded-full ${sv.dot}`} />{sv.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                {categories.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Category</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      <button onClick={() => setActiveCategory(null)}
-                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-all ${!activeCategory ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground"}`}>
-                        All
+              <div className="flex flex-wrap gap-1">
+                {(["critical","warn","safe"] as Severity[]).map(s => {
+                  const sv = SEV[s];
+                  return (
+                    <button key={s} onClick={() => toggleSeverity(s)}
+                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-all ${activeSeverities.has(s) ? sv.chip : "border-border/60 text-muted-foreground/60 bg-transparent"}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${sv.dot}`} />{sv.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {categories.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  <button onClick={() => setActiveCategory(null)}
+                    className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-all ${!activeCategory ? "bg-foreground text-background border-foreground" : "border-border/60 text-muted-foreground/60"}`}>
+                    All
+                  </button>
+                  {categories.map(c => {
+                    const cm = catMeta(c);
+                    return (
+                      <button key={c} onClick={() => setActiveCategory(activeCategory === c ? null : c)}
+                        className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-all ${activeCategory === c ? "bg-foreground text-background border-foreground" : "border-border/60 text-muted-foreground/60"}`}>
+                        {cm.emoji} {c}
                       </button>
-                      {categories.map(c => {
-                        const cm = catMeta(c);
-                        return (
-                          <button key={c} onClick={() => setActiveCategory(activeCategory === c ? null : c)}
-                            className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-all ${activeCategory === c ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground"}`}>
-                            {cm.emoji} {c}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                <div className="rounded-xl bg-secondary/70 p-2.5 text-[11px] text-muted-foreground">
-                  Showing {filteredReports.length} of {reports.length} reports
+                    );
+                  })}
                 </div>
-              </div>
+              )}
+              <p className="mt-2 text-[10px] text-muted-foreground">{filteredReports.length}/{reports.length} reports</p>
             </div>
           </div>
 
-          {/* Right floating live updates panel */}
-          <div className="absolute right-4 top-20 z-[450] hidden lg:flex w-[300px] flex-col max-h-[460px] rounded-2xl border border-border bg-white/95 shadow-float backdrop-blur overflow-hidden">
-            <div className="px-4 py-3 border-b border-border flex items-center gap-2 shrink-0">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-[10px] font-bold text-success">
-                <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" /> LIVE
-              </span>
-              <span className="text-xs font-semibold text-foreground">Updates</span>
-              <span className="ml-auto text-[11px] text-muted-foreground">{filteredReports.length}</span>
+          {/* Right floating live updates panel — compact */}
+          <div className="absolute right-3 top-20 z-[450] hidden lg:flex w-[220px] flex-col max-h-[380px] rounded-xl border border-border bg-white/95 shadow-float backdrop-blur overflow-hidden">
+            <div className="px-3 py-2 border-b border-border flex items-center gap-1.5 shrink-0">
+              <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+              <span className="text-[10px] font-bold text-success">LIVE</span>
+              <span className="text-[10px] font-semibold text-foreground ml-1">Updates</span>
+              <span className="ml-auto text-[10px] text-muted-foreground">{filteredReports.length}</span>
             </div>
             <div className="overflow-y-auto no-scrollbar flex-1">
               {status !== "live" && filteredReports.length === 0 && (
-                <div className="p-3 space-y-2">
-                  {[1,2,3,4].map(i => (
-                    <div key={i} className="flex gap-2 p-2 animate-pulse">
-                      <div className="h-12 w-12 rounded-lg bg-secondary shrink-0" />
-                      <div className="flex-1 space-y-1.5 pt-1">
-                        <div className="h-2.5 bg-secondary rounded w-2/3" />
-                        <div className="h-2.5 bg-secondary rounded w-full" />
-                        <div className="h-2.5 bg-secondary rounded w-1/2" />
+                <div className="p-2 space-y-1.5">
+                  {[1,2,3].map(i => (
+                    <div key={i} className="flex gap-1.5 p-1 animate-pulse">
+                      <div className="flex-1 space-y-1 pt-0.5">
+                        <div className="h-2 bg-secondary rounded w-2/3" />
+                        <div className="h-2 bg-secondary rounded w-full" />
                       </div>
                     </div>
                   ))}
@@ -1051,22 +1038,17 @@ export function HomePage() {
                 <button key={r.id} onClick={() => {
                   setDetailReport(r);
                   if (r.lat && r.lon) setFlyTo([r.lat, r.lon]);
-                }} className={`w-full text-left p-3 border-b border-border/60 hover:bg-secondary/50 transition-colors ${flashId === r.id ? "bg-primary/5" : ""}`}>
-                  <div className="flex items-start gap-2">
-                    {r.image_url && <img src={r.image_url} alt="" className="h-14 w-14 rounded-lg object-cover shrink-0 border border-border" />}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${SEV[r.severity].dot}`} />
-                        <span className="text-[10px] font-bold text-muted-foreground truncate">{r.district}</span>
-                        <span className="text-[10px] text-muted-foreground ml-auto shrink-0">{formatReportTime(r.created_at)}</span>
-                      </div>
-                      <p className="text-xs text-foreground line-clamp-2 leading-snug">{r.message}</p>
-                    </div>
+                }} className={`w-full text-left px-3 py-2 border-b border-border/50 hover:bg-secondary/50 transition-colors ${flashId === r.id ? "bg-primary/5" : ""}`}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${SEV[r.severity].dot}`} />
+                    <span className="text-[10px] font-bold text-muted-foreground truncate">{r.district}</span>
+                    <span className="text-[9px] text-muted-foreground ml-auto shrink-0">{formatReportTime(r.created_at)}</span>
                   </div>
+                  <p className="text-[11px] text-foreground line-clamp-2 leading-snug">{r.message}</p>
                 </button>
               ))}
-              {filteredReports.length === 0 && (
-                <div className="p-6 text-center text-xs text-muted-foreground">No matching incidents</div>
+              {filteredReports.length === 0 && status === "live" && (
+                <div className="p-4 text-center text-[11px] text-muted-foreground">No incidents</div>
               )}
             </div>
           </div>
