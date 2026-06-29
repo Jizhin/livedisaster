@@ -583,16 +583,17 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
       subdomains: cfg.sub ?? [], maxZoom: cfg.maxZ, attribution: cfg.attr,
       detectRetina: true,
     }).addTo(mapRef.current);
-    // Satellite hybrid: roads (Esri) + place names (Esri) + dense local labels (CartoDB OSM)
+    // Satellite hybrid: OSM semi-transparent (roads+places) + Esri roads + Esri places + CartoDB labels
     if (activeLayer === "satellite") {
-      const hybridLayers = [
-        { url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}", sub: null },
-        { url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", sub: null },
-        { url: "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png", sub: "abcd" },
+      const hybridLayers: { url: string; sub: string | null; opacity: number }[] = [
+        { url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", sub: "abc", opacity: 0.35 },
+        { url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}", sub: null, opacity: 1 },
+        { url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", sub: null, opacity: 1 },
+        { url: "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png", sub: "abcd", opacity: 1 },
       ];
-      hybridLayers.forEach(({ url, sub }) => {
+      hybridLayers.forEach(({ url, sub, opacity }) => {
         labelsRef.current.push(
-          L.tileLayer(url, { pane: "labelsPane", maxZoom: 19, opacity: 1, ...(sub ? { subdomains: sub } : {}) }).addTo(mapRef.current)
+          L.tileLayer(url, { pane: "labelsPane", maxZoom: 19, opacity, ...(sub ? { subdomains: sub } : {}) }).addTo(mapRef.current)
         );
       });
     } else if (cfg.labels) {
