@@ -520,7 +520,7 @@ function SiteNav({ onReport, reportsCount, status }: {
             </svg>
           </div>
           <div className="leading-tight">
-            <div className="font-display font-bold text-base tracking-tight text-foreground">LiveKerala</div>
+            <div className="font-display font-bold text-base tracking-tight text-foreground">DisasterWatch</div>
             <div className="hidden sm:block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Crowdsourced disaster watch</div>
           </div>
         </a>
@@ -1692,7 +1692,7 @@ export function HomePage() {
       {/* ── FOOTER ───────────────────────────────────────────── */}
       <footer className="border-t border-border bg-white/60 py-8 backdrop-blur">
         <div className="mx-auto flex w-full max-w-[1400px] flex-col items-center justify-between gap-3 px-6 text-xs text-muted-foreground md:flex-row">
-          <span>© {new Date().getFullYear()} LiveKerala — A crowdsourced safety map.</span>
+          <span>© {new Date().getFullYear()} DisasterWatch — A crowdsourced safety map.</span>
           <span>Made for neighbors, everywhere.</span>
         </div>
       </footer>
