@@ -1057,6 +1057,14 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     mapRef.current.flyTo([15, 30], 3, { duration: 1.2 });
   }, [resetView]);
 
+  // Dismiss bubble on page scroll
+  useEffect(() => {
+    if (!markerPopup) return;
+    const close = () => setMarkerPopup(null);
+    window.addEventListener("scroll", close, { passive: true });
+    return () => window.removeEventListener("scroll", close);
+  }, [markerPopup]);
+
   // Ctrl+scroll to zoom
   useEffect(() => {
     const el = outerRef.current;
