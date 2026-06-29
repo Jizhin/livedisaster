@@ -580,48 +580,45 @@ function IncidentCard({ report, compact = false, flash = false, onSelect }: {
       className={`group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-float flex flex-col h-full ${flash ? "ring-2 ring-primary/30" : ""}`}>
 
       {/* Fixed-height image area — always present so all cards are the same size */}
-      <div className="relative h-36 w-full overflow-hidden shrink-0">
+      <div className="relative h-24 w-full overflow-hidden shrink-0">
         {report.image_url && !imgErr ? (
           <img src={report.image_url} alt="" onError={() => setImgErr(true)}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
         ) : (
-          <div className={`h-full w-full flex items-center justify-center text-5xl select-none ${sev.chip}`}>
+          <div className={`h-full w-full flex items-center justify-center text-3xl select-none ${sev.chip}`}>
             {cat.emoji}
           </div>
         )}
-        <div className="absolute left-3 top-3">
-          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold bg-white/95 backdrop-blur ${sev.chip}`}>
+        <div className="absolute left-2.5 top-2.5">
+          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold bg-white/95 backdrop-blur ${sev.chip}`}>
             <span className={`inline-block h-1.5 w-1.5 rounded-full mr-1 ${sev.dot}`} />{sev.label}
           </span>
         </div>
       </div>
 
       {/* Body */}
-      <div className="flex flex-col flex-1 p-4">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">
+      <div className="flex flex-col flex-1 p-3">
+        <div className="flex items-center gap-1.5">
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
             {cat.emoji} {t[cat.labelKey as keyof typeof t] as string}
           </span>
-          <span className="ml-auto text-[11px] text-muted-foreground shrink-0">{formatReportTime(report.created_at)}</span>
+          <span className="ml-auto text-[10px] text-muted-foreground shrink-0">{formatReportTime(report.created_at)}</span>
         </div>
-        <p className="mt-2 text-sm leading-relaxed text-foreground line-clamp-3 flex-1">{report.message}</p>
-        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-          <MapPin className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{report.place ? `${report.place} · ${report.district}` : report.district}</span>
+        <p className="mt-1.5 text-sm leading-snug text-foreground line-clamp-2 flex-1">{report.message}</p>
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <MapPin className="h-3 w-3 shrink-0" />
+          <span className="truncate text-[11px]">{report.place ? `${report.place} · ${report.district}` : report.district}</span>
         </div>
-        <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3">
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="mt-2 flex items-center justify-between border-t border-border/60 pt-2">
+          <div className="flex items-center gap-1.5 min-w-0">
             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${report.id}`} alt=""
-              className="h-7 w-7 shrink-0 rounded-full border border-border bg-secondary object-cover" />
-            <div className="min-w-0">
-              <div className="truncate text-xs font-semibold text-foreground">Community member</div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Verified</div>
-            </div>
+              className="h-6 w-6 shrink-0 rounded-full border border-border bg-secondary object-cover" />
+            <div className="truncate text-[10px] font-semibold text-foreground">Community member</div>
           </div>
-          <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1"><ThumbsUp className="h-3 w-3 text-emerald-500" />0</span>
-            <span className="inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-blue-500" />0</span>
-            <span className="inline-flex items-center gap-1"><MessageSquare className="h-3 w-3" />0</span>
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+            <span className="inline-flex items-center gap-0.5"><ThumbsUp className="h-2.5 w-2.5 text-emerald-500" />0</span>
+            <span className="inline-flex items-center gap-0.5"><CheckCircle2 className="h-2.5 w-2.5 text-blue-500" />0</span>
+            <span className="inline-flex items-center gap-0.5"><MessageSquare className="h-2.5 w-2.5" />0</span>
           </div>
         </div>
       </div>
@@ -780,7 +777,7 @@ function MarkerBubble({ report, x, y, onClose }: { report: Report; x: number; y:
 
       {/* Bubble card — positioned above the marker click point */}
       <div
-        style={{ position: "absolute", left: x, top: y, transform: "translate(-50%, -100%)" }}
+        style={{ position: "fixed", left: x, top: y, transform: "translate(-50%, -100%)" }}
         className="z-[9000] w-[300px] max-w-[calc(100vw-2rem)] float-in"
         onClick={e => e.stopPropagation()}
       >
@@ -1191,15 +1188,16 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
         ))}
       </div>
 
-      {/* Marker bubble popup — position computed from lat/lon each render (updates on pan/zoom via mapTick) */}
-      {markerPopup && mapRef.current && (() => {
-        void mapTick; // consumed here so re-render fires on map move
+      {/* Marker bubble popup — screen coords = outerRef.getBoundingClientRect() + latLngToContainerPoint */}
+      {markerPopup && mapRef.current && outerRef.current && (() => {
+        void mapTick;
         const pt = mapRef.current.latLngToContainerPoint([markerPopup.lat, markerPopup.lon]);
+        const rect = outerRef.current.getBoundingClientRect();
         return (
           <MarkerBubble
             report={markerPopup.report}
-            x={Math.round(pt.x)}
-            y={Math.round(pt.y) - 38}
+            x={Math.round(rect.left + pt.x)}
+            y={Math.round(rect.top + pt.y) - 38}
             onClose={() => setMarkerPopup(null)}
           />
         );
@@ -1579,20 +1577,31 @@ export function HomePage() {
       <section id="alerts" className="mx-auto w-full max-w-[1400px] px-4 pb-12 md:px-6">
         <h2 className="font-display text-2xl font-bold text-foreground md:text-3xl">Official alerts</h2>
         <p className="mt-1 text-sm text-muted-foreground">Verified advisories from NDMA, IMD, GDACS and district authorities.</p>
-        <div className="mt-5 grid gap-3 md:grid-cols-2">
+        <div className="mt-5">
           {alertStatus === "loading" ? (
-            [1,2,3,4].map(i => <div key={i} className="h-28 rounded-2xl bg-secondary animate-pulse" />)
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {[1,2,3,4].map(i => <div key={i} className="shrink-0 w-72 h-28 rounded-2xl bg-secondary animate-pulse" />)}
+            </div>
           ) : alerts.length === 0 && gdacsAlerts.length === 0 ? (
-            <div className="col-span-2 rounded-2xl border border-border bg-card py-12 text-center">
+            <div className="rounded-2xl border border-border bg-card py-12 text-center">
               <p className="text-3xl mb-2">✅</p>
               <p className="font-semibold text-foreground">No active official alerts</p>
               <p className="text-sm text-muted-foreground mt-1">All official advisory feeds are clear right now</p>
             </div>
           ) : (
-            <>
-              {alerts.map(a => <AlertCard key={a.id} alert={a} />)}
-              {gdacsAlerts.map(e => <GDACSAlertCard key={e.id} event={e} />)}
-            </>
+            <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-3 -mx-4 px-4 md:-mx-6 md:px-6"
+              style={{ scrollbarWidth: "none" }}>
+              {alerts.map(a => (
+                <div key={a.id} className="snap-start shrink-0 w-72">
+                  <AlertCard alert={a} />
+                </div>
+              ))}
+              {gdacsAlerts.map(e => (
+                <div key={e.id} className="snap-start shrink-0 w-72">
+                  <GDACSAlertCard event={e} />
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </section>
