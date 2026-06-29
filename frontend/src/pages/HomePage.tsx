@@ -354,7 +354,7 @@ function LiveTicker() {
   if (all.length === 0) return null;
 
   const items = [...all, ...all]; // duplicate for seamless infinite loop
-  const dur = Math.max(24, all.length * 3.5);
+  const dur = Math.max(80, all.length * 8);
 
   return (
     <div className="mt-5 w-full overflow-hidden rounded-xl border border-border bg-white/70 backdrop-blur shadow-soft">
@@ -1082,7 +1082,7 @@ export function HomePage() {
       {waking && loadingPhase === "hidden" && <ConnectingBanner />}
 
       {/* ── HERO ────────────────────────────────────────────── */}
-      <section className="relative mx-auto w-full max-w-[860px] px-4 pt-8 pb-4 md:px-6 md:pt-12 text-center">
+      <section className="relative mx-auto w-full max-w-[860px] px-4 pt-4 pb-2 md:px-6 md:pt-6 text-center">
         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-white/70 px-3 py-1 text-[11px] font-medium text-foreground shadow-soft backdrop-blur">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
           {reports.length > 0 ? `${reports.length} live reports worldwide` : "Community powered disaster watch"}
@@ -1094,8 +1094,8 @@ export function HomePage() {
             Tell your neighbors.
           </span>
         </h1>
-        <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground md:text-base">
-          A flood, a power cut, a tremor — share it in 10 seconds. We map it live.
+        <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground md:text-base">
+          Real-time disaster awareness, powered by your community. Locals report floods, road closures, and outages — watch it map live before official news reaches you.
         </p>
         <LiveTicker />
       </section>
