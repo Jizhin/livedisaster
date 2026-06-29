@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLanguage } from "../i18n/LanguageContext";
 import {
-  Camera, MessageCircle, ArrowRight, Filter, X,
+  Camera, Search, MessageCircle, ArrowRight, Filter, X,
   ThumbsUp, CheckCircle2, MessageSquare, ShieldAlert, MapPin,
 } from "lucide-react";
 
@@ -589,6 +589,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     const cfg = TILE_LAYERS[activeLayer];
     tileRef.current = L.tileLayer(cfg.url, {
       subdomains: cfg.sub ?? [], maxZoom: cfg.maxZ, attribution: cfg.attr,
+      detectRetina: true,
     }).addTo(mapRef.current);
     // Satellite: stack Esri Transportation (roads) + Esri Boundaries+Places (labels)
     if (activeLayer === "satellite") {
@@ -866,7 +867,10 @@ export function HomePage() {
   const [showFeed, setShowFeed] = useState(true);
 
   const [reportFlowOpen, setReportFlowOpen] = useState(false);
-  const [heroMessage, setHeroMessage] = useState("");
+  const [heroSearch, setHeroSearch] = useState("");
+  const [heroSearchOpen, setHeroSearchOpen] = useState(false);
+  const heroSearchRef = useRef<HTMLDivElement>(null);
+  const { results: heroResults, loading: heroLoading } = usePhotonSearch(heroSearch);
   const [mapPickPlace, setMapPickPlace] = useState<Place | null>(null);
   const [mapPickLoading, setMapPickLoading] = useState(false);
   const [mapPickReset, setMapPickReset] = useState(0);
@@ -926,9 +930,24 @@ export function HomePage() {
 
   function closeReportModal() {
     setReportFlowOpen(false);
-    setHeroMessage("");
     setMapPickPlace(null);
     setMapPickReset(n => n + 1);
+  }
+
+  useEffect(() => {
+    function h(e: MouseEvent) {
+      if (heroSearchRef.current && !heroSearchRef.current.contains(e.target as Node))
+        setHeroSearchOpen(false);
+    }
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  function handleHeroSelect(p: Place) {
+    setFlyTo([p.lat, p.lon]);
+    setHeroSearch(p.name);
+    setHeroSearchOpen(false);
+    document.getElementById("map")?.scrollIntoView({ behavior: "smooth" });
   }
 
   function dismissWelcome() {
@@ -963,27 +982,45 @@ export function HomePage() {
           A flood, a power cut, a tremor — share it in 10 seconds. We map it live.
         </p>
 
-        {/* Compact report bar + quick chips */}
-        <div className="mx-auto mt-5 max-w-xl">
+        {/* Search bar + report CTA */}
+        <div ref={heroSearchRef} className="relative mx-auto mt-5 max-w-xl">
           <div className="flex items-center gap-2 rounded-2xl border border-border bg-white p-1.5 shadow-float focus-within:ring-2 focus-within:ring-primary/40">
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-secondary text-primary">
-              <MessageCircle className="h-4 w-4" />
+              {heroLoading
+                ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                : <Search className="h-4 w-4" />}
             </div>
             <input
               type="text"
-              value={heroMessage}
-              onChange={e => setHeroMessage(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && heroMessage.trim() && openReportFlow()}
-              placeholder="What's happening near you?"
+              value={heroSearch}
+              onChange={e => { setHeroSearch(e.target.value); setHeroSearchOpen(!!e.target.value); }}
+              onFocus={() => heroResults.length > 0 && setHeroSearchOpen(true)}
+              placeholder="Search a place or area on the map…"
               className="min-w-0 flex-1 bg-transparent px-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
             />
-            <button
-              onClick={openReportFlow}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-foreground px-3 py-2 text-xs font-semibold text-background hover:bg-foreground/90 sm:px-4 sm:text-sm"
-            >
+            {heroSearch && (
+              <button onClick={() => { setHeroSearch(""); setHeroSearchOpen(false); }}
+                className="h-5 w-5 shrink-0 rounded-full bg-muted text-muted-foreground text-xs flex items-center justify-center hover:bg-secondary">✕</button>
+            )}
+            <button onClick={openReportFlow}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-foreground px-3 py-2 text-xs font-semibold text-background hover:bg-foreground/90 sm:px-4 sm:text-sm">
               <Camera className="h-4 w-4" /> <span className="hidden sm:inline">Report</span>
             </button>
           </div>
+          {heroSearchOpen && heroResults.length > 0 && (
+            <div className="absolute left-0 right-0 mt-2 rounded-2xl border border-border bg-white shadow-float overflow-hidden z-50">
+              {heroResults.map((p, i) => (
+                <button key={`${p.lat}-${p.lon}-${i}`} onClick={() => handleHeroSelect(p)}
+                  className="w-full text-left px-4 py-2.5 hover:bg-secondary flex items-start gap-3 border-b border-border/60 last:border-b-0 transition-colors">
+                  <span className="text-primary mt-0.5 shrink-0">📍</span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-foreground truncate">{p.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">{p.context}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
             {["🌊 Flood", "⚡ Power cut", "🔥 Fire", "🌪 Storm", "🚧 Road", "🩺 Medical"].map((tag) => (
@@ -1280,7 +1317,7 @@ export function HomePage() {
         <WelcomeModal dataReady={status === "live" && alertStatus !== "loading"} t={t} onDismiss={dismissWelcome} />
       )}
       {reportFlowOpen && (
-        <ReportFlowModal onClose={closeReportModal} onReported={refresh} initialPlace={mapPickPlace ?? undefined} initialMessage={heroMessage || undefined} />
+        <ReportFlowModal onClose={closeReportModal} onReported={refresh} initialPlace={mapPickPlace ?? undefined} />
       )}
       {districtFocus && (
         <DistrictModal
