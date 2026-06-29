@@ -910,6 +910,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
       center: [15, 30], zoom: 3,
       attributionControl: false, zoomControl: false,
       scrollWheelZoom: false, worldCopyJump: true,
+      maxZoom: 19,
     });
 
     // Dedicated pane for labels — always above base tiles, transparent to pointer events
