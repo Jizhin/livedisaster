@@ -525,6 +525,11 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
 
   const [activeLayer, setActiveLayer] = useState<TileKey>("satellite");
   const labelsRef = useRef<any[]>([]);
+  const searchBoxRef = useRef<HTMLDivElement>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const { results: searchResults, loading: searchLoading } = usePhotonSearch(searchQ);
 
   // Map init
   useEffect(() => {
@@ -688,12 +693,84 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     mapRef.current.flyTo([15, 30], 3, { duration: 1.2 });
   }, [resetView]);
 
+  // Close search dropdown on outside click
+  useEffect(() => {
+    function h(e: MouseEvent) {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node))
+        setSearchOpen(false);
+    }
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  function handleSearchSelect(p: Place) {
+    if (!mapRef.current) return;
+    mapRef.current.flyTo([p.lat, p.lon], Math.max(mapRef.current.getZoom(), 13), { duration: 0.8 });
+    setSearchQ(p.name);
+    setSearchOpen(false);
+  }
+
+  function handleLocateInMap() {
+    if (!navigator.geolocation || !mapRef.current) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const m = mapRef.current;
+        if (m) m.flyTo([pos.coords.latitude, pos.coords.longitude], Math.max(m.getZoom(), 13), { duration: 0.8 });
+        setLocating(false);
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
+  }
+
   const locatedCount = reports.filter(r => r.lat !== null).length;
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
-      {/* Map canvas */}
-      <div ref={containerRef} className="absolute inset-0 bg-[#dde7f0]" />
+    <div className="relative h-full w-full">
+      {/* Map canvas — overflow-hidden clips tiles to rounded border */}
+      <div className="absolute inset-0 rounded-2xl overflow-hidden border border-border bg-card shadow-soft">
+        <div ref={containerRef} className="absolute inset-0 bg-[#dde7f0]" />
+      </div>
+
+      {/* Search bar — centered top, outside overflow-hidden so dropdown isn't clipped */}
+      <div ref={searchBoxRef} className="absolute top-3 left-1/2 z-[600] w-full max-w-[340px] -translate-x-1/2 px-2">
+        <div className="flex items-center gap-1.5 rounded-full border border-border bg-white/95 px-3 py-2 shadow-float backdrop-blur focus-within:ring-2 focus-within:ring-primary/40">
+          {searchLoading
+            ? <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            : <Search className="h-4 w-4 shrink-0 text-muted-foreground" />}
+          <input
+            type="text"
+            value={searchQ}
+            onChange={e => { setSearchQ(e.target.value); setSearchOpen(!!e.target.value); }}
+            onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
+            placeholder="Search a place…"
+            className="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+          />
+          <button onClick={handleLocateInMap} disabled={locating} title="My location"
+            className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary transition-colors disabled:opacity-60">
+            {locating ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <span className="text-sm">📍</span>}
+          </button>
+          {searchQ && (
+            <button onClick={() => { setSearchQ(""); setSearchOpen(false); }}
+              className="h-5 w-5 shrink-0 rounded-full bg-muted text-muted-foreground text-xs flex items-center justify-center hover:bg-secondary">✕</button>
+          )}
+        </div>
+        {searchOpen && searchResults.length > 0 && (
+          <div className="mt-1.5 overflow-hidden rounded-2xl border border-border bg-white shadow-float">
+            {searchResults.map((p, i) => (
+              <button key={`${p.lat}-${p.lon}-${i}`} onClick={() => handleSearchSelect(p)}
+                className="w-full text-left px-4 py-2.5 hover:bg-secondary flex items-start gap-3 border-b border-border/60 last:border-b-0 transition-colors">
+                <span className="text-primary mt-0.5 shrink-0">📍</span>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-foreground truncate">{p.name}</div>
+                  <div className="text-xs text-muted-foreground truncate">{p.context}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Layer switcher — right side */}
       <div className="absolute right-4 top-20 z-[500] flex flex-col gap-1 rounded-2xl border border-border bg-white/95 shadow-float backdrop-blur p-1">
@@ -791,23 +868,8 @@ export function HomePage() {
 
   const [showFilters, setShowFilters] = useState(false);
   const [showFeed, setShowFeed] = useState(true);
-  const [locating, setLocating] = useState(false);
-
-  function handleLocate() {
-    if (!navigator.geolocation) return;
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      pos => { setFlyTo([pos.coords.latitude, pos.coords.longitude]); setLocating(false); },
-      () => setLocating(false),
-      { enableHighAccuracy: true, timeout: 8000 },
-    );
-  }
 
   const [reportFlowOpen, setReportFlowOpen] = useState(false);
-  const [heroSearch, setHeroSearch] = useState("");
-  const [heroSearchOpen, setHeroSearchOpen] = useState(false);
-  const heroSearchRef = useRef<HTMLDivElement>(null);
-  const { results: heroResults, loading: heroLoading } = usePhotonSearch(heroSearch);
   const [mapPickPlace, setMapPickPlace] = useState<Place | null>(null);
   const [mapPickLoading, setMapPickLoading] = useState(false);
   const [mapPickReset, setMapPickReset] = useState(0);
@@ -871,22 +933,6 @@ export function HomePage() {
     setMapPickReset(n => n + 1);
   }
 
-  useEffect(() => {
-    function h(e: MouseEvent) {
-      if (heroSearchRef.current && !heroSearchRef.current.contains(e.target as Node))
-        setHeroSearchOpen(false);
-    }
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
-
-  function handleHeroSelect(p: Place) {
-    setFlyTo([p.lat, p.lon]);
-    setHeroSearch(p.name);
-    setHeroSearchOpen(false);
-    document.getElementById("map")?.scrollIntoView({ behavior: "smooth" });
-  }
-
   function dismissWelcome() {
     sessionStorage.setItem(WELCOME_KEY, "1");
     setWelcomeOpen(false);
@@ -903,7 +949,7 @@ export function HomePage() {
       {waking && loadingPhase === "hidden" && <ConnectingBanner />}
 
       {/* ── HERO ────────────────────────────────────────────── */}
-      <section className="relative z-10 mx-auto w-full max-w-[860px] px-4 pt-8 pb-4 md:px-6 md:pt-12 text-center">
+      <section className="relative mx-auto w-full max-w-[860px] px-4 pt-8 pb-4 md:px-6 md:pt-12 text-center">
         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-white/70 px-3 py-1 text-[11px] font-medium text-foreground shadow-soft backdrop-blur">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
           {reports.length > 0 ? `${reports.length} live reports worldwide` : "Community powered disaster watch"}
@@ -918,65 +964,6 @@ export function HomePage() {
         <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground md:text-base">
           A flood, a power cut, a tremor — share it in 10 seconds. We map it live.
         </p>
-
-        {/* Search bar */}
-        <div ref={heroSearchRef} className="relative mx-auto mt-5 max-w-xl">
-          <div className="flex items-center gap-2 rounded-full border border-border bg-white px-4 py-2.5 shadow-float focus-within:ring-2 focus-within:ring-primary/40">
-            {heroLoading
-              ? <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              : <Search className="h-4 w-4 shrink-0 text-muted-foreground" />}
-            <input
-              type="text"
-              value={heroSearch}
-              onChange={e => { setHeroSearch(e.target.value); setHeroSearchOpen(!!e.target.value); }}
-              onFocus={() => heroResults.length > 0 && setHeroSearchOpen(true)}
-              placeholder="Search a place or area…"
-              className="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-            />
-            {heroSearch && (
-              <button onClick={() => { setHeroSearch(""); setHeroSearchOpen(false); }}
-                className="h-5 w-5 shrink-0 rounded-full bg-muted text-muted-foreground text-xs flex items-center justify-center hover:bg-secondary">✕</button>
-            )}
-          </div>
-          {heroSearchOpen && heroResults.length > 0 && (
-            <div className="absolute left-0 right-0 mt-2 rounded-2xl border border-border bg-white shadow-float overflow-hidden z-50">
-              {heroResults.map((p, i) => (
-                <button key={`${p.lat}-${p.lon}-${i}`} onClick={() => handleHeroSelect(p)}
-                  className="w-full text-left px-4 py-2.5 hover:bg-secondary flex items-start gap-3 border-b border-border/60 last:border-b-0 transition-colors">
-                  <span className="text-primary mt-0.5 shrink-0">📍</span>
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-foreground truncate">{p.name}</div>
-                    <div className="text-xs text-muted-foreground truncate">{p.context}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
-            {["🌊 Flood", "⚡ Power cut", "🔥 Fire", "🌪 Storm", "🚧 Road", "🩺 Medical"].map((tag) => (
-              <button
-                key={tag}
-                onClick={openReportFlow}
-                className="rounded-full border border-border bg-white px-2.5 py-0.5 text-[11px] font-medium text-foreground transition hover:border-foreground hover:bg-foreground hover:text-background"
-              >
-                {tag}
-              </button>
-            ))}
-            <a href="#map" className="ml-1 inline-flex items-center gap-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground">
-              or explore map <ArrowRight className="h-3 w-3" />
-            </a>
-          </div>
-        </div>
-
-        {/* Inline stats */}
-        <div className="mx-auto mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
-          <span><span className="font-semibold text-foreground">{stats.active}</span> active alerts</span>
-          <span className="hidden h-1 w-1 rounded-full bg-border sm:inline-block" />
-          <span><span className="font-semibold text-foreground">{stats.today}</span> today's reports</span>
-          <span className="hidden h-1 w-1 rounded-full bg-border sm:inline-block" />
-          <span><span className="font-semibold text-foreground">{reports.length}</span> contributors</span>
-        </div>
       </section>
 
       {/* ── MAP ─────────────────────────────────────────────── */}
@@ -1005,11 +992,6 @@ export function HomePage() {
                   {(3 - activeSeverities.size) + (activeCategory ? 1 : 0)}
                 </span>
               )}
-            </button>
-            <button onClick={handleLocate} disabled={locating}
-              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-border bg-white/95 px-3 py-1.5 text-xs font-semibold text-foreground shadow-float backdrop-blur hover:bg-white disabled:opacity-60">
-              {locating ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" /> : "📍"}
-              <span className="hidden sm:inline">{locating ? "Locating…" : "My location"}</span>
             </button>
           </div>
 
