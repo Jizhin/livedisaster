@@ -641,6 +641,171 @@ function AlertCard({ alert }: { alert: OfficialAlert }) {
   );
 }
 
+/* ─── Marker Bubble ─────────────────────────────────────────── */
+function MarkerBubble({ report, cx, cy, onClose }: { report: Report; cx: number; cy: number; onClose: () => void }) {
+  const { t } = useLanguage();
+  const { data, loading } = useReportDetail(report.id);
+  const [localCounts, setLocalCounts] = useState<{ confirmed: number; incorrect: number; resolved: number } | null>(null);
+  const [voted, setVoted] = useState<string | null>(null);
+  const [comments, setComments] = useState<ApiComment[]>([]);
+  const [showComments, setShowComments] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [posting, setPosting] = useState(false);
+  const [imgExpanded, setImgExpanded] = useState(false);
+  const anonName = useRef(`user_${Math.random().toString(36).slice(2, 8)}`);
+  const sev = SEV[report.severity];
+  const cat = catMeta(report.category);
+  const imgUrl = data?.images?.[0]?.file_path ? `${UPLOADS_ORIGIN}/uploads/${data.images[0].file_path}` : report.image_url;
+
+  useEffect(() => {
+    if (data) {
+      setLocalCounts({ confirmed: data.confirmed_count ?? 0, incorrect: data.incorrect_count ?? 0, resolved: data.resolved_count ?? 0 });
+      setComments(data.comments ?? []);
+    }
+  }, [data]);
+
+  async function vote(kind: "confirm" | "incorrect" | "resolved") {
+    if (voted) return;
+    setVoted(kind);
+    setLocalCounts(c => {
+      if (!c) return c;
+      if (kind === "confirm") return { ...c, confirmed: c.confirmed + 1 };
+      if (kind === "incorrect") return { ...c, incorrect: c.incorrect + 1 };
+      return { ...c, resolved: c.resolved + 1 };
+    });
+    await fetch(`${API_BASE}/reports/${report.id}/verifications`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, voter_name: null }),
+    }).catch(() => {});
+  }
+
+  async function submitComment(e: React.FormEvent) {
+    e.preventDefault();
+    const text = commentText.trim();
+    if (!text) return;
+    setPosting(true);
+    try {
+      const res = await fetch(`${API_BASE}/reports/${report.id}/comments`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ author_name: anonName.current, content: text }),
+      });
+      if (res.ok) {
+        setComments(prev => [...prev, { id: Date.now(), author_name: anonName.current, content: text, created_at: new Date().toISOString() }]);
+        setCommentText("");
+      }
+    } finally { setPosting(false); }
+  }
+
+  return (
+    <>
+      {imgExpanded && imgUrl && (
+        <div className="fixed inset-0 z-[9500] flex items-center justify-center bg-black/90 p-4" onClick={() => setImgExpanded(false)}>
+          <img src={imgUrl} alt="" className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl" />
+          <button onClick={() => setImgExpanded(false)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/20 text-white hover:bg-white/30">✕</button>
+        </div>
+      )}
+
+      {/* Bubble card — positioned above the marker click point */}
+      <div
+        style={{ position: "fixed", left: cx, top: cy, transform: "translate(-50%, calc(-100% - 20px))" }}
+        className="z-[9000] w-[300px] max-w-[calc(100vw-2rem)] float-in"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-float">
+          {/* Severity bar */}
+          <div className={`h-1 w-full ${sev.bar}`} />
+
+          {/* Image strip */}
+          {imgUrl && (
+            <button onClick={() => setImgExpanded(true)} className="block w-full overflow-hidden h-24 bg-secondary">
+              <img src={imgUrl} alt="" className="w-full h-full object-cover hover:brightness-90 transition" />
+            </button>
+          )}
+
+          {/* Header */}
+          <div className="flex items-start gap-2 px-3 pt-3 pb-1">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1 flex-wrap">
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${sev.text}`}>{sev.label}</span>
+                <span className="text-muted-foreground/40 text-[10px]">·</span>
+                <span className="text-[10px] text-muted-foreground">{cat.emoji} {t[cat.labelKey as keyof typeof t] as string}</span>
+                <span className="text-muted-foreground/40 text-[10px]">·</span>
+                <span className="text-[10px] text-muted-foreground">{formatReportTime(report.created_at)}</span>
+              </div>
+              <p className="font-display text-sm font-bold text-foreground mt-0.5 leading-snug">
+                {report.place ? `${report.place} · ${report.district}` : report.district}
+              </p>
+            </div>
+            <button onClick={onClose}
+              className="shrink-0 grid h-6 w-6 place-items-center rounded-full bg-secondary text-muted-foreground hover:bg-border transition-colors">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+
+          {/* Message */}
+          <div className="px-3 pt-0.5 pb-3 border-b border-border/60">
+            <p className="text-[13px] leading-relaxed text-foreground">{report.message}</p>
+          </div>
+
+          {/* Vote row */}
+          <div className="flex border-b border-border/60">
+            {loading ? (
+              <div className="flex-1 h-9 animate-pulse bg-secondary/50" />
+            ) : localCounts ? (
+              ([
+                { kind: "confirm" as const, icon: "👍", count: localCounts.confirmed, active: "bg-emerald-50 text-emerald-700" },
+                { kind: "incorrect" as const, icon: "👎", count: localCounts.incorrect, active: "bg-red-50 text-red-700" },
+                { kind: "resolved" as const, icon: "✓", count: localCounts.resolved, active: "bg-blue-50 text-blue-700" },
+                { kind: null as const, icon: "👁", count: data?.views_count ?? 0, active: "" },
+              ] as const).map(({ kind, icon, count, active }) => (
+                <button key={String(kind)} onClick={() => kind && vote(kind)} disabled={!kind || !!voted}
+                  className={`flex-1 flex flex-col items-center justify-center py-1.5 gap-0.5 text-[10px] font-bold border-r border-border/40 last:border-r-0 transition-colors disabled:cursor-default ${voted === kind ? active : !kind ? "text-muted-foreground/50" : "text-muted-foreground hover:bg-secondary"}`}>
+                  <span className="text-sm leading-none">{icon}</span>
+                  <span>{count}</span>
+                </button>
+              ))
+            ) : null}
+          </div>
+
+          {/* Comment input */}
+          <div className="px-3 py-2">
+            <form onSubmit={submitComment} className="flex items-center gap-2">
+              <input value={commentText} onChange={e => setCommentText(e.target.value)}
+                placeholder="Add a note…"
+                className="flex-1 min-w-0 rounded-full border border-border bg-secondary px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/25"
+              />
+              <button type="submit" disabled={posting || !commentText.trim()}
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-foreground text-background hover:opacity-90 disabled:opacity-30 transition-opacity">
+                {posting ? <span className="text-[10px]">…</span> : <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>}
+              </button>
+            </form>
+            {comments.length > 0 && (
+              <button onClick={() => setShowComments(v => !v)} className="mt-1 text-[10px] font-medium text-primary hover:underline">
+                {showComments ? "Hide" : `${comments.length} comment${comments.length !== 1 ? "s" : ""}`}
+              </button>
+            )}
+            {showComments && (
+              <div className="mt-1.5 space-y-1 max-h-24 overflow-y-auto">
+                {comments.map(c => (
+                  <div key={c.id} className="rounded-lg bg-secondary px-2.5 py-1.5">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-primary">{c.author_name}</p>
+                    <p className="text-[11px] leading-snug text-foreground mt-0.5">{c.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Arrow pointing down to the marker */}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full" style={{ filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.08))" }}>
+          <div style={{ width: 0, height: 0, borderLeft: "10px solid transparent", borderRight: "10px solid transparent", borderTop: "10px solid white" }} />
+        </div>
+      </div>
+    </>
+  );
+}
+
 /* ─── Live Map ──────────────────────────────────────────────── */
 function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickReset, pickedLabel, activeLayer, onLayerChange }: {
   reports: Report[];
@@ -670,6 +835,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
   const [searchQ, setSearchQ] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [markerPopup, setMarkerPopup] = useState<{ report: Report; cx: number; cy: number } | null>(null);
   const { results: searchResults, loading: searchLoading } = usePhotonSearch(searchQ);
 
   // Map init
@@ -693,6 +859,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 
+    map.on("click", () => { setMarkerPopup(null); });
     map.on("click", (e: any) => {
       if (!onMapPickRef.current) return;
       const { lat, lng } = e.latlng;
@@ -785,7 +952,10 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
       `);
       const marker = L.marker([r.lat, r.lon], { icon });
       marker.bindPopup(popup);
-      marker.on("click", () => onSelectReport(r));
+      marker.on("click", (e: any) => {
+        const orig = e.originalEvent as MouseEvent | undefined;
+        setMarkerPopup({ report: r, cx: orig?.clientX ?? 0, cy: orig?.clientY ?? 0 });
+      });
       layerRef.current.addLayer(marker);
     });
     if (located.length > 0 && !fitDoneRef.current) {
@@ -951,6 +1121,22 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
           title="Zoom out"
         >−</button>
       </div>
+
+      {/* Layer switcher — bottom center, own dedicated space */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[500] flex flex-row gap-0.5 rounded-full border border-border bg-white/95 shadow-float backdrop-blur p-0.5">
+        {(Object.keys(TILE_LAYERS) as TileKey[]).map(key => (
+          <button key={key} onClick={() => onLayerChange(key)} title={TILE_LAYERS[key].label}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${activeLayer === key ? "bg-foreground text-background" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+            <span className="text-sm">{TILE_LAYERS[key].icon}</span>
+            <span>{TILE_LAYERS[key].label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Marker bubble popup */}
+      {markerPopup && (
+        <MarkerBubble report={markerPopup.report} cx={markerPopup.cx} cy={markerPopup.cy} onClose={() => setMarkerPopup(null)} />
+      )}
     </div>
   );
 }
@@ -1143,16 +1329,6 @@ export function HomePage() {
                 </span>
               )}
             </button>
-            {/* Layer switcher — inline with Filters */}
-            <div className="pointer-events-auto flex flex-row gap-0.5 rounded-full border border-border bg-white/95 shadow-float backdrop-blur p-0.5">
-              {(Object.keys(TILE_LAYERS) as TileKey[]).map(key => (
-                <button key={key} onClick={() => setActiveLayer(key)} title={TILE_LAYERS[key].label}
-                  className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${activeLayer === key ? "bg-foreground text-background" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
-                  <span className="text-xs">{TILE_LAYERS[key].icon}</span>
-                  <span className="hidden sm:inline">{TILE_LAYERS[key].label}</span>
-                </button>
-              ))}
-            </div>
           </div>
 
           <div className="pointer-events-none absolute right-4 top-4 z-[450] flex flex-col items-end gap-2">
