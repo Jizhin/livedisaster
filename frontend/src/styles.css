@@ -220,6 +220,20 @@
 .leaflet-popup-tip { box-shadow: none; }
 .leaflet-popup-content { margin: 0; }
 
+/* place-name label for search results and picked locations */
+.leaflet-tooltip.lk-place-label {
+  background: white;
+  border: 1.5px solid #cbd5e1;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  padding: 4px 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2), 0 0 0 3px rgba(255,255,255,0.7);
+}
+.leaflet-tooltip.lk-place-label::before { border-top-color: white; }
+
 /* ═══════════════════════════════════════════════════════════════
    EXISTING lkp-* STYLES (unchanged below this line)
    ═══════════════════════════════════════════════════════════════ */

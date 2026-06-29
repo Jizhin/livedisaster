@@ -503,13 +503,14 @@ function AlertCard({ alert }: { alert: OfficialAlert }) {
 }
 
 /* ─── Live Map ──────────────────────────────────────────────── */
-function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickReset }: {
+function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickReset, pickedLabel }: {
   reports: Report[];
   flyTo?: [number, number] | null;
   resetView?: number;
   onMapPick?: (lat: number, lon: number) => void;
   onSelectReport: (r: Report) => void;
   pickReset?: number;
+  pickedLabel?: string | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -517,6 +518,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
   const tileRef = useRef<any>(null);
   const fitDoneRef = useRef(false);
   const pendingPinRef = useRef<any>(null);
+  const searchPinRef = useRef<any>(null);
   const onMapPickRef = useRef(onMapPick);
   onMapPickRef.current = onMapPick;
   const flyToPrevRef = useRef<[number, number] | null>(null);
@@ -573,7 +575,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     return () => {
       map.remove();
       mapRef.current = null; layerRef.current = null; tileRef.current = null; labelsRef.current = null;
-      fitDoneRef.current = false; pendingPinRef.current = null;
+      fitDoneRef.current = false; pendingPinRef.current = null; searchPinRef.current = null;
     };
   }, []);
 
@@ -650,6 +652,22 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     if (pendingPinRef.current) { pendingPinRef.current.remove(); pendingPinRef.current = null; }
   }, [pickReset]);
 
+  // show resolved place name above the picked map pin
+  useEffect(() => {
+    if (!pickedLabel || !pendingPinRef.current) return;
+    try { pendingPinRef.current.unbindTooltip(); } catch {}
+    pendingPinRef.current.bindTooltip(pickedLabel, { permanent: true, direction: "top", className: "lk-place-label" });
+    pendingPinRef.current.openTooltip();
+  }, [pickedLabel]);
+
+  // clear search pin when search input is cleared
+  useEffect(() => {
+    if (!searchQ && searchPinRef.current) {
+      searchPinRef.current.remove();
+      searchPinRef.current = null;
+    }
+  }, [searchQ]);
+
   // flyTo
   useEffect(() => {
     if (!flyTo || !mapRef.current) return;
@@ -664,6 +682,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     if (resetView === resetViewPrevRef.current) return;
     resetViewPrevRef.current = resetView;
     flyToPrevRef.current = null; fitDoneRef.current = false;
+    if (searchPinRef.current) { searchPinRef.current.remove(); searchPinRef.current = null; }
     mapRef.current.flyTo([15, 30], 3, { duration: 1.2 });
   }, [resetView]);
 
@@ -714,7 +733,16 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
             {searchResults.map((p, i) => (
               <button key={`${p.lat}-${p.lon}-${i}`}
                 onClick={() => {
-                  if (mapRef.current) mapRef.current.flyTo([p.lat, p.lon], 13, { duration: 0.8 });
+                  const L2 = (window as any).L;
+                  if (mapRef.current && L2) {
+                    mapRef.current.flyTo([p.lat, p.lon], 14, { duration: 0.8 });
+                    if (searchPinRef.current) { searchPinRef.current.remove(); searchPinRef.current = null; }
+                    searchPinRef.current = L2.circleMarker([p.lat, p.lon], {
+                      radius: 6, fillColor: "#3b82f6", color: "#fff", weight: 2, fillOpacity: 1, interactive: false,
+                    }).addTo(mapRef.current);
+                    searchPinRef.current.bindTooltip(p.name, { permanent: true, direction: "top", className: "lk-place-label" });
+                    searchPinRef.current.openTooltip();
+                  }
                   setSearchOpen(false); setSearchQ(p.name);
                 }}
                 className="w-full text-left px-4 py-2.5 hover:bg-secondary flex items-start gap-3 border-b border-border/60 last:border-b-0 transition-colors">
@@ -977,6 +1005,7 @@ export function HomePage() {
             onMapPick={handleMapPick}
             onSelectReport={r => setDetailReport(r)}
             pickReset={mapPickReset}
+            pickedLabel={mapPickPlace?.name ?? null}
           />
 
           {/* Floating toggle buttons — always visible */}
