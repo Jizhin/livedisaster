@@ -1925,57 +1925,51 @@ function StandaloneDetailModal({ report, onClose }: { report: Report; onClose: (
 
   return (
     <>
-      {imgExpanded && imgUrl && (
-        <div className="fixed inset-0 z-[9500] flex items-center justify-center bg-black/90 p-4" onClick={() => setImgExpanded(false)}>
-          <img src={imgUrl} alt="" className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl" />
-          <button onClick={() => setImgExpanded(false)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/20 text-white hover:bg-white/30">✕</button>
-        </div>
-      )}
-
-      {/* Compact map popup card — bottom-left, no backdrop */}
-      <div className="fixed bottom-4 left-4 z-[9000] w-[340px] max-w-[calc(100vw-2rem)] float-in">
-        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-float">
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+        {/* Compact modal card */}
+        <div className="relative w-full max-w-sm max-h-[80dvh] flex flex-col overflow-hidden rounded-2xl bg-card shadow-float float-in" onClick={e => e.stopPropagation()}>
           {/* Severity bar */}
-          <div className={`h-1 w-full ${sev.bar}`} />
+          <div className={`h-1 w-full shrink-0 ${sev.bar}`} />
 
-          {/* Image strip */}
-          {imgUrl && (
-            <button onClick={() => setImgExpanded(true)} className="block w-full overflow-hidden h-28 bg-secondary">
-              <img src={imgUrl} alt="" className="w-full h-full object-cover hover:brightness-90 transition" />
-            </button>
-          )}
-
-          {/* Header */}
-          <div className="flex items-start gap-2 px-4 pt-3 pb-1">
+          {/* Header row */}
+          <div className="flex items-start gap-2 px-4 pt-3 pb-2 shrink-0">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${sev.text}`}>{sev.label}</span>
-                <span className="text-muted-foreground/50 text-[10px]">·</span>
-                <span className="text-[10px] font-medium text-muted-foreground">{cat.emoji} {t[cat.labelKey as keyof typeof t] as string}</span>
-                <span className="text-muted-foreground/50 text-[10px]">·</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wide ${sev.text}`}>{sev.label}</span>
+                <span className="text-muted-foreground/40 text-[10px]">·</span>
+                <span className="text-[10px] text-muted-foreground">{cat.emoji} {t[cat.labelKey as keyof typeof t] as string}</span>
+                <span className="text-muted-foreground/40 text-[10px]">·</span>
                 <span className="text-[10px] text-muted-foreground">{formatReportTime(report.created_at)}</span>
               </div>
               <h3 className="font-display text-sm font-bold text-foreground mt-0.5 leading-snug">
                 {report.place ? `${report.place} · ${report.district}` : report.district}
               </h3>
             </div>
-            <button onClick={onClose}
-              className="shrink-0 grid h-7 w-7 place-items-center rounded-full bg-secondary text-muted-foreground hover:bg-border transition-colors">
+            <button onClick={onClose} className="shrink-0 grid h-7 w-7 place-items-center rounded-full bg-secondary text-muted-foreground hover:bg-border transition-colors">
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
 
-          {/* Message */}
-          <div className="px-4 pt-1 pb-3 border-b border-border/60">
-            <p className="text-sm leading-relaxed text-foreground">{report.message}</p>
-          </div>
+          {/* Scrollable body */}
+          <div className="overflow-y-auto flex-1">
+            {/* Image */}
+            {imgUrl && (
+              <button onClick={() => setImgExpanded(true)} className="block w-full h-36 overflow-hidden bg-secondary">
+                <img src={imgUrl} alt="" className="w-full h-full object-cover hover:brightness-90 transition" />
+              </button>
+            )}
 
-          {/* Vote row */}
-          <div className="flex border-b border-border/60">
+            {/* Message */}
+            <div className="px-4 py-3 border-b border-border/60">
+              <p className="text-sm leading-relaxed text-foreground">{report.message}</p>
+            </div>
+
+            {/* Vote row */}
             {loading ? (
-              <div className="flex-1 h-10 animate-pulse bg-secondary/50" />
+              <div className="h-10 mx-4 my-3 animate-pulse rounded-lg bg-secondary/50" />
             ) : localCounts ? (
-              <>
+              <div className="flex border-b border-border/60">
                 {(([
                   { kind: "confirm" as const, icon: "👍", count: localCounts.confirmed, active: "bg-emerald-50 text-emerald-700" },
                   { kind: "incorrect" as const, icon: "👎", count: localCounts.incorrect, active: "bg-red-50 text-red-700" },
@@ -1983,46 +1977,54 @@ function StandaloneDetailModal({ report, onClose }: { report: Report; onClose: (
                   { kind: null, icon: "👁", count: data?.views_count ?? 0, active: "" },
                 ] as Array<{ kind: "confirm" | "incorrect" | "resolved" | null; icon: string; count: number; active: string }>)).map(({ kind, icon, count, active }) => (
                   <button key={String(kind)} onClick={() => kind && vote(kind)} disabled={!kind || !!voted}
-                    className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-bold border-r border-border/40 last:border-r-0 transition-colors disabled:cursor-default ${voted === kind ? active : !kind ? "text-muted-foreground/60" : "text-muted-foreground hover:bg-secondary"}`}>
-                    <span className="text-sm leading-none">{icon}</span>
+                    className={`flex-1 flex flex-col items-center py-2.5 gap-0.5 text-[10px] font-bold border-r border-border/40 last:border-r-0 transition-colors disabled:cursor-default ${voted === kind ? active : !kind ? "text-muted-foreground/50" : "text-muted-foreground hover:bg-secondary"}`}>
+                    <span className="text-sm">{icon}</span>
                     <span>{count}</span>
-                    {voted === kind && <span className="text-[9px] text-success">✓ voted</span>}
+                    {voted === kind && <span className="text-[8px] text-success">✓</span>}
                   </button>
                 ))}
-              </>
-            ) : null}
-          </div>
-
-          {/* Comment input + toggle */}
-          <div className="px-3 py-2">
-            <form onSubmit={submitComment} className="flex items-center gap-2">
-              <input value={commentText} onChange={e => setCommentText(e.target.value)}
-                placeholder="Add a note…"
-                className="flex-1 min-w-0 rounded-full border border-border bg-secondary px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/25"
-              />
-              <button type="submit" disabled={posting || !commentText.trim()}
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-foreground text-background hover:opacity-90 disabled:opacity-30 transition-opacity">
-                {posting ? <span className="text-[10px]">…</span> : <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>}
-              </button>
-            </form>
-            {comments.length > 0 && (
-              <button onClick={() => setShowComments(v => !v)} className="mt-1.5 text-[10px] font-medium text-primary hover:underline">
-                {showComments ? "Hide comments" : `${comments.length} comment${comments.length !== 1 ? "s" : ""}`}
-              </button>
-            )}
-            {showComments && (
-              <div className="mt-2 space-y-1 max-h-28 overflow-y-auto">
-                {comments.map(c => (
-                  <div key={c.id} className="rounded-lg bg-secondary px-3 py-2">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-primary">{c.author_name}</p>
-                    <p className="text-[11px] leading-snug text-foreground mt-0.5">{c.content}</p>
-                  </div>
-                ))}
               </div>
-            )}
+            ) : null}
+
+            {/* Comment input + list */}
+            <div className="px-4 py-3">
+              <form onSubmit={submitComment} className="flex items-center gap-2">
+                <input value={commentText} onChange={e => setCommentText(e.target.value)}
+                  placeholder="Add a note…"
+                  className="flex-1 min-w-0 rounded-full border border-border bg-secondary px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/25"
+                />
+                <button type="submit" disabled={posting || !commentText.trim()}
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-foreground text-background hover:opacity-90 disabled:opacity-30 transition-opacity">
+                  {posting ? <span className="text-[10px]">…</span> : <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>}
+                </button>
+              </form>
+              {comments.length > 0 && (
+                <button onClick={() => setShowComments(v => !v)} className="mt-2 text-[10px] font-medium text-primary hover:underline">
+                  {showComments ? "Hide comments" : `${comments.length} comment${comments.length !== 1 ? "s" : ""}`}
+                </button>
+              )}
+              {showComments && (
+                <div className="mt-2 space-y-1.5">
+                  {comments.map(c => (
+                    <div key={c.id} className="rounded-lg bg-secondary px-3 py-2">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-primary">{c.author_name}</p>
+                      <p className="text-[11px] leading-snug text-foreground mt-0.5">{c.content}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Full-screen image expand */}
+      {imgExpanded && imgUrl && (
+        <div className="fixed inset-0 z-[9500] flex items-center justify-center bg-black/90 p-4" onClick={() => setImgExpanded(false)}>
+          <img src={imgUrl} alt="" className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl" />
+          <button onClick={() => setImgExpanded(false)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/20 text-white hover:bg-white/30">✕</button>
+        </div>
+      )}
     </>
   );
 }
