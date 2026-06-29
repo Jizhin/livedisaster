@@ -83,7 +83,7 @@ const SEV = {
 };
 
 const TILE_LAYERS = {
-  streets:   { url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",  sub: "abcd", maxZ: 19, attr: "© OpenStreetMap, © CARTO", label: "Streets",   icon: "🗺", labels: null },
+  streets:   { url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", sub: "abc", maxZ: 19, attr: "© OpenStreetMap contributors", label: "Map", icon: "🗺", labels: null },
   terrain:   { url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",                        sub: "abc",  maxZ: 17, attr: "© OpenStreetMap, SRTM | OpenTopoMap (CC-BY-SA)", label: "Terrain",   icon: "⛰", labels: null },
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -524,7 +524,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
   const flyToPrevRef = useRef<[number, number] | null>(null);
   const resetViewPrevRef = useRef(0);
 
-  const [activeLayer, setActiveLayer] = useState<TileKey>("satellite");
+  const [activeLayer, setActiveLayer] = useState<TileKey>("streets");
   const labelsRef = useRef<any>(null);
   const [searchQ, setSearchQ] = useState("");
   const { results: searchResults, loading: searchLoading } = usePhotonSearch(searchQ);
