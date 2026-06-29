@@ -518,7 +518,6 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
   const tileRef = useRef<any>(null);
   const fitDoneRef = useRef(false);
   const pendingPinRef = useRef<any>(null);
-  const searchPinRef = useRef<any>(null);
   const onMapPickRef = useRef(onMapPick);
   onMapPickRef.current = onMapPick;
   const flyToPrevRef = useRef<[number, number] | null>(null);
@@ -526,19 +525,6 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
 
   const [activeLayer, setActiveLayer] = useState<TileKey>("satellite");
   const labelsRef = useRef<any[]>([]);
-  const [searchQ, setSearchQ] = useState("");
-  const { results: searchResults, loading: searchLoading } = usePhotonSearch(searchQ);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const searchBoxRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function h(e: MouseEvent) {
-      if (!searchBoxRef.current?.contains(e.target as Node)) setSearchOpen(false);
-    }
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
 
   // Map init
   useEffect(() => {
@@ -575,7 +561,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     return () => {
       map.remove();
       mapRef.current = null; layerRef.current = null; tileRef.current = null; labelsRef.current = [];
-      fitDoneRef.current = false; pendingPinRef.current = null; searchPinRef.current = null;
+      fitDoneRef.current = false; pendingPinRef.current = null;
     };
   }, []);
 
@@ -674,14 +660,6 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     pendingPinRef.current.openTooltip();
   }, [pickedLabel]);
 
-  // clear search pin when search input is cleared
-  useEffect(() => {
-    if (!searchQ && searchPinRef.current) {
-      searchPinRef.current.remove();
-      searchPinRef.current = null;
-    }
-  }, [searchQ]);
-
   // flyTo
   useEffect(() => {
     if (!flyTo || !mapRef.current) return;
@@ -696,23 +674,8 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     if (resetView === resetViewPrevRef.current) return;
     resetViewPrevRef.current = resetView;
     flyToPrevRef.current = null; fitDoneRef.current = false;
-    if (searchPinRef.current) { searchPinRef.current.remove(); searchPinRef.current = null; }
     mapRef.current.flyTo([15, 30], 3, { duration: 1.2 });
   }, [resetView]);
-
-  function handleLocate() {
-    if (!navigator.geolocation) return;
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const c: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-        if (mapRef.current) mapRef.current.flyTo(c, 11, { duration: 0.8 });
-        setLocating(false);
-      },
-      () => setLocating(false),
-      { enableHighAccuracy: true, timeout: 8000 },
-    );
-  }
 
   const locatedCount = reports.filter(r => r.lat !== null).length;
 
@@ -720,56 +683,6 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
       {/* Map canvas */}
       <div ref={containerRef} className="absolute inset-0 bg-[#dde7f0]" />
-
-      {/* Floating search bar — centered top */}
-      <div ref={searchBoxRef} className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] w-[min(640px,calc(100%-2rem))]">
-        <div className="flex items-center gap-2 rounded-full border border-border bg-white/95 shadow-float backdrop-blur pl-4 pr-2 py-2">
-          <span className="text-muted-foreground text-sm shrink-0">🔍</span>
-          <input
-            value={searchQ}
-            onChange={e => { setSearchQ(e.target.value); setSearchOpen(true); if (!e.target.value) setSearchOpen(false); }}
-            onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
-            placeholder="Search a city, street or place worldwide…"
-            className="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground py-1 min-w-0"
-          />
-          {searchQ && (
-            <button onClick={() => { setSearchQ(""); setSearchOpen(false); }} className="shrink-0 h-5 w-5 rounded-full bg-muted text-muted-foreground text-xs flex items-center justify-center hover:bg-secondary transition-colors">✕</button>
-          )}
-          {searchLoading && <span className="text-[11px] text-muted-foreground animate-pulse shrink-0">···</span>}
-          <button onClick={handleLocate} disabled={locating}
-            className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary transition-colors disabled:opacity-60">
-            {locating ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" /> : "📍"}
-            <span className="hidden sm:inline">{locating ? "Locating…" : "My location"}</span>
-          </button>
-        </div>
-        {searchOpen && searchResults.length > 0 && (
-          <div className="absolute left-0 right-0 mt-2 rounded-2xl border border-border bg-white shadow-float overflow-hidden z-10">
-            {searchResults.map((p, i) => (
-              <button key={`${p.lat}-${p.lon}-${i}`}
-                onClick={() => {
-                  const L2 = (window as any).L;
-                  if (mapRef.current && L2) {
-                    mapRef.current.flyTo([p.lat, p.lon], 14, { duration: 0.8 });
-                    if (searchPinRef.current) { searchPinRef.current.remove(); searchPinRef.current = null; }
-                    searchPinRef.current = L2.circleMarker([p.lat, p.lon], {
-                      radius: 6, fillColor: "#3b82f6", color: "#fff", weight: 2, fillOpacity: 1, interactive: false,
-                    }).addTo(mapRef.current);
-                    searchPinRef.current.bindTooltip(p.name, { permanent: true, direction: "top", className: "lk-place-label" });
-                    searchPinRef.current.openTooltip();
-                  }
-                  setSearchOpen(false); setSearchQ(p.name);
-                }}
-                className="w-full text-left px-4 py-2.5 hover:bg-secondary flex items-start gap-3 border-b border-border/60 last:border-b-0 transition-colors">
-                <span className="text-primary mt-0.5 shrink-0">📍</span>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-foreground truncate">{p.name}</div>
-                  <div className="text-xs text-muted-foreground truncate">{p.context}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Layer switcher — right side */}
       <div className="absolute right-4 top-20 z-[500] flex flex-col gap-1 rounded-2xl border border-border bg-white/95 shadow-float backdrop-blur p-1">
@@ -867,6 +780,17 @@ export function HomePage() {
 
   const [showFilters, setShowFilters] = useState(false);
   const [showFeed, setShowFeed] = useState(true);
+  const [locating, setLocating] = useState(false);
+
+  function handleLocate() {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => { setFlyTo([pos.coords.latitude, pos.coords.longitude]); setLocating(false); },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
+  }
 
   const [reportFlowOpen, setReportFlowOpen] = useState(false);
   const [heroSearch, setHeroSearch] = useState("");
@@ -1064,7 +988,7 @@ export function HomePage() {
           />
 
           {/* Floating toggle buttons — always visible */}
-          <div className="pointer-events-none absolute left-4 top-4 z-[450] flex flex-col gap-2">
+          <div className="pointer-events-none absolute left-4 top-4 z-[450] flex flex-row gap-2">
             <button
               onClick={() => setShowFilters(v => !v)}
               className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-border bg-white/95 px-3 py-1.5 text-xs font-semibold text-foreground shadow-float backdrop-blur hover:bg-white"
@@ -1076,6 +1000,11 @@ export function HomePage() {
                   {(3 - activeSeverities.size) + (activeCategory ? 1 : 0)}
                 </span>
               )}
+            </button>
+            <button onClick={handleLocate} disabled={locating}
+              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-border bg-white/95 px-3 py-1.5 text-xs font-semibold text-foreground shadow-float backdrop-blur hover:bg-white disabled:opacity-60">
+              {locating ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" /> : "📍"}
+              <span className="hidden sm:inline">{locating ? "Locating…" : "My location"}</span>
             </button>
           </div>
 
