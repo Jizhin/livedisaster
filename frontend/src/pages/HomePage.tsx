@@ -777,7 +777,7 @@ function MarkerBubble({ report, x, y, onClose }: { report: Report; x: number; y:
 
       {/* Bubble card — positioned above the marker click point */}
       <div
-        style={{ position: "fixed", left: x, top: y, transform: "translate(-50%, -100%)" }}
+        style={{ position: "absolute", left: x, top: y, transform: "translate(-50%, -100%)" }}
         className="z-[9000] w-[300px] max-w-[calc(100vw-2rem)] float-in"
         onClick={e => e.stopPropagation()}
       >
@@ -1188,16 +1188,15 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
         ))}
       </div>
 
-      {/* Marker bubble popup — screen coords = outerRef.getBoundingClientRect() + latLngToContainerPoint */}
-      {markerPopup && mapRef.current && outerRef.current && (() => {
+      {/* Marker bubble popup — absolute within outerRef, coords from latLngToContainerPoint */}
+      {markerPopup && mapRef.current && (() => {
         void mapTick;
         const pt = mapRef.current.latLngToContainerPoint([markerPopup.lat, markerPopup.lon]);
-        const rect = outerRef.current.getBoundingClientRect();
         return (
           <MarkerBubble
             report={markerPopup.report}
-            x={Math.round(rect.left + pt.x)}
-            y={Math.round(rect.top + pt.y) - 10}
+            x={Math.round(pt.x) + 1}
+            y={Math.round(pt.y) - 9}
             onClose={() => setMarkerPopup(null)}
           />
         );
