@@ -1197,7 +1197,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
           <MarkerBubble
             report={markerPopup.report}
             x={Math.round(rect.left + pt.x)}
-            y={Math.round(rect.top + pt.y) - 38}
+            y={Math.round(rect.top + pt.y) - 10}
             onClose={() => setMarkerPopup(null)}
           />
         );
