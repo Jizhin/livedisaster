@@ -554,58 +554,130 @@ function IncidentCard({ report, compact = false, flash = false, onSelect }: {
   const { t } = useLanguage();
   const sev = SEV[report.severity];
   const cat = catMeta(report.category);
-  return (
-    <article
-      onClick={onSelect}
-      className={`group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-float ${flash ? "ring-2 ring-primary/30" : ""}`}
-    >
-      {report.image_url && !compact && (
-        <div className="relative h-36 w-full overflow-hidden">
-          <img src={report.image_url} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-          <div className="absolute left-3 top-3">
-            <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold bg-white/95 backdrop-blur ${sev.chip}`}>
-              <span className={`inline-block h-1.5 w-1.5 rounded-full mr-1 ${sev.dot}`} />{sev.label}
-            </span>
+  const [imgErr, setImgErr] = useState(false);
+
+  if (compact) {
+    return (
+      <article onClick={onSelect}
+        className={`cursor-pointer overflow-hidden rounded-xl border border-border bg-card p-3 hover:bg-secondary/50 transition-colors ${flash ? "ring-2 ring-primary/30" : ""}`}>
+        <div className="flex items-start gap-2">
+          <div className={`h-8 w-8 rounded-lg grid place-items-center shrink-0 text-lg ${sev.chip}`}>{cat.emoji}</div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${sev.text}`}>{sev.label}</span>
+              <span className="ml-auto text-[10px] text-muted-foreground shrink-0">{formatReportTime(report.created_at)}</span>
+            </div>
+            <p className="mt-0.5 text-xs text-foreground line-clamp-2 leading-snug">{report.message}</p>
+            <p className="mt-1 text-[10px] text-muted-foreground truncate">📍 {report.place ? `${report.place} · ${report.district}` : report.district}</p>
           </div>
         </div>
-      )}
-      <div className={compact ? "p-3" : "p-4"}>
+      </article>
+    );
+  }
+
+  return (
+    <article onClick={onSelect}
+      className={`group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-float flex flex-col h-full ${flash ? "ring-2 ring-primary/30" : ""}`}>
+
+      {/* Fixed-height image area — always present so all cards are the same size */}
+      <div className="relative h-36 w-full overflow-hidden shrink-0">
+        {report.image_url && !imgErr ? (
+          <img src={report.image_url} alt="" onError={() => setImgErr(true)}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        ) : (
+          <div className={`h-full w-full flex items-center justify-center text-5xl select-none ${sev.chip}`}>
+            {cat.emoji}
+          </div>
+        )}
+        <div className="absolute left-3 top-3">
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold bg-white/95 backdrop-blur ${sev.chip}`}>
+            <span className={`inline-block h-1.5 w-1.5 rounded-full mr-1 ${sev.dot}`} />{sev.label}
+          </span>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex flex-col flex-1 p-4">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {(compact || !report.image_url) && (
-            <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold flex items-center gap-1 ${sev.chip}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${sev.dot}`} />{sev.label}
-            </span>
-          )}
           <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">
             {cat.emoji} {t[cat.labelKey as keyof typeof t] as string}
           </span>
           <span className="ml-auto text-[11px] text-muted-foreground shrink-0">{formatReportTime(report.created_at)}</span>
         </div>
-        <p className={`mt-2 text-sm leading-relaxed text-foreground ${compact ? "line-clamp-2" : "line-clamp-3"}`}>{report.message}</p>
+        <p className="mt-2 text-sm leading-relaxed text-foreground line-clamp-3 flex-1">{report.message}</p>
         <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
           <MapPin className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">{report.place ? `${report.place} · ${report.district}` : report.district}</span>
         </div>
-        {!compact && (
-          <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <img
-                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${report.id}`}
-                alt=""
-                className="h-7 w-7 shrink-0 rounded-full border border-border bg-secondary object-cover"
-              />
-              <div className="min-w-0">
-                <div className="truncate text-xs font-semibold text-foreground">Community member</div>
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Verified</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground">
-              <span className="inline-flex items-center gap-1"><ThumbsUp className="h-3 w-3 text-emerald-500" />0</span>
-              <span className="inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-blue-500" />0</span>
-              <span className="inline-flex items-center gap-1"><MessageSquare className="h-3 w-3" />0</span>
+        <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${report.id}`} alt=""
+              className="h-7 w-7 shrink-0 rounded-full border border-border bg-secondary object-cover" />
+            <div className="min-w-0">
+              <div className="truncate text-xs font-semibold text-foreground">Community member</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Verified</div>
             </div>
           </div>
-        )}
+          <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1"><ThumbsUp className="h-3 w-3 text-emerald-500" />0</span>
+            <span className="inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-blue-500" />0</span>
+            <span className="inline-flex items-center gap-1"><MessageSquare className="h-3 w-3" />0</span>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+/* ─── All Reports Modal ──────────────────────────────────────── */
+function AllReportsModal({ reports, onClose, onSelect }: { reports: Report[]; onClose: () => void; onSelect: (r: Report) => void }) {
+  return (
+    <div className="fixed inset-0 z-[8500] flex items-center justify-center bg-foreground/40 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="relative flex w-full max-w-3xl max-h-[82dvh] flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-float float-in" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-border/60 px-6 py-4 shrink-0">
+          <h2 className="font-display text-lg font-bold text-foreground">All reports <span className="text-muted-foreground font-normal text-base">({reports.length})</span></h2>
+          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-secondary text-muted-foreground hover:bg-border transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="overflow-y-auto p-4">
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {reports.map(r => (
+              <IncidentCard key={r.id} report={r} compact onSelect={() => { onSelect(r); onClose(); }} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── GDACS Alert Card ───────────────────────────────────────── */
+function GDACSAlertCard({ event }: { event: TickerEvent }) {
+  const sevMap: Record<string, typeof SEV[keyof typeof SEV]> = { red: SEV.critical, orange: SEV.warn, green: SEV.safe, info: SEV.safe };
+  const sev = sevMap[event.alert] ?? SEV.warn;
+  return (
+    <article className="relative overflow-hidden rounded-2xl border border-border bg-card p-4 hover:shadow-soft transition-shadow">
+      <div className={`absolute inset-y-0 left-0 w-1.5 rounded-l-2xl ${sev.bar}`} />
+      <div className="pl-3 flex items-start gap-3">
+        <div className={`h-9 w-9 rounded-xl grid place-items-center shrink-0 text-xl ${sev.chip}`}>{event.emoji}</div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2">{event.title}</h3>
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap ${sev.chip}`}>GDACS</span>
+          </div>
+          {event.location && (
+            <div className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+              <span>📍</span><span className="truncate">{event.location}</span>
+            </div>
+          )}
+          {event.url && (
+            <a href={event.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+              className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary hover:underline">
+              View details →
+            </a>
+          )}
+        </div>
       </div>
     </article>
   );
@@ -1185,8 +1257,10 @@ export function HomePage() {
   useKeepAlive();
   const { reports, status, waking, flashId, refresh } = useLiveReports(50);
   const { alerts, status: alertStatus } = useKeralaAlerts();
+  const gdacsAlerts = useGDACS();
 
   const [activeSeverities, setActiveSeverities] = useState<Set<Severity>>(() => new Set(["critical", "warn", "safe"] as Severity[]));
+  const [showAllReports, setShowAllReports] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [flyTo, setFlyTo] = useState<[number, number] | null>(null);
   const [mapResetView, setMapResetView] = useState(0);
@@ -1484,7 +1558,7 @@ export function HomePage() {
             </button>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-stretch">
             {filteredReports.slice(0, 6).map(r => (
               <IncidentCard key={r.id} report={r} flash={flashId === r.id} onSelect={() => setDetailReport(r)} />
             ))}
@@ -1492,7 +1566,8 @@ export function HomePage() {
         )}
         {filteredReports.length > 6 && (
           <div className="mt-6 text-center">
-            <button className="rounded-full border border-border bg-white/70 backdrop-blur px-6 py-2.5 text-sm font-medium text-foreground hover:bg-secondary transition-colors">
+            <button onClick={() => setShowAllReports(true)}
+              className="rounded-full border border-border bg-white/70 backdrop-blur px-6 py-2.5 text-sm font-medium text-foreground hover:bg-secondary transition-colors">
               View all {filteredReports.length} reports
             </button>
           </div>
@@ -1503,18 +1578,21 @@ export function HomePage() {
       {/* ── ALERTS ───────────────────────────────────────────── */}
       <section id="alerts" className="mx-auto w-full max-w-[1400px] px-4 pb-12 md:px-6">
         <h2 className="font-display text-2xl font-bold text-foreground md:text-3xl">Official alerts</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Verified advisories from NDMA, IMD and district authorities.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Verified advisories from NDMA, IMD, GDACS and district authorities.</p>
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           {alertStatus === "loading" ? (
             [1,2,3,4].map(i => <div key={i} className="h-28 rounded-2xl bg-secondary animate-pulse" />)
-          ) : alerts.length === 0 ? (
+          ) : alerts.length === 0 && gdacsAlerts.length === 0 ? (
             <div className="col-span-2 rounded-2xl border border-border bg-card py-12 text-center">
               <p className="text-3xl mb-2">✅</p>
               <p className="font-semibold text-foreground">No active official alerts</p>
               <p className="text-sm text-muted-foreground mt-1">All official advisory feeds are clear right now</p>
             </div>
           ) : (
-            alerts.map(a => <AlertCard key={a.id} alert={a} />)
+            <>
+              {alerts.map(a => <AlertCard key={a.id} alert={a} />)}
+              {gdacsAlerts.map(e => <GDACSAlertCard key={e.id} event={e} />)}
+            </>
           )}
         </div>
       </section>
@@ -1573,6 +1651,7 @@ export function HomePage() {
         />
       )}
       {detailReport && <StandaloneDetailModal report={detailReport} onClose={() => setDetailReport(null)} />}
+      {showAllReports && <AllReportsModal reports={filteredReports} onClose={() => setShowAllReports(false)} onSelect={r => setDetailReport(r)} />}
       {loadingPhase !== "hidden" && <LoadingScreen fading={loadingPhase === "fading"} waking={waking} />}
     </div>
   );
