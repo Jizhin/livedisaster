@@ -84,8 +84,7 @@ const TILE_LAYERS = {
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     sub: null, maxZ: 18, attr: "Tiles © Esri | © OpenStreetMap", label: "Satellite", icon: "🛰",
-    // CartoDB labels-only layer — comprehensive local names, roads, POIs
-    labels: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png",
+    labels: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
   },
 } as const;
 type TileKey = keyof typeof TILE_LAYERS;
@@ -539,12 +538,10 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
       scrollWheelZoom: false, worldCopyJump: true,
     });
 
-    const cfg = TILE_LAYERS.satellite;
-    tileRef.current = L.tileLayer(cfg.url, {
-      subdomains: cfg.sub ?? [], maxZoom: cfg.maxZ, attribution: cfg.attr,
-    }).addTo(map);
-    // Labels overlay for initial satellite view
-    labelsRef.current = L.tileLayer(cfg.labels!, { subdomains: "abcd", maxZoom: cfg.maxZ, opacity: 1 }).addTo(map);
+    // Dedicated pane for labels — always above base tiles, transparent to pointer events
+    map.createPane("labelsPane");
+    map.getPane("labelsPane").style.zIndex = "650";
+    map.getPane("labelsPane").style.pointerEvents = "none";
 
     L.control.attribution({ prefix: false, position: "bottomright" }).addTo(map);
 
@@ -569,20 +566,20 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     };
   }, []);
 
-  // Tile layer switch
+  // Tile layer switch (also runs on initial render to set up the first tile)
   useEffect(() => {
     const L = (window as any).L;
-    if (!mapRef.current || !tileRef.current || !L) return;
-    // Remove old base + labels
-    tileRef.current.remove();
+    if (!mapRef.current || !L) return;
+    if (tileRef.current) { tileRef.current.remove(); tileRef.current = null; }
     if (labelsRef.current) { labelsRef.current.remove(); labelsRef.current = null; }
     const cfg = TILE_LAYERS[activeLayer];
     tileRef.current = L.tileLayer(cfg.url, {
       subdomains: cfg.sub ?? [], maxZoom: cfg.maxZ, attribution: cfg.attr,
     }).addTo(mapRef.current);
-    // Add place-name labels on top for satellite
     if (cfg.labels) {
-      labelsRef.current = L.tileLayer(cfg.labels, { subdomains: "abcd", maxZoom: cfg.maxZ, opacity: 1 }).addTo(mapRef.current);
+      labelsRef.current = L.tileLayer(cfg.labels, {
+        pane: "labelsPane", maxZoom: 19, opacity: 1,
+      }).addTo(mapRef.current);
     }
   }, [activeLayer]);
 
@@ -893,20 +890,20 @@ export function HomePage() {
       {waking && loadingPhase === "hidden" && <ConnectingBanner />}
 
       {/* ── HERO ────────────────────────────────────────────── */}
-      <section className="mx-auto w-full max-w-[1400px] px-4 pt-10 pb-8">
+      <section className="mx-auto w-full max-w-[1400px] px-4 pt-6 pb-4">
         <div className="grid gap-10 md:grid-cols-[1.1fr_0.9fr]">
           {/* Left */}
           <div className="float-in flex flex-col gap-6">
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-border bg-white/70 px-3 py-1.5 text-xs font-semibold shadow-soft backdrop-blur">
               ✨ <span className="text-muted-foreground">{reports.length > 0 ? `${reports.length} live reports worldwide` : "Community powered disaster watch"}</span>
             </div>
-            <h1 className="font-display text-4xl font-bold leading-[1.05] md:text-5xl xl:text-6xl text-foreground">
+            <h1 className="font-display text-2xl font-bold leading-tight md:text-3xl text-foreground">
               What's happening{" "}
               <span className="bg-gradient-to-r from-primary via-sky-500 to-accent bg-clip-text text-transparent">
                 near you, right now?
               </span>
             </h1>
-            <p className="max-w-lg text-base text-muted-foreground md:text-lg leading-relaxed">
+            <p className="max-w-lg text-sm text-muted-foreground md:text-base leading-relaxed">
               See something on the road, in your area, or near home? Tell the world. Your report helps someone nearby make a better decision.
             </p>
             <div className="flex flex-wrap gap-3">
