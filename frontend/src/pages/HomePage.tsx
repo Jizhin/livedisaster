@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLanguage } from "../i18n/LanguageContext";
+import {
+  Camera, MessageCircle, ArrowRight, Filter, X,
+  ThumbsUp, CheckCircle2, MessageSquare, ShieldAlert, MapPin,
+} from "lucide-react";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 type Severity = "safe" | "warn" | "critical";
@@ -375,8 +379,8 @@ function SiteNav({ onReport, reportsCount, status }: {
             </svg>
           </div>
           <div className="leading-tight">
-            <div className="font-display font-bold text-base text-foreground">DisasterWatch</div>
-            <div className="hidden sm:block text-[10px] uppercase tracking-widest text-muted-foreground">Crowdsourced disaster watch</div>
+            <div className="font-display font-bold text-base tracking-tight text-foreground">LiveKerala</div>
+            <div className="hidden sm:block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Crowdsourced disaster watch</div>
           </div>
         </a>
 
@@ -439,20 +443,27 @@ function IncidentCard({ report, compact = false, flash = false, onSelect }: {
           <span className="ml-auto text-[11px] text-muted-foreground shrink-0">{formatReportTime(report.created_at)}</span>
         </div>
         <p className={`mt-2 text-sm leading-relaxed text-foreground ${compact ? "line-clamp-2" : "line-clamp-3"}`}>{report.message}</p>
-        <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-          <span className="shrink-0">📍</span>
-          <span className="truncate">{report.place ? `${report.place}, ${report.district}` : report.district}</span>
+        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <MapPin className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{report.place ? `${report.place} · ${report.district}` : report.district}</span>
         </div>
         {!compact && (
-          <div className="mt-3 border-t border-border pt-3 flex items-center gap-2">
-            <div className="h-7 w-7 rounded-full bg-secondary grid place-items-center text-[11px] font-bold text-muted-foreground shrink-0">
-              {String(report.id).slice(-2)}
+          <div className="mt-3 flex items-center justify-between border-t border-border/70 pt-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <img
+                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${report.id}`}
+                alt=""
+                className="h-7 w-7 shrink-0 rounded-full border border-border bg-secondary object-cover"
+              />
+              <div className="min-w-0">
+                <div className="truncate text-xs font-semibold text-foreground">Community member</div>
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Verified</div>
+              </div>
             </div>
-            <span className="text-xs font-semibold text-foreground truncate">Community member</span>
-            <div className="ml-auto flex items-center gap-3 text-[11px] text-muted-foreground">
-              <span className="text-emerald-600">👍 0</span>
-              <span className="text-blue-600">✓ 0</span>
-              <span>💬 0</span>
+            <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1"><ThumbsUp className="h-3 w-3 text-emerald-500" />0</span>
+              <span className="inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-blue-500" />0</span>
+              <span className="inline-flex items-center gap-1"><MessageSquare className="h-3 w-3" />0</span>
             </div>
           </div>
         )}
@@ -469,7 +480,7 @@ function AlertCard({ alert }: { alert: OfficialAlert }) {
       <div className={`absolute inset-y-0 left-0 w-1.5 rounded-l-2xl ${sev.bar}`} />
       <div className="pl-3 flex items-start gap-3">
         <div className={`h-9 w-9 rounded-xl grid place-items-center shrink-0 ${sev.chip}`}>
-          <span className="text-base">⚠️</span>
+          <ShieldAlert className="h-4 w-4" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
@@ -812,6 +823,9 @@ export function HomePage() {
   const [flyTo, setFlyTo] = useState<[number, number] | null>(null);
   const [mapResetView, setMapResetView] = useState(0);
 
+  const [showFilters, setShowFilters] = useState(false);
+  const [showFeed, setShowFeed] = useState(true);
+
   const [reportFlowOpen, setReportFlowOpen] = useState(false);
   const [mapPickPlace, setMapPickPlace] = useState<Place | null>(null);
   const [mapPickLoading, setMapPickLoading] = useState(false);
@@ -890,173 +904,72 @@ export function HomePage() {
       {waking && loadingPhase === "hidden" && <ConnectingBanner />}
 
       {/* ── HERO ────────────────────────────────────────────── */}
-      <section className="mx-auto w-full max-w-[1400px] px-4 pt-6 pb-4">
-        <div className="grid gap-10 md:grid-cols-[1.1fr_0.9fr]">
-          {/* Left */}
-          <div className="float-in flex flex-col gap-6">
-            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-border bg-white/70 px-3 py-1.5 text-xs font-semibold shadow-soft backdrop-blur">
-              ✨ <span className="text-muted-foreground">{reports.length > 0 ? `${reports.length} live reports worldwide` : "Community powered disaster watch"}</span>
+      <section className="relative mx-auto w-full max-w-[860px] px-4 pt-8 pb-4 md:px-6 md:pt-12 text-center">
+        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-white/70 px-3 py-1 text-[11px] font-medium text-foreground shadow-soft backdrop-blur">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          {reports.length > 0 ? `${reports.length} live reports worldwide` : "Community powered disaster watch"}
+        </div>
+
+        <h1 className="mx-auto mt-3 max-w-2xl font-display text-3xl font-bold leading-[1.05] tracking-tight text-foreground md:text-5xl">
+          See something?{" "}
+          <span className="bg-gradient-to-r from-primary via-sky-500 to-accent bg-clip-text text-transparent">
+            Tell your neighbors.
+          </span>
+        </h1>
+        <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground md:text-base">
+          A flood, a power cut, a tremor — share it in 10 seconds. We map it live.
+        </p>
+
+        {/* Compact report bar + quick chips */}
+        <div className="mx-auto mt-5 max-w-xl">
+          <div className="flex items-center gap-2 rounded-2xl border border-border bg-white p-1.5 shadow-float focus-within:ring-2 focus-within:ring-primary/40">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-secondary text-primary">
+              <MessageCircle className="h-4 w-4" />
             </div>
-            <h1 className="font-display text-2xl font-bold leading-tight md:text-3xl text-foreground">
-              What's happening{" "}
-              <span className="bg-gradient-to-r from-primary via-sky-500 to-accent bg-clip-text text-transparent">
-                near you, right now?
-              </span>
-            </h1>
-            <p className="max-w-lg text-sm text-muted-foreground md:text-base leading-relaxed">
-              See something on the road, in your area, or near home? Tell the world. Your report helps someone nearby make a better decision.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <button onClick={() => setReportFlowOpen(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-foreground text-background px-5 py-3 text-sm font-semibold shadow-soft hover:opacity-90 transition-opacity">
-                📷 Share what you see
-              </button>
-              <a href="#map" className="inline-flex items-center gap-2 rounded-full border border-border bg-white/70 backdrop-blur px-5 py-3 text-sm font-semibold text-foreground hover:bg-secondary transition-colors">
-                🗺 Explore the live map
-              </a>
-            </div>
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-3 max-w-md">
-              {[
-                { n: stats.active, label: "Active alerts" },
-                { n: stats.critical, label: "Critical now" },
-                { n: stats.today, label: "Today" },
-              ].map(({ n, label }) => (
-                <div key={label} className="rounded-2xl border border-border bg-white/70 p-3 backdrop-blur text-center">
-                  <div className="font-display text-2xl font-bold text-foreground tabular-nums">{n}</div>
-                  <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mt-0.5">{label}</div>
-                </div>
-              ))}
-            </div>
+            <input
+              type="text"
+              placeholder="What's happening near you?"
+              readOnly
+              onClick={() => setReportFlowOpen(true)}
+              className="min-w-0 flex-1 cursor-pointer bg-transparent px-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+            />
+            <button
+              onClick={() => setReportFlowOpen(true)}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-foreground px-3 py-2 text-xs font-semibold text-background hover:bg-foreground/90 sm:px-4 sm:text-sm"
+            >
+              <Camera className="h-4 w-4" /> <span className="hidden sm:inline">Report</span>
+            </button>
           </div>
 
-          {/* Right — live card */}
-          <div className="hidden md:block relative">
-            <div aria-hidden className="absolute inset-0 rounded-3xl bg-gradient-to-br from-sky-200/60 via-white to-accent/40 blur-2xl" />
-            <div className="relative rounded-3xl border border-border bg-white/70 p-4 shadow-float backdrop-blur">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-[11px] font-bold text-success">
-                  <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" /> LIVE FEED
-                </span>
-                <span className="text-[11px] text-muted-foreground">latest updates</span>
-              </div>
-              <div className="space-y-2">
-                {status !== "live" ? (
-                  <div className="space-y-2">
-                    {[1,2,3].map(i => (
-                      <div key={i} className="rounded-2xl border border-border bg-card/60 p-3 animate-pulse">
-                        <div className="flex gap-2 mb-2"><div className="h-4 w-14 rounded-full bg-secondary" /><div className="h-4 w-10 rounded-full bg-secondary" /></div>
-                        <div className="h-3 bg-secondary rounded w-full mb-1" />
-                        <div className="h-3 bg-secondary rounded w-2/3" />
-                      </div>
-                    ))}
-                  </div>
-                ) : reports.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-muted-foreground">No reports yet</div>
-                ) : (
-                  reports.slice(0, 3).map(r => (
-                    <IncidentCard key={r.id} report={r} compact flash={flashId === r.id} onSelect={() => setDetailReport(r)} />
-                  ))
-                )}
-              </div>
-            </div>
+          <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
+            {["🌊 Flood", "⚡ Power cut", "🔥 Fire", "🌪 Storm", "🚧 Road", "🩺 Medical"].map((tag) => (
+              <button
+                key={tag}
+                onClick={() => setReportFlowOpen(true)}
+                className="rounded-full border border-border bg-white px-2.5 py-0.5 text-[11px] font-medium text-foreground transition hover:border-foreground hover:bg-foreground hover:text-background"
+              >
+                {tag}
+              </button>
+            ))}
+            <a href="#map" className="ml-1 inline-flex items-center gap-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground">
+              or explore map <ArrowRight className="h-3 w-3" />
+            </a>
           </div>
+        </div>
+
+        {/* Inline stats */}
+        <div className="mx-auto mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
+          <span><span className="font-semibold text-foreground">{stats.active}</span> active alerts</span>
+          <span className="hidden h-1 w-1 rounded-full bg-border sm:inline-block" />
+          <span><span className="font-semibold text-foreground">{stats.today}</span> today's reports</span>
+          <span className="hidden h-1 w-1 rounded-full bg-border sm:inline-block" />
+          <span><span className="font-semibold text-foreground">{reports.length}</span> contributors</span>
         </div>
       </section>
 
       {/* ── MAP ─────────────────────────────────────────────── */}
-      <section id="map" className="mx-auto w-full max-w-[1400px] px-4 pb-12">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-2xl font-bold text-foreground">Live map</h2>
-          <span className="text-sm text-muted-foreground">{filteredReports.filter(r => r.lat).length} incidents plotted</span>
-        </div>
+      <section id="map" className="mx-auto w-full max-w-[1400px] px-4 pb-10 md:px-6">
         <div className="relative h-[640px] w-full overflow-visible">
-          {/* Left floating filter panel — compact */}
-          <div className="absolute left-3 top-20 z-[450]">
-            <div className="rounded-xl border border-border bg-white/95 p-3 shadow-float backdrop-blur w-[200px]">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Filters</span>
-                <button onClick={resetFilters} className="text-[10px] font-semibold text-primary hover:underline">Reset</button>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {(["critical","warn","safe"] as Severity[]).map(s => {
-                  const sv = SEV[s];
-                  return (
-                    <button key={s} onClick={() => toggleSeverity(s)}
-                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-all ${activeSeverities.has(s) ? sv.chip : "border-border/60 text-muted-foreground/60 bg-transparent"}`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${sv.dot}`} />{sv.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {categories.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <button onClick={() => setActiveCategory(null)}
-                    className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-all ${!activeCategory ? "bg-foreground text-background border-foreground" : "border-border/60 text-muted-foreground/60"}`}>
-                    All
-                  </button>
-                  {categories.map(c => {
-                    const cm = catMeta(c);
-                    return (
-                      <button key={c} onClick={() => setActiveCategory(activeCategory === c ? null : c)}
-                        className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-all ${activeCategory === c ? "bg-foreground text-background border-foreground" : "border-border/60 text-muted-foreground/60"}`}>
-                        {cm.emoji} {c}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              <p className="mt-2 text-[10px] text-muted-foreground">{filteredReports.length}/{reports.length} reports</p>
-            </div>
-          </div>
-
-          {/* Right floating live updates panel — compact */}
-          <div className="absolute right-3 top-20 z-[450] hidden lg:flex w-[220px] flex-col max-h-[380px] rounded-xl border border-border bg-white/95 shadow-float backdrop-blur overflow-hidden">
-            <div className="px-3 py-2 border-b border-border flex items-center gap-1.5 shrink-0">
-              <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-              <span className="text-[10px] font-bold text-success">LIVE</span>
-              <span className="text-[10px] font-semibold text-foreground ml-1">Updates</span>
-              <span className="ml-auto text-[10px] text-muted-foreground">{filteredReports.length}</span>
-            </div>
-            <div className="overflow-y-auto no-scrollbar flex-1">
-              {status !== "live" && filteredReports.length === 0 && (
-                <div className="p-2 space-y-1.5">
-                  {[1,2,3].map(i => (
-                    <div key={i} className="flex gap-1.5 p-1 animate-pulse">
-                      <div className="flex-1 space-y-1 pt-0.5">
-                        <div className="h-2 bg-secondary rounded w-2/3" />
-                        <div className="h-2 bg-secondary rounded w-full" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {filteredReports.slice(0, 20).map(r => (
-                <button key={r.id} onClick={() => {
-                  setDetailReport(r);
-                  if (r.lat && r.lon) setFlyTo([r.lat, r.lon]);
-                }} className={`w-full text-left px-3 py-2 border-b border-border/50 hover:bg-secondary/50 transition-colors ${flashId === r.id ? "bg-primary/5" : ""}`}>
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${SEV[r.severity].dot}`} />
-                    <span className="text-[10px] font-bold text-muted-foreground truncate">{r.district}</span>
-                    <span className="text-[9px] text-muted-foreground ml-auto shrink-0">{formatReportTime(r.created_at)}</span>
-                  </div>
-                  <p className="text-[11px] text-foreground line-clamp-2 leading-snug">{r.message}</p>
-                </button>
-              ))}
-              {filteredReports.length === 0 && status === "live" && (
-                <div className="p-4 text-center text-[11px] text-muted-foreground">No incidents</div>
-              )}
-            </div>
-          </div>
-
-          {mapPickLoading && (
-            <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-[500] flex items-center gap-2 rounded-full bg-card border border-border px-4 py-2 text-sm font-semibold shadow-float">
-              <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              Finding location…
-            </div>
-          )}
-
           <LiveMap
             reports={filteredReports}
             flyTo={flyTo}
@@ -1065,19 +978,158 @@ export function HomePage() {
             onSelectReport={r => setDetailReport(r)}
             pickReset={mapPickReset}
           />
+
+          {/* Floating toggle buttons — always visible */}
+          <div className="pointer-events-none absolute left-4 top-4 z-[450] flex flex-col gap-2">
+            <button
+              onClick={() => setShowFilters(v => !v)}
+              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-border bg-white/95 px-3 py-1.5 text-xs font-semibold text-foreground shadow-float backdrop-blur hover:bg-white"
+            >
+              <Filter className="h-3.5 w-3.5 text-primary" />
+              Filters
+              {(activeSeverities.size < 3 || activeCategory) && (
+                <span className="ml-0.5 rounded-full bg-foreground px-1.5 text-[10px] text-background">
+                  {(3 - activeSeverities.size) + (activeCategory ? 1 : 0)}
+                </span>
+              )}
+            </button>
+          </div>
+
+          <div className="pointer-events-none absolute right-4 top-4 z-[450] flex flex-col items-end gap-2">
+            <button
+              onClick={() => setShowFeed(v => !v)}
+              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-border bg-white/95 px-3 py-1.5 text-xs font-semibold text-foreground shadow-float backdrop-blur hover:bg-white"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live updates
+              <span className="ml-0.5 rounded-full bg-foreground px-1.5 text-[10px] text-background">
+                {filteredReports.length}
+              </span>
+            </button>
+          </div>
+
+          {/* Floating FILTERS card — left */}
+          {showFilters && (
+            <aside className="pointer-events-none absolute left-4 top-16 z-[450] w-[min(280px,calc(100%-2rem))]">
+              <div className="pointer-events-auto rounded-2xl border border-border bg-white/95 p-3 shadow-float backdrop-blur">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs font-semibold text-foreground">Filters</span>
+                  {(activeSeverities.size < 3 || activeCategory) && (
+                    <button onClick={resetFilters} className="ml-auto text-[11px] font-medium text-primary hover:underline">Reset</button>
+                  )}
+                  <button onClick={() => setShowFilters(false)} className="rounded-full p-1 text-muted-foreground hover:bg-secondary">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div className="mt-2.5">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Severity</div>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {(["critical","warn","safe"] as Severity[]).map(s => {
+                      const sv = SEV[s];
+                      return (
+                        <button key={s} onClick={() => toggleSeverity(s)}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition ${activeSeverities.has(s) ? "border-foreground bg-foreground text-background" : "border-border bg-white text-foreground hover:bg-secondary"}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${sv.dot}`} />{sv.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {categories.length > 0 && (
+                  <div className="mt-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Category</div>
+                    <div className="mt-1.5 flex max-h-24 flex-wrap gap-1 overflow-y-auto">
+                      <button onClick={() => setActiveCategory(null)}
+                        className={`rounded-full border px-2 py-0.5 text-[11px] font-medium transition ${!activeCategory ? "border-foreground bg-foreground text-background" : "border-border bg-white text-foreground hover:bg-secondary"}`}>
+                        All
+                      </button>
+                      {categories.map(c => {
+                        const cm = catMeta(c);
+                        return (
+                          <button key={c} onClick={() => setActiveCategory(activeCategory === c ? null : c)}
+                            className={`rounded-full border px-2 py-0.5 text-[11px] font-medium transition ${activeCategory === c ? "border-foreground bg-foreground text-background" : "border-border bg-white text-foreground hover:bg-secondary"}`}>
+                            {cm.emoji} {c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <div className="mt-3 text-[10px] text-muted-foreground">
+                  Showing <span className="font-semibold text-foreground">{filteredReports.length}</span> of {reports.length}.
+                </div>
+              </div>
+            </aside>
+          )}
+
+          {/* Floating LIVE UPDATES card — right */}
+          {showFeed && (
+            <aside className="pointer-events-none absolute right-4 top-16 z-[450] hidden w-[300px] md:block">
+              <div className="pointer-events-auto flex max-h-[440px] flex-col overflow-hidden rounded-2xl border border-border bg-white/95 shadow-float backdrop-blur">
+                <div className="flex items-center justify-between border-b border-border/70 px-3 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-xs font-semibold text-foreground">Live updates</span>
+                    <span className="text-[10px] text-muted-foreground">· {filteredReports.length}</span>
+                  </div>
+                  <button onClick={() => setShowFeed(false)} className="rounded-full p-1 text-muted-foreground hover:bg-secondary">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div className="flex-1 space-y-2 overflow-y-auto p-2.5">
+                  {status !== "live" && filteredReports.length === 0 ? (
+                    <div className="space-y-1.5 p-1 animate-pulse">
+                      {[1,2,3].map(i => <div key={i} className="h-16 bg-secondary rounded-xl" />)}
+                    </div>
+                  ) : filteredReports.length === 0 ? (
+                    <div className="py-8 text-center text-[11px] text-muted-foreground">No incidents match these filters.</div>
+                  ) : filteredReports.slice(0, 20).map(r => (
+                    <article key={r.id} onClick={() => {
+                      setDetailReport(r);
+                      if (r.lat && r.lon) setFlyTo([r.lat, r.lon]);
+                    }} className={`cursor-pointer rounded-xl border border-border/80 p-2 transition hover:bg-secondary/50 ${flashId === r.id ? "bg-primary/5" : ""}`}>
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${r.id}`}
+                          alt=""
+                          className="h-7 w-7 rounded-full border border-border bg-secondary"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[11px] font-semibold text-foreground">Community member</div>
+                          <div className="truncate text-[10px] text-muted-foreground">{r.district}{r.place ? ` · ${r.place}` : ""}</div>
+                        </div>
+                        <span className="shrink-0 text-[10px] text-muted-foreground">{formatReportTime(r.created_at)}</span>
+                      </div>
+                      <p className="mt-1.5 text-[11px] leading-relaxed text-foreground/90 line-clamp-2">{r.message}</p>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </aside>
+          )}
+
+          {mapPickLoading && (
+            <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-[500] flex items-center gap-2 rounded-full bg-card border border-border px-4 py-2 text-sm font-semibold shadow-float">
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              Finding location…
+            </div>
+          )}
         </div>
-        <p className="mt-3 text-center text-xs text-muted-foreground">Click anywhere on the map to report an incident</p>
       </section>
 
       {/* ── FEED GRID ────────────────────────────────────────── */}
-      <section id="feed" className="mx-auto w-full max-w-[1400px] px-4 pb-12">
-        <div className="mb-6 flex items-end justify-between">
+      <section id="feed" className="mx-auto w-full max-w-[1400px] px-4 py-10 md:px-6">
+        <div className="flex items-end justify-between">
           <div>
-            <h2 className="font-display text-2xl font-bold text-foreground">Latest from the community</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Real-time crowdsourced reports from around the world</p>
+            <h2 className="font-display text-2xl font-bold text-foreground md:text-3xl">Latest from the community</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Verified by neighbors, sourced from the field.</p>
           </div>
-          <button onClick={refresh} className="text-xs font-medium text-primary hover:underline">↻ Refresh</button>
+          <a href="#map" className="hidden text-sm font-medium text-primary hover:underline md:inline-flex md:items-center md:gap-1">
+            See on map <ArrowRight className="h-4 w-4" />
+          </a>
         </div>
+        <div className="mt-5">
         {status !== "live" ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[1,2,3,4,5,6].map(i => (
@@ -1116,69 +1168,64 @@ export function HomePage() {
             </button>
           </div>
         )}
+        </div>
       </section>
 
       {/* ── ALERTS ───────────────────────────────────────────── */}
-      <section id="alerts" className="mx-auto w-full max-w-[1400px] px-4 pb-12">
-        <div className="mb-6">
-          <h2 className="font-display text-2xl font-bold text-foreground">Official alerts</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Verified advisories from NDMA, IMD and district authorities</p>
+      <section id="alerts" className="mx-auto w-full max-w-[1400px] px-4 pb-12 md:px-6">
+        <h2 className="font-display text-2xl font-bold text-foreground md:text-3xl">Official alerts</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Verified advisories from NDMA, IMD and district authorities.</p>
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          {alertStatus === "loading" ? (
+            [1,2,3,4].map(i => <div key={i} className="h-28 rounded-2xl bg-secondary animate-pulse" />)
+          ) : alerts.length === 0 ? (
+            <div className="col-span-2 rounded-2xl border border-border bg-card py-12 text-center">
+              <p className="text-3xl mb-2">✅</p>
+              <p className="font-semibold text-foreground">No active official alerts</p>
+              <p className="text-sm text-muted-foreground mt-1">All official advisory feeds are clear right now</p>
+            </div>
+          ) : (
+            alerts.map(a => <AlertCard key={a.id} alert={a} />)
+          )}
         </div>
-        {alertStatus === "loading" ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            {[1,2,3,4].map(i => <div key={i} className="h-28 rounded-2xl bg-secondary animate-pulse" />)}
-          </div>
-        ) : alerts.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-card py-12 text-center">
-            <p className="text-3xl mb-2">✅</p>
-            <p className="font-semibold text-foreground">No active official alerts</p>
-            <p className="text-sm text-muted-foreground mt-1">All official advisory feeds are clear right now</p>
-          </div>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {alerts.map(a => <AlertCard key={a.id} alert={a} />)}
-          </div>
-        )}
       </section>
 
       {/* ── HOW IT WORKS ─────────────────────────────────────── */}
-      <section id="how" className="mx-auto w-full max-w-[1400px] px-4 pb-14">
-        <div className="rounded-[28px] bg-gradient-to-br from-sky-100 via-white to-peach/60 p-6 md:p-10 border border-border">
-          <div className="mb-8 text-center">
-            <h2 className="font-display text-2xl font-bold text-foreground md:text-3xl">
-              Built for small towns and the whole world.
-            </h2>
-            <p className="mt-2 text-muted-foreground max-w-lg mx-auto">Anyone, anywhere can report and verify incidents in real time — no account needed.</p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
+      <section id="how" className="mx-auto w-full max-w-[1400px] px-4 pb-20 md:px-6">
+        <div className="rounded-[28px] bg-gradient-to-br from-sky-100 via-white to-accent/60 p-6 md:p-10">
+          <h2 className="font-display text-2xl font-bold text-foreground md:text-3xl">
+            Built for small towns and the whole world.
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground md:text-base">
+            Three simple steps. No app to download, no account required.
+          </p>
+          <div className="mt-7 grid gap-4 md:grid-cols-3">
             {[
-              { icon: "📷", n: "1", title: "Spot it", desc: "See something? Tap the Report button, drop a pin, and describe what you see. Takes under 30 seconds." },
-              { icon: "👥", n: "2", title: "Neighbors verify", desc: "Others nearby confirm or challenge your post. The more votes, the more reliable the signal." },
-              { icon: "📢", n: "3", title: "The world sees it", desc: "Your report appears on the live map instantly. Emergency teams and travelers can act on it right away." },
-            ].map(s => (
-              <div key={s.n} className="rounded-2xl border border-white/70 bg-white/80 p-5 backdrop-blur">
-                <div className="h-10 w-10 rounded-xl bg-foreground text-background grid place-items-center text-xl mb-4 shadow-soft">
-                  {s.icon}
+              { Icon: Camera, t: "1. Spot it", d: "See a flooded road, fallen tree, power outage? Snap a photo and drop a pin." },
+              { Icon: CheckCircle2, t: "2. Neighbors verify", d: "People nearby confirm, dispute, or add context. Truth surfaces fast." },
+              { Icon: MessageSquare, t: "3. The world sees", d: "Verified reports appear on the live map and reach responders in seconds." },
+            ].map(({ Icon, t: title, d }) => (
+              <div key={title} className="rounded-2xl border border-white/70 bg-white/80 p-5 backdrop-blur">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-foreground text-background">
+                  <Icon className="h-5 w-5" />
                 </div>
-                <h3 className="font-display text-base font-bold text-foreground">{s.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
+                <h3 className="mt-4 font-display text-lg font-semibold text-foreground">{title}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{d}</p>
               </div>
             ))}
           </div>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-6 border-t border-border/60 pt-6">
-            {[["🛡","Community verified"],["🌐","Works worldwide"],["💬","Free and open"]].map(([icon,text]) => (
-              <span key={text} className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <span className="text-base">{icon}</span>{text}
-              </span>
-            ))}
+          <div className="mt-8 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5"><ShieldAlert className="h-3.5 w-3.5 text-emerald-500" /> Community verified</span>
+            <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-primary" /> Works worldwide</span>
+            <span className="inline-flex items-center gap-1.5"><MessageCircle className="h-3.5 w-3.5 text-accent-foreground" /> Free and open</span>
           </div>
         </div>
       </section>
 
       {/* ── FOOTER ───────────────────────────────────────────── */}
-      <footer className="border-t border-border bg-white/60 py-8 backdrop-blur mt-auto">
-        <div className="mx-auto flex w-full max-w-[1400px] flex-col items-center justify-between gap-2 px-4 text-sm text-muted-foreground sm:flex-row">
-          <span>© 2026 DisasterWatch</span>
+      <footer className="border-t border-border bg-white/60 py-8 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-[1400px] flex-col items-center justify-between gap-3 px-6 text-xs text-muted-foreground md:flex-row">
+          <span>© {new Date().getFullYear()} LiveKerala — A crowdsourced safety map.</span>
           <span>Made for neighbors, everywhere.</span>
         </div>
       </footer>
