@@ -553,7 +553,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
 
     // Dedicated pane for labels — always above base tiles, transparent to pointer events
     map.createPane("labelsPane");
-    map.getPane("labelsPane").style.zIndex = "650";
+    map.getPane("labelsPane").style.zIndex = "450";
     map.getPane("labelsPane").style.pointerEvents = "none";
 
     L.control.attribution({ prefix: false, position: "bottomright" }).addTo(map);
@@ -591,14 +591,16 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
       subdomains: cfg.sub ?? [], maxZoom: cfg.maxZ, attribution: cfg.attr,
       detectRetina: true,
     }).addTo(mapRef.current);
-    // Satellite: stack Esri Transportation (roads) + Esri Boundaries+Places (labels)
+    // Satellite hybrid: roads (Esri) + place names (Esri) + dense local labels (CartoDB OSM)
     if (activeLayer === "satellite") {
-      [
-        "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
-        "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
-      ].forEach(url => {
+      const hybridLayers = [
+        { url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}", sub: null },
+        { url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", sub: null },
+        { url: "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png", sub: "abcd" },
+      ];
+      hybridLayers.forEach(({ url, sub }) => {
         labelsRef.current.push(
-          L.tileLayer(url, { pane: "labelsPane", maxZoom: 19, opacity: 1 }).addTo(mapRef.current)
+          L.tileLayer(url, { pane: "labelsPane", maxZoom: 19, opacity: 1, ...(sub ? { subdomains: sub } : {}) }).addTo(mapRef.current)
         );
       });
     } else if (cfg.labels) {
