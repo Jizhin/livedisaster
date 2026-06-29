@@ -552,8 +552,14 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
       const { lat, lng } = e.latlng;
       if (pendingPinRef.current) { pendingPinRef.current.remove(); pendingPinRef.current = null; }
       const L2 = (window as any).L;
-      pendingPinRef.current = L2.circleMarker([lat, lng], {
-        radius: 10, fillColor: "#3b82f6", color: "#fff", weight: 3, fillOpacity: 0.9,
+      pendingPinRef.current = L2.marker([lat, lng], {
+        icon: L2.divIcon({
+          className: "",
+          html: `<div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;transform:translateX(-50%)"><div style="background:#1e293b;color:#fff;border-radius:20px;padding:5px 12px;font:700 12px/1.5 'Manrope',sans-serif;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.25)">📍 Report here</div><div style="width:2px;height:8px;background:#1e293b"></div><div style="width:8px;height:8px;background:#1e293b;border-radius:50%"></div></div>`,
+          iconSize: [0, 0], iconAnchor: [0, 0],
+        }),
+        interactive: false,
+        zIndexOffset: 1000,
       }).addTo(map);
       onMapPickRef.current(lat, lng);
     });
@@ -652,12 +658,16 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     if (pendingPinRef.current) { pendingPinRef.current.remove(); pendingPinRef.current = null; }
   }, [pickReset]);
 
-  // show resolved place name above the picked map pin
+  // update "Report here" marker with resolved place name
   useEffect(() => {
     if (!pickedLabel || !pendingPinRef.current) return;
-    try { pendingPinRef.current.unbindTooltip(); } catch {}
-    pendingPinRef.current.bindTooltip(pickedLabel, { permanent: true, direction: "top", className: "lk-place-label" });
-    pendingPinRef.current.openTooltip();
+    try {
+      const el = pendingPinRef.current.getElement?.();
+      if (el) {
+        const label = el.querySelector("div > div:first-child") as HTMLElement | null;
+        if (label) label.textContent = `📍 ${pickedLabel}`;
+      }
+    } catch {}
   }, [pickedLabel]);
 
   // flyTo
@@ -892,7 +902,7 @@ export function HomePage() {
       {waking && loadingPhase === "hidden" && <ConnectingBanner />}
 
       {/* ── HERO ────────────────────────────────────────────── */}
-      <section className="relative mx-auto w-full max-w-[860px] px-4 pt-8 pb-4 md:px-6 md:pt-12 text-center">
+      <section className="relative z-10 mx-auto w-full max-w-[860px] px-4 pt-8 pb-4 md:px-6 md:pt-12 text-center">
         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-white/70 px-3 py-1 text-[11px] font-medium text-foreground shadow-soft backdrop-blur">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
           {reports.length > 0 ? `${reports.length} live reports worldwide` : "Community powered disaster watch"}
@@ -908,30 +918,24 @@ export function HomePage() {
           A flood, a power cut, a tremor — share it in 10 seconds. We map it live.
         </p>
 
-        {/* Search bar + report CTA */}
+        {/* Search bar */}
         <div ref={heroSearchRef} className="relative mx-auto mt-5 max-w-xl">
-          <div className="flex items-center gap-2 rounded-2xl border border-border bg-white p-1.5 shadow-float focus-within:ring-2 focus-within:ring-primary/40">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-secondary text-primary">
-              {heroLoading
-                ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                : <Search className="h-4 w-4" />}
-            </div>
+          <div className="flex items-center gap-2 rounded-full border border-border bg-white px-4 py-2.5 shadow-float focus-within:ring-2 focus-within:ring-primary/40">
+            {heroLoading
+              ? <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              : <Search className="h-4 w-4 shrink-0 text-muted-foreground" />}
             <input
               type="text"
               value={heroSearch}
               onChange={e => { setHeroSearch(e.target.value); setHeroSearchOpen(!!e.target.value); }}
               onFocus={() => heroResults.length > 0 && setHeroSearchOpen(true)}
-              placeholder="Search a place or area on the map…"
-              className="min-w-0 flex-1 bg-transparent px-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+              placeholder="Search a place or area…"
+              className="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
             />
             {heroSearch && (
               <button onClick={() => { setHeroSearch(""); setHeroSearchOpen(false); }}
                 className="h-5 w-5 shrink-0 rounded-full bg-muted text-muted-foreground text-xs flex items-center justify-center hover:bg-secondary">✕</button>
             )}
-            <button onClick={openReportFlow}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-foreground px-3 py-2 text-xs font-semibold text-background hover:bg-foreground/90 sm:px-4 sm:text-sm">
-              <Camera className="h-4 w-4" /> <span className="hidden sm:inline">Report</span>
-            </button>
           </div>
           {heroSearchOpen && heroResults.length > 0 && (
             <div className="absolute left-0 right-0 mt-2 rounded-2xl border border-border bg-white shadow-float overflow-hidden z-50">
