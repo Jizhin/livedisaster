@@ -110,7 +110,7 @@ const SEV = {
 };
 
 const TILE_LAYERS = {
-  streets:   { url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", sub: "abc", maxZ: 19, attr: "© OpenStreetMap contributors", label: "Map", icon: "🗺", labels: null },
+  streets:   { url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", sub: "abcd", maxZ: 20, attr: "© OpenStreetMap contributors © CARTO", label: "Map", icon: "🗺", labels: null },
   terrain:   { url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",                        sub: "abc",  maxZ: 17, attr: "© OpenStreetMap, SRTM | OpenTopoMap (CC-BY-SA)", label: "Terrain",   icon: "⛰", labels: null },
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -925,18 +925,8 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
         )}
       </div>
 
-      {/* Layer switcher — horizontal pill above zoom, bottom-right */}
-      <div className="absolute right-4 bottom-32 z-[500] flex flex-row gap-0.5 rounded-full border border-border bg-white/95 shadow-float backdrop-blur p-0.5">
-        {(Object.keys(TILE_LAYERS) as TileKey[]).map(key => (
-          <button key={key} onClick={() => setActiveLayer(key)} title={TILE_LAYERS[key].label}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${activeLayer === key ? "bg-foreground text-background" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
-            <span className="text-sm">{TILE_LAYERS[key].icon}</span>
-            <span className="hidden md:inline">{TILE_LAYERS[key].label}</span>
-          </button>
-        ))}
-      </div>
 
-      {/* Legend — bottom left */}
+{/* Legend — bottom left */}
       <div className="hidden md:flex absolute bottom-4 left-4 z-[500] items-center gap-3 rounded-full border border-border bg-white/95 shadow-soft backdrop-blur px-4 py-2 text-[11px]">
         <span className="text-muted-foreground">🗂</span>
         {([["critical","#ef4444","Critical"],["warn","#f59e0b","Warning"],["safe","#10b981","Safe"]] as const).map(([,color,label]) => (
@@ -1149,6 +1139,16 @@ export function HomePage() {
                 </span>
               )}
             </button>
+            {/* Layer switcher — inline with Filters */}
+            <div className="pointer-events-auto flex flex-row gap-0.5 rounded-full border border-border bg-white/95 shadow-float backdrop-blur p-0.5">
+              {(Object.keys(TILE_LAYERS) as TileKey[]).map(key => (
+                <button key={key} onClick={() => setActiveLayer(key)} title={TILE_LAYERS[key].label}
+                  className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${activeLayer === key ? "bg-foreground text-background" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+                  <span className="text-xs">{TILE_LAYERS[key].icon}</span>
+                  <span className="hidden sm:inline">{TILE_LAYERS[key].label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="pointer-events-none absolute right-4 top-4 z-[450] flex flex-col items-end gap-2">
@@ -1593,13 +1593,155 @@ function ReportFormStep({ place, onBack, onClose, onReported, initialMessage }: 
 
 /* ─── Standalone Detail Modal ────────────────────────────────── */
 function StandaloneDetailModal({ report, onClose }: { report: Report; onClose: () => void }) {
+  const { t } = useLanguage();
+  const { data, loading } = useReportDetail(report.id);
+  const [localCounts, setLocalCounts] = useState<{ confirmed: number; incorrect: number; resolved: number } | null>(null);
+  const [voted, setVoted] = useState<string | null>(null);
+  const [comments, setComments] = useState<ApiComment[]>([]);
+  const [showComments, setShowComments] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [posting, setPosting] = useState(false);
+  const [imgExpanded, setImgExpanded] = useState(false);
+  const anonName = useRef(`user_${Math.random().toString(36).slice(2, 8)}`);
+  const sev = SEV[report.severity];
+  const cat = catMeta(report.category);
+  const imgUrl = data?.images?.[0]?.file_path ? `${UPLOADS_ORIGIN}/uploads/${data.images[0].file_path}` : report.image_url;
+
+  useEffect(() => {
+    if (data) {
+      setLocalCounts({ confirmed: data.confirmed_count ?? 0, incorrect: data.incorrect_count ?? 0, resolved: data.resolved_count ?? 0 });
+      setComments(data.comments ?? []);
+    }
+  }, [data]);
+
+  async function vote(kind: "confirm" | "incorrect" | "resolved") {
+    if (voted) return;
+    setVoted(kind);
+    setLocalCounts(c => c ? { ...c, [kind === "confirm" ? "confirmed" : kind]: (c[kind === "confirm" ? "confirmed" : kind as "incorrect" | "resolved"]) + 1 } : c);
+    await fetch(`${API_BASE}/reports/${report.id}/verifications`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, voter_name: null }),
+    }).catch(() => {});
+  }
+
+  async function submitComment(e: React.FormEvent) {
+    e.preventDefault();
+    const text = commentText.trim();
+    if (!text) return;
+    setPosting(true);
+    try {
+      const res = await fetch(`${API_BASE}/reports/${report.id}/comments`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ author_name: anonName.current, content: text }),
+      });
+      if (res.ok) {
+        setComments(prev => [...prev, { id: Date.now(), author_name: anonName.current, content: text, created_at: new Date().toISOString() }]);
+        setCommentText("");
+      }
+    } finally { setPosting(false); }
+  }
+
   return (
-    <div className="fixed inset-0 z-[9000] flex items-center justify-center bg-foreground/40 backdrop-blur-sm p-4" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()}
-        className="relative flex max-h-[min(640px,calc(100dvh-2rem))] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-float">
-        <ReportDetailPanel report={report} onBack={onClose} />
+    <>
+      {imgExpanded && imgUrl && (
+        <div className="fixed inset-0 z-[9500] flex items-center justify-center bg-black/90 p-4" onClick={() => setImgExpanded(false)}>
+          <img src={imgUrl} alt="" className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl" />
+          <button onClick={() => setImgExpanded(false)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/20 text-white hover:bg-white/30">✕</button>
+        </div>
+      )}
+
+      {/* Compact map popup card — bottom-left, no backdrop */}
+      <div className="fixed bottom-4 left-4 z-[9000] w-[340px] max-w-[calc(100vw-2rem)] float-in">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-float">
+          {/* Severity bar */}
+          <div className={`h-1 w-full ${sev.bar}`} />
+
+          {/* Image strip */}
+          {imgUrl && (
+            <button onClick={() => setImgExpanded(true)} className="block w-full overflow-hidden h-28 bg-secondary">
+              <img src={imgUrl} alt="" className="w-full h-full object-cover hover:brightness-90 transition" />
+            </button>
+          )}
+
+          {/* Header */}
+          <div className="flex items-start gap-2 px-4 pt-3 pb-1">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${sev.text}`}>{sev.label}</span>
+                <span className="text-muted-foreground/50 text-[10px]">·</span>
+                <span className="text-[10px] font-medium text-muted-foreground">{cat.emoji} {t[cat.labelKey as keyof typeof t] as string}</span>
+                <span className="text-muted-foreground/50 text-[10px]">·</span>
+                <span className="text-[10px] text-muted-foreground">{formatReportTime(report.created_at)}</span>
+              </div>
+              <h3 className="font-display text-sm font-bold text-foreground mt-0.5 leading-snug">
+                {report.place ? `${report.place} · ${report.district}` : report.district}
+              </h3>
+            </div>
+            <button onClick={onClose}
+              className="shrink-0 grid h-7 w-7 place-items-center rounded-full bg-secondary text-muted-foreground hover:bg-border transition-colors">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Message */}
+          <div className="px-4 pt-1 pb-3 border-b border-border/60">
+            <p className="text-sm leading-relaxed text-foreground">{report.message}</p>
+          </div>
+
+          {/* Vote row */}
+          <div className="flex border-b border-border/60">
+            {loading ? (
+              <div className="flex-1 h-10 animate-pulse bg-secondary/50" />
+            ) : localCounts ? (
+              <>
+                {([
+                  { kind: "confirm" as const, icon: "👍", count: localCounts.confirmed, active: "bg-emerald-50 text-emerald-700" },
+                  { kind: "incorrect" as const, icon: "👎", count: localCounts.incorrect, active: "bg-red-50 text-red-700" },
+                  { kind: "resolved" as const, icon: "✓", count: localCounts.resolved, active: "bg-blue-50 text-blue-700" },
+                  { kind: null, icon: "👁", count: data?.views_count ?? 0, active: "" },
+                ] as const).map(({ kind, icon, count, active }) => (
+                  <button key={String(kind)} onClick={() => kind && vote(kind)} disabled={!kind || !!voted}
+                    className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-bold border-r border-border/40 last:border-r-0 transition-colors disabled:cursor-default ${voted === kind ? active : !kind ? "text-muted-foreground/60" : "text-muted-foreground hover:bg-secondary"}`}>
+                    <span className="text-sm leading-none">{icon}</span>
+                    <span>{count}</span>
+                    {voted === kind && <span className="text-[9px] text-success">✓ voted</span>}
+                  </button>
+                ))}
+              </>
+            ) : null}
+          </div>
+
+          {/* Comment input + toggle */}
+          <div className="px-3 py-2">
+            <form onSubmit={submitComment} className="flex items-center gap-2">
+              <input value={commentText} onChange={e => setCommentText(e.target.value)}
+                placeholder="Add a note…"
+                className="flex-1 min-w-0 rounded-full border border-border bg-secondary px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/25"
+              />
+              <button type="submit" disabled={posting || !commentText.trim()}
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-foreground text-background hover:opacity-90 disabled:opacity-30 transition-opacity">
+                {posting ? <span className="text-[10px]">…</span> : <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>}
+              </button>
+            </form>
+            {comments.length > 0 && (
+              <button onClick={() => setShowComments(v => !v)} className="mt-1.5 text-[10px] font-medium text-primary hover:underline">
+                {showComments ? "Hide comments" : `${comments.length} comment${comments.length !== 1 ? "s" : ""}`}
+              </button>
+            )}
+            {showComments && (
+              <div className="mt-2 space-y-1 max-h-28 overflow-y-auto">
+                {comments.map(c => (
+                  <div key={c.id} className="rounded-lg bg-secondary px-3 py-2">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-primary">{c.author_name}</p>
+                    <p className="text-[11px] leading-snug text-foreground mt-0.5">{c.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
