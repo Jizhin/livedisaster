@@ -1422,7 +1422,6 @@ export function HomePage() {
                     <div className="py-6 text-center text-[10px] text-muted-foreground">No incidents match filters.</div>
                   ) : filteredReports.slice(0, 20).map(r => (
                     <article key={r.id} onClick={() => {
-                      setDetailReport(r);
                       if (r.lat && r.lon) setFlyTo([r.lat, r.lon]);
                     }} className={`cursor-pointer rounded-lg border border-border/60 p-1.5 transition hover:bg-secondary/50 ${flashId === r.id ? "bg-primary/5" : ""}`}>
                       <div className="flex items-center gap-1.5">
