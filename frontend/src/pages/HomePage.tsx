@@ -350,36 +350,40 @@ function useKeralaAlerts() {
 function LiveTicker() {
   const gdacs = useGDACS();
   const nasa = useNASAEONET();
+  const [paused, setPaused] = useState(false);
+
   const all = [...gdacs, ...nasa];
   if (all.length === 0) return null;
 
-  const items = [...all, ...all]; // duplicate for seamless infinite loop
+  const items = [...all, ...all];
   const dur = Math.max(80, all.length * 8);
 
   return (
-    <div className="mt-5 w-full overflow-hidden rounded-xl border border-border bg-white/70 backdrop-blur shadow-soft">
-      <div className="flex items-stretch h-10">
-        {/* Fixed "LIVE" pill */}
-        <div className="shrink-0 flex items-center gap-1.5 border-r border-border bg-foreground px-3 rounded-l-xl">
+    <div className="w-full overflow-hidden border-y border-border/60 bg-white/60 backdrop-blur-sm">
+      <div className="flex items-stretch h-10"
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}>
+        {/* Fixed "LIVE" label */}
+        <div className="shrink-0 flex items-center gap-1.5 border-r border-border bg-foreground px-4">
           <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse" />
           <span className="text-[10px] font-bold uppercase tracking-wider text-background whitespace-nowrap">Live</span>
         </div>
 
         {/* Scrolling strip */}
         <div className="relative flex-1 overflow-hidden">
-          <div className="pointer-events-none absolute left-0 inset-y-0 w-10 z-10"
-            style={{ background: "linear-gradient(to right, rgba(255,255,255,0.8), transparent)" }} />
-          <div className="pointer-events-none absolute right-0 inset-y-0 w-10 z-10"
-            style={{ background: "linear-gradient(to left, rgba(255,255,255,0.8), transparent)" }} />
+          <div className="pointer-events-none absolute left-0 inset-y-0 w-12 z-10"
+            style={{ background: "linear-gradient(to right, rgba(255,255,255,0.7), transparent)" }} />
+          <div className="pointer-events-none absolute right-0 inset-y-0 w-12 z-10"
+            style={{ background: "linear-gradient(to left, rgba(255,255,255,0.7), transparent)" }} />
 
           <div className="flex items-center h-full"
-            style={{ animation: `lk-ticker ${dur}s linear infinite`, width: "max-content" }}>
+            style={{ animation: `lk-ticker ${dur}s linear infinite`, animationPlayState: paused ? "paused" : "running", width: "max-content" }}>
             {items.map((ev, i) => (
               <div key={`${ev.id}-${i}`}
-                className="flex shrink-0 items-center gap-2 px-4 h-full border-r border-border/25">
+                className="flex shrink-0 items-center gap-2 px-5 h-full border-r border-border/20">
                 <span className="text-sm leading-none">{ev.emoji}</span>
                 <span className="text-[11px] font-semibold text-foreground whitespace-nowrap" title={ev.title}>
-                  {ev.title.length > 50 ? ev.title.slice(0, 50) + "…" : ev.title}
+                  {ev.title.length > 55 ? ev.title.slice(0, 55) + "…" : ev.title}
                 </span>
                 {ev.location && (
                   <span className="text-[11px] text-muted-foreground whitespace-nowrap">· {ev.location}</span>
@@ -647,6 +651,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
   pickReset?: number;
   pickedLabel?: string | null;
 }) {
+  const outerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const layerRef = useRef<any>(null);
@@ -826,6 +831,21 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     mapRef.current.flyTo([15, 30], 3, { duration: 1.2 });
   }, [resetView]);
 
+  // Ctrl+scroll to zoom
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      if (!mapRef.current) return;
+      if (e.deltaY < 0) mapRef.current.zoomIn();
+      else mapRef.current.zoomOut();
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
   // Close search dropdown on outside click
   useEffect(() => {
     function h(e: MouseEvent) {
@@ -860,7 +880,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
   const locatedCount = reports.filter(r => r.lat !== null).length;
 
   return (
-    <div className="relative h-full w-full">
+    <div ref={outerRef} className="relative h-full w-full">
       {/* Map canvas — overflow-hidden clips tiles to rounded border */}
       <div className="absolute inset-0 rounded-2xl overflow-hidden border border-border bg-card shadow-soft">
         <div ref={containerRef} className="absolute inset-0 bg-[#dde7f0]" />
@@ -905,11 +925,11 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
         )}
       </div>
 
-      {/* Layer switcher — right side */}
-      <div className="absolute right-4 top-20 z-[500] flex flex-col gap-1 rounded-2xl border border-border bg-white/95 shadow-float backdrop-blur p-1">
+      {/* Layer switcher — horizontal pill above zoom, bottom-right */}
+      <div className="absolute right-4 bottom-32 z-[500] flex flex-row gap-0.5 rounded-full border border-border bg-white/95 shadow-float backdrop-blur p-0.5">
         {(Object.keys(TILE_LAYERS) as TileKey[]).map(key => (
           <button key={key} onClick={() => setActiveLayer(key)} title={TILE_LAYERS[key].label}
-            className={`flex items-center justify-center gap-1.5 rounded-xl px-2.5 py-2 text-[11px] font-semibold transition-colors ${activeLayer === key ? "bg-primary text-white" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${activeLayer === key ? "bg-foreground text-background" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <span className="text-sm">{TILE_LAYERS[key].icon}</span>
             <span className="hidden md:inline">{TILE_LAYERS[key].label}</span>
           </button>
@@ -1097,8 +1117,10 @@ export function HomePage() {
         <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground md:text-base">
           Real-time disaster awareness, powered by your community. Locals report floods, road closures, and outages — watch it map live before official news reaches you.
         </p>
-        <LiveTicker />
       </section>
+
+      {/* ── LIVE TICKER — full viewport width ───────────────── */}
+      <LiveTicker />
 
       {/* ── MAP ─────────────────────────────────────────────── */}
       <section id="map" className="mx-auto w-full max-w-[1400px] px-4 pb-10 md:px-6">
