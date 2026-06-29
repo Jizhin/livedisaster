@@ -110,7 +110,7 @@ const SEV = {
 };
 
 const TILE_LAYERS = {
-  streets:   { url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", sub: null, maxZ: 20, attr: "Tiles © Esri © OpenStreetMap contributors", label: "Map", icon: "🗺", labels: null },
+  streets:   { url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", sub: null, maxZ: 19, attr: "Tiles © Esri © OpenStreetMap contributors", label: "Map", icon: "🗺", labels: null },
   terrain:   { url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",                        sub: "abc",  maxZ: 17, attr: "© OpenStreetMap, SRTM | OpenTopoMap (CC-BY-SA)", label: "Terrain",   icon: "⛰", labels: null },
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -642,7 +642,7 @@ function AlertCard({ alert }: { alert: OfficialAlert }) {
 }
 
 /* ─── Marker Bubble ─────────────────────────────────────────── */
-function MarkerBubble({ report, cx, cy, onClose }: { report: Report; cx: number; cy: number; onClose: () => void }) {
+function MarkerBubble({ report, x, y, onClose }: { report: Report; x: number; y: number; onClose: () => void }) {
   const { t } = useLanguage();
   const { data, loading } = useReportDetail(report.id);
   const [localCounts, setLocalCounts] = useState<{ confirmed: number; incorrect: number; resolved: number } | null>(null);
@@ -652,6 +652,7 @@ function MarkerBubble({ report, cx, cy, onClose }: { report: Report; cx: number;
   const [commentText, setCommentText] = useState("");
   const [posting, setPosting] = useState(false);
   const [imgExpanded, setImgExpanded] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const anonName = useRef(`user_${Math.random().toString(36).slice(2, 8)}`);
   const sev = SEV[report.severity];
   const cat = catMeta(report.category);
@@ -707,7 +708,7 @@ function MarkerBubble({ report, cx, cy, onClose }: { report: Report; cx: number;
 
       {/* Bubble card — positioned above the marker click point */}
       <div
-        style={{ position: "fixed", left: cx, top: cy, transform: "translate(-50%, calc(-100% - 20px))" }}
+        style={{ position: "absolute", left: x, top: y, transform: "translate(-50%, -100%)" }}
         className="z-[9000] w-[300px] max-w-[calc(100vw-2rem)] float-in"
         onClick={e => e.stopPropagation()}
       >
@@ -716,9 +717,9 @@ function MarkerBubble({ report, cx, cy, onClose }: { report: Report; cx: number;
           <div className={`h-1 w-full ${sev.bar}`} />
 
           {/* Image strip */}
-          {imgUrl && (
+          {imgUrl && !imgError && (
             <button onClick={() => setImgExpanded(true)} className="block w-full overflow-hidden h-24 bg-secondary">
-              <img src={imgUrl} alt="" className="w-full h-full object-cover hover:brightness-90 transition" />
+              <img src={imgUrl} alt="" onError={() => setImgError(true)} className="w-full h-full object-cover hover:brightness-90 transition" />
             </button>
           )}
 
@@ -835,7 +836,8 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
   const [searchQ, setSearchQ] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [markerPopup, setMarkerPopup] = useState<{ report: Report; cx: number; cy: number } | null>(null);
+  const [markerPopup, setMarkerPopup] = useState<{ report: Report; lat: number; lon: number } | null>(null);
+  const [mapTick, setMapTick] = useState(0);
   const { results: searchResults, loading: searchLoading } = usePhotonSearch(searchQ);
 
   // Map init
@@ -860,6 +862,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     mapRef.current = map;
 
     map.on("click", () => { setMarkerPopup(null); });
+    map.on("moveend zoomend", () => setMapTick(t => t + 1));
     map.on("click", (e: any) => {
       if (!onMapPickRef.current) return;
       const { lat, lng } = e.latlng;
@@ -935,9 +938,8 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
         iconSize: [34, 34], iconAnchor: [17, 34], popupAnchor: [0, -32],
       });
       const marker = L.marker([r.lat, r.lon], { icon });
-      marker.on("click", (e: any) => {
-        const orig = e.originalEvent as MouseEvent | undefined;
-        setMarkerPopup({ report: r, cx: orig?.clientX ?? 0, cy: orig?.clientY ?? 0 });
+      marker.on("click", () => {
+        setMarkerPopup({ report: r, lat: r.lat!, lon: r.lon! });
       });
       layerRef.current.addLayer(marker);
     });
@@ -1117,10 +1119,19 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
         ))}
       </div>
 
-      {/* Marker bubble popup */}
-      {markerPopup && (
-        <MarkerBubble report={markerPopup.report} cx={markerPopup.cx} cy={markerPopup.cy} onClose={() => setMarkerPopup(null)} />
-      )}
+      {/* Marker bubble popup — position computed from lat/lon each render (updates on pan/zoom via mapTick) */}
+      {markerPopup && mapRef.current && (() => {
+        void mapTick; // consumed here so re-render fires on map move
+        const pt = mapRef.current.latLngToContainerPoint([markerPopup.lat, markerPopup.lon]);
+        return (
+          <MarkerBubble
+            report={markerPopup.report}
+            x={Math.round(pt.x)}
+            y={Math.round(pt.y) - 38}
+            onClose={() => setMarkerPopup(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
