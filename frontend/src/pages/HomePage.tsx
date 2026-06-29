@@ -1317,7 +1317,7 @@ export function HomePage() {
 
   const [showFilters, setShowFilters] = useState(false);
   const [showFeed, setShowFeed] = useState(true);
-  const [activeLayer, setActiveLayer] = useState<TileKey>("osm");
+  const [activeLayer, setActiveLayer] = useState<TileKey>("streets");
 
   const [reportFlowOpen, setReportFlowOpen] = useState(false);
   const [mapPickPlace, setMapPickPlace] = useState<Place | null>(null);
