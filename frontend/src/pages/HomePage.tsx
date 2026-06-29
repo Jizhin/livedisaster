@@ -655,25 +655,25 @@ function GDACSAlertCard({ event }: { event: TickerEvent }) {
   const sevMap: Record<string, typeof SEV[keyof typeof SEV]> = { red: SEV.critical, orange: SEV.warn, green: SEV.safe, info: SEV.safe };
   const sev = sevMap[event.alert] ?? SEV.warn;
   return (
-    <article className="relative overflow-hidden rounded-2xl border border-border bg-card p-4 hover:shadow-soft transition-shadow">
-      <div className={`absolute inset-y-0 left-0 w-1.5 rounded-l-2xl ${sev.bar}`} />
-      <div className="pl-3 flex items-start gap-3">
-        <div className={`h-9 w-9 rounded-xl grid place-items-center shrink-0 text-xl ${sev.chip}`}>{event.emoji}</div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2">{event.title}</h3>
-            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap ${sev.chip}`}>GDACS</span>
-          </div>
-          {event.location && (
-            <div className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-              <span>📍</span><span className="truncate">{event.location}</span>
-            </div>
-          )}
+    <article className="flex h-[152px] flex-col overflow-hidden rounded-2xl border border-border bg-card transition-shadow hover:shadow-soft">
+      <div className={`h-1 w-full shrink-0 ${sev.bar}`} />
+      <div className="flex flex-1 flex-col gap-2 p-4 min-h-0">
+        <div className="flex items-center gap-2">
+          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${sev.chip}`}>
+            <span className={`inline-block h-1.5 w-1.5 rounded-full mr-1 ${sev.dot}`} />{sev.label}
+          </span>
+          <span className="ml-auto text-[10px] font-bold text-muted-foreground/70 tracking-wider">{event.emoji} GDACS</span>
+        </div>
+        <h3 className="text-sm font-bold text-foreground leading-snug line-clamp-2 flex-1">{event.title}</h3>
+        <div className="flex items-center justify-between gap-2 mt-auto">
+          {event.location ? (
+            <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+              <MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{event.location}</span>
+            </span>
+          ) : <span />}
           {event.url && (
             <a href={event.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-              className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary hover:underline">
-              View details →
-            </a>
+              className="shrink-0 text-[11px] font-semibold text-primary hover:underline">Details →</a>
           )}
         </div>
       </div>
@@ -685,26 +685,26 @@ function GDACSAlertCard({ event }: { event: TickerEvent }) {
 function AlertCard({ alert }: { alert: OfficialAlert }) {
   const sev = SEV[alert.severity] ?? SEV.warn;
   return (
-    <article className="relative overflow-hidden rounded-2xl border border-border bg-card p-4 hover:shadow-soft transition-shadow">
-      <div className={`absolute inset-y-0 left-0 w-1.5 rounded-l-2xl ${sev.bar}`} />
-      <div className="pl-3 flex items-start gap-3">
-        <div className={`h-9 w-9 rounded-xl grid place-items-center shrink-0 ${sev.chip}`}>
-          <ShieldAlert className="h-4 w-4" />
+    <article className="flex h-[152px] flex-col overflow-hidden rounded-2xl border border-border bg-card transition-shadow hover:shadow-soft">
+      <div className={`h-1 w-full shrink-0 ${sev.bar}`} />
+      <div className="flex flex-1 flex-col gap-2 p-4 min-h-0">
+        <div className="flex items-center gap-2">
+          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${sev.chip}`}>
+            <span className={`inline-block h-1.5 w-1.5 rounded-full mr-1 ${sev.dot}`} />{sev.label}
+          </span>
+          <span className="ml-auto text-[10px] text-muted-foreground shrink-0">
+            {alert.effectiveStart ? formatReportTime(alert.effectiveStart) : ""}
+          </span>
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="text-sm font-semibold text-foreground leading-snug">
-              {alert.disasterType} — {alert.severityLabel}
-            </h3>
-            <span className="text-[11px] text-muted-foreground shrink-0">{alert.effectiveStart ? formatReportTime(alert.effectiveStart) : ""}</span>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground line-clamp-3 leading-relaxed">{alert.message || alert.areaDescription}</p>
-          <div className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground">
-            <span>📍</span>
+        <h3 className="text-sm font-bold text-foreground leading-snug line-clamp-2 flex-1">
+          {alert.disasterType}{alert.severityLabel ? ` — ${alert.severityLabel}` : ""}
+        </h3>
+        <div className="flex items-center justify-between gap-2 mt-auto">
+          <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+            <MapPin className="h-3 w-3 shrink-0" />
             <span className="truncate">{alert.district || alert.areaDescription}</span>
-            <span className="mx-1">·</span>
-            <span>{alert.source}</span>
-          </div>
+          </span>
+          <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">{alert.source}</span>
         </div>
       </div>
     </article>
