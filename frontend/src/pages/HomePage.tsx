@@ -752,12 +752,12 @@ function MarkerBubble({ report, cx, cy, onClose }: { report: Report; cx: number;
             {loading ? (
               <div className="flex-1 h-9 animate-pulse bg-secondary/50" />
             ) : localCounts ? (
-              ([
+              (([
                 { kind: "confirm" as const, icon: "👍", count: localCounts.confirmed, active: "bg-emerald-50 text-emerald-700" },
                 { kind: "incorrect" as const, icon: "👎", count: localCounts.incorrect, active: "bg-red-50 text-red-700" },
                 { kind: "resolved" as const, icon: "✓", count: localCounts.resolved, active: "bg-blue-50 text-blue-700" },
-                { kind: null as const, icon: "👁", count: data?.views_count ?? 0, active: "" },
-              ] as const).map(({ kind, icon, count, active }) => (
+                { kind: null, icon: "👁", count: data?.views_count ?? 0, active: "" },
+              ] as Array<{ kind: "confirm" | "incorrect" | "resolved" | null; icon: string; count: number; active: string }>)).map(({ kind, icon, count, active }) => (
                 <button key={String(kind)} onClick={() => kind && vote(kind)} disabled={!kind || !!voted}
                   className={`flex-1 flex flex-col items-center justify-center py-1.5 gap-0.5 text-[10px] font-bold border-r border-border/40 last:border-r-0 transition-colors disabled:cursor-default ${voted === kind ? active : !kind ? "text-muted-foreground/50" : "text-muted-foreground hover:bg-secondary"}`}>
                   <span className="text-sm leading-none">{icon}</span>
@@ -1873,12 +1873,12 @@ function StandaloneDetailModal({ report, onClose }: { report: Report; onClose: (
               <div className="flex-1 h-10 animate-pulse bg-secondary/50" />
             ) : localCounts ? (
               <>
-                {([
+                {(([
                   { kind: "confirm" as const, icon: "👍", count: localCounts.confirmed, active: "bg-emerald-50 text-emerald-700" },
                   { kind: "incorrect" as const, icon: "👎", count: localCounts.incorrect, active: "bg-red-50 text-red-700" },
                   { kind: "resolved" as const, icon: "✓", count: localCounts.resolved, active: "bg-blue-50 text-blue-700" },
                   { kind: null, icon: "👁", count: data?.views_count ?? 0, active: "" },
-                ] as const).map(({ kind, icon, count, active }) => (
+                ] as Array<{ kind: "confirm" | "incorrect" | "resolved" | null; icon: string; count: number; active: string }>)).map(({ kind, icon, count, active }) => (
                   <button key={String(kind)} onClick={() => kind && vote(kind)} disabled={!kind || !!voted}
                     className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] font-bold border-r border-border/40 last:border-r-0 transition-colors disabled:cursor-default ${voted === kind ? active : !kind ? "text-muted-foreground/60" : "text-muted-foreground hover:bg-secondary"}`}>
                     <span className="text-sm leading-none">{icon}</span>
