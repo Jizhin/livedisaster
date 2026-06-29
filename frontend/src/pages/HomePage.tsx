@@ -642,7 +642,7 @@ function AlertCard({ alert }: { alert: OfficialAlert }) {
 }
 
 /* ─── Live Map ──────────────────────────────────────────────── */
-function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickReset, pickedLabel }: {
+function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickReset, pickedLabel, activeLayer, onLayerChange }: {
   reports: Report[];
   flyTo?: [number, number] | null;
   resetView?: number;
@@ -650,6 +650,8 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
   onSelectReport: (r: Report) => void;
   pickReset?: number;
   pickedLabel?: string | null;
+  activeLayer: TileKey;
+  onLayerChange: (k: TileKey) => void;
 }) {
   const outerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -663,7 +665,6 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
   const flyToPrevRef = useRef<[number, number] | null>(null);
   const resetViewPrevRef = useRef(0);
 
-  const [activeLayer, setActiveLayer] = useState<TileKey>("satellite");
   const labelsRef = useRef<any[]>([]);
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const [searchQ, setSearchQ] = useState("");
@@ -1011,6 +1012,7 @@ export function HomePage() {
 
   const [showFilters, setShowFilters] = useState(false);
   const [showFeed, setShowFeed] = useState(true);
+  const [activeLayer, setActiveLayer] = useState<TileKey>("satellite");
 
   const [reportFlowOpen, setReportFlowOpen] = useState(false);
   const [mapPickPlace, setMapPickPlace] = useState<Place | null>(null);
@@ -1123,6 +1125,8 @@ export function HomePage() {
             onSelectReport={r => setDetailReport(r)}
             pickReset={mapPickReset}
             pickedLabel={mapPickPlace?.name ?? null}
+            activeLayer={activeLayer}
+            onLayerChange={setActiveLayer}
           />
 
           {/* Floating toggle buttons — always visible */}
