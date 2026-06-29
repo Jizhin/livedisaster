@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { useLanguage } from "../i18n/LanguageContext";
 import {
@@ -1003,7 +1003,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
 
       const marker = L.marker([r.lat, r.lon], { icon });
 
-      // Native Leaflet popup — Leaflet owns all coordinate math
+      // Create popup container and React root once per marker
       const container = document.createElement("div");
       const root = createRoot(container);
       popupRoots.push(root);
@@ -1018,16 +1018,20 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
         autoPanPaddingBottomRight: L.point(10, 10),
       }).setContent(container);
 
-      marker.bindPopup(leafletPopup);
-
-      marker.on("popupopen", () => {
-        root.render(
-          <MarkerBubble
-            report={r}
-            t={tRef.current}
-            onClose={() => marker.closePopup()}
-          />
-        );
+      marker.on("click", () => {
+        // flushSync renders content synchronously so Leaflet measures
+        // the correct popup height before positioning it
+        flushSync(() => {
+          root.render(
+            <MarkerBubble
+              report={r}
+              t={tRef.current}
+              onClose={() => leafletPopup.close()}
+            />
+          );
+        });
+        // Explicitly set lat/lng and open — no ambiguity about position
+        leafletPopup.setLatLng(marker.getLatLng()).openOn(mapRef.current);
       });
 
       layerRef.current.addLayer(marker);
