@@ -728,7 +728,6 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
       const hybridLayers: { url: string; sub: string | null; opacity: number }[] = [
         { url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}", sub: null, opacity: 1 },
         { url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", sub: null, opacity: 1 },
-        { url: "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png", sub: "abcd", opacity: 1 },
       ];
       hybridLayers.forEach(({ url, sub, opacity }) => {
         labelsRef.current.push(
