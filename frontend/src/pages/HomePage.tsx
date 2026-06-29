@@ -110,7 +110,7 @@ const SEV = {
 };
 
 const TILE_LAYERS = {
-  streets:   { url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", sub: "abcd", maxZ: 20, attr: "© OpenStreetMap contributors © CARTO", label: "Map", icon: "🗺", labels: null },
+  streets:   { url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", sub: null, maxZ: 20, attr: "Tiles © Esri © OpenStreetMap contributors", label: "Map", icon: "🗺", labels: null },
   terrain:   { url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",                        sub: "abc",  maxZ: 17, attr: "© OpenStreetMap, SRTM | OpenTopoMap (CC-BY-SA)", label: "Terrain",   icon: "⛰", labels: null },
   satellite: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -934,24 +934,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
         </div>`,
         iconSize: [34, 34], iconAnchor: [17, 34], popupAnchor: [0, -32],
       });
-      const cat = catMeta(r.category);
-      const popup = L.popup({ maxWidth: 280, minWidth: 240 }).setContent(`
-        <div style="font-family:Manrope,sans-serif;padding:12px;">
-          ${r.image_url ? `<img src="${r.image_url}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;margin-bottom:10px;" />` : ""}
-          <div style="color:${col};font-size:11px;letter-spacing:0.06em;text-transform:uppercase;font-weight:700;margin-bottom:4px;">
-            ${cat.emoji} ${r.category || ""} · ${sc.label}
-          </div>
-          <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:4px;">
-            ${r.district}${r.place ? ` · ${r.place}` : ""}
-          </div>
-          <div style="font-size:12px;color:#475569;line-height:1.5;">
-            ${r.message.length > 120 ? r.message.slice(0, 120) + "…" : r.message}
-          </div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:8px;">${formatReportTime(r.created_at)}</div>
-        </div>
-      `);
       const marker = L.marker([r.lat, r.lon], { icon });
-      marker.bindPopup(popup);
       marker.on("click", (e: any) => {
         const orig = e.originalEvent as MouseEvent | undefined;
         setMarkerPopup({ report: r, cx: orig?.clientX ?? 0, cy: orig?.clientY ?? 0 });
@@ -990,6 +973,7 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     if (!flyTo || !mapRef.current) return;
     if (flyToPrevRef.current?.[0] === flyTo[0] && flyToPrevRef.current?.[1] === flyTo[1]) return;
     flyToPrevRef.current = flyTo;
+    setMarkerPopup(null);
     mapRef.current.flyTo(flyTo, Math.max(mapRef.current.getZoom(), 13), { duration: 0.8 });
   }, [flyTo]);
 
