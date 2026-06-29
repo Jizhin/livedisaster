@@ -61,6 +61,24 @@ type ApiReportDetail = ApiReport & {
   comments?: ApiComment[];
 };
 
+type TickerEvent = {
+  id: string; emoji: string; title: string;
+  location: string | null; alert: "green" | "orange" | "red" | "info";
+  source: "GDACS" | "NASA"; url: string | null;
+};
+type GDACSFeature = {
+  properties: {
+    name?: string; eventtype: string; alertlevel?: string;
+    country?: string; url?: { report?: string };
+  };
+};
+type EONETEvent = {
+  id: string; title: string;
+  categories: { id: string; title: string }[];
+  sources: { id: string; url: string }[];
+  closed: string | null;
+};
+
 /* ─── Constants ─────────────────────────────────────────────── */
 const CATEGORY_META: Record<string, { emoji: string; labelKey: string }> = {
   "Flood":             { emoji: "🌊", labelKey: "catFlood" },
@@ -70,6 +88,15 @@ const CATEGORY_META: Record<string, { emoji: string; labelKey: string }> = {
   "Medical Emergency": { emoji: "🚨", labelKey: "catMedical" },
   "Fire":              { emoji: "🔥", labelKey: "catFire" },
   "Other":             { emoji: "📌", labelKey: "catOther" },
+};
+
+const GDACS_META: Record<string, string> = {
+  EQ: "🌍", TC: "🌀", FL: "🌊", VO: "🌋", DR: "🏜", WF: "🔥",
+};
+const EONET_META: Record<string, string> = {
+  drought: "🏜", dustHaze: "🌫", earthquakes: "🌍", floods: "🌊",
+  landslides: "⛰️", seaLakeIce: "🧊", severeStorms: "🌪", snow: "❄️",
+  tempExtremes: "🌡️", volcanoes: "🌋", waterColor: "💧", wildfires: "🔥",
 };
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8000/api";
@@ -248,6 +275,60 @@ function useKeepAlive() {
   }, []);
 }
 
+function useGDACS(): TickerEvent[] {
+  const [events, setEvents] = useState<TickerEvent[]>([]);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const to = new Date();
+    const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const fmt = (d: Date) => d.toISOString().split("T")[0];
+    fetch(
+      `https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventlist=EQ,TC,FL,VO,DR,WF&alertlevel=Green,Orange,Red&fromDate=${fmt(from)}&toDate=${fmt(to)}`,
+      { signal: ctrl.signal }
+    )
+      .then(r => r.json())
+      .then((d: { features: GDACSFeature[] }) => {
+        setEvents(
+          (d.features ?? []).slice(0, 15).map((f, i) => {
+            const p = f.properties;
+            const alert: TickerEvent["alert"] =
+              p.alertlevel?.toLowerCase() === "red" ? "red" :
+              p.alertlevel?.toLowerCase() === "orange" ? "orange" : "green";
+            return {
+              id: `gdacs-${i}`, emoji: GDACS_META[p.eventtype] ?? "⚠️",
+              title: p.name ?? p.eventtype, location: p.country ?? null,
+              alert, source: "GDACS", url: p.url?.report ?? null,
+            };
+          })
+        );
+      })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, []);
+  return events;
+}
+
+function useNASAEONET(): TickerEvent[] {
+  const [events, setEvents] = useState<TickerEvent[]>([]);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=15", { signal: ctrl.signal })
+      .then(r => r.json())
+      .then((d: { events: EONETEvent[] }) => {
+        setEvents(
+          (d.events ?? []).slice(0, 15).map(e => ({
+            id: e.id, emoji: EONET_META[e.categories?.[0]?.id ?? ""] ?? "🌐",
+            title: e.title, location: null, alert: "info" as const,
+            source: "NASA", url: e.sources?.[0]?.url ?? null,
+          }))
+        );
+      })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, []);
+  return events;
+}
+
 function useKeralaAlerts() {
   const [alerts, setAlerts] = useState<OfficialAlert[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -263,6 +344,60 @@ function useKeralaAlerts() {
     return () => { active = false; clearInterval(id); };
   }, []);
   return { alerts, status };
+}
+
+/* ─── Live Event Ticker ─────────────────────────────────────── */
+function LiveTicker() {
+  const gdacs = useGDACS();
+  const nasa = useNASAEONET();
+  const all = [...gdacs, ...nasa];
+  if (all.length === 0) return null;
+
+  const items = [...all, ...all]; // duplicate for seamless infinite loop
+  const dur = Math.max(24, all.length * 3.5);
+
+  return (
+    <div className="mt-5 w-full overflow-hidden rounded-xl border border-border bg-white/70 backdrop-blur shadow-soft">
+      <div className="flex items-stretch h-10">
+        {/* Fixed "LIVE" pill */}
+        <div className="shrink-0 flex items-center gap-1.5 border-r border-border bg-foreground px-3 rounded-l-xl">
+          <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-background whitespace-nowrap">Live</span>
+        </div>
+
+        {/* Scrolling strip */}
+        <div className="relative flex-1 overflow-hidden">
+          <div className="pointer-events-none absolute left-0 inset-y-0 w-10 z-10"
+            style={{ background: "linear-gradient(to right, rgba(255,255,255,0.8), transparent)" }} />
+          <div className="pointer-events-none absolute right-0 inset-y-0 w-10 z-10"
+            style={{ background: "linear-gradient(to left, rgba(255,255,255,0.8), transparent)" }} />
+
+          <div className="flex items-center h-full"
+            style={{ animation: `lk-ticker ${dur}s linear infinite`, width: "max-content" }}>
+            {items.map((ev, i) => (
+              <div key={`${ev.id}-${i}`}
+                className="flex shrink-0 items-center gap-2 px-4 h-full border-r border-border/25">
+                <span className="text-sm leading-none">{ev.emoji}</span>
+                <span className="text-[11px] font-semibold text-foreground whitespace-nowrap" title={ev.title}>
+                  {ev.title.length > 50 ? ev.title.slice(0, 50) + "…" : ev.title}
+                </span>
+                {ev.location && (
+                  <span className="text-[11px] text-muted-foreground whitespace-nowrap">· {ev.location}</span>
+                )}
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+                  ev.source === "NASA" ? "bg-blue-50 text-blue-700" :
+                  ev.alert === "red"   ? "bg-red-50 text-red-700" :
+                  ev.alert === "orange"? "bg-amber-50 text-amber-700" :
+                                         "bg-emerald-50 text-emerald-700"
+                }`}>{ev.source}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <style>{`@keyframes lk-ticker { from { transform: translateX(0) } to { transform: translateX(-50%) } }`}</style>
+    </div>
+  );
 }
 
 /* ─── Loading Screen ────────────────────────────────────────── */
@@ -964,6 +1099,7 @@ export function HomePage() {
         <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground md:text-base">
           A flood, a power cut, a tremor — share it in 10 seconds. We map it live.
         </p>
+        <LiveTicker />
       </section>
 
       {/* ── MAP ─────────────────────────────────────────────── */}
