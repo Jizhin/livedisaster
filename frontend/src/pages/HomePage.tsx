@@ -726,7 +726,6 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
     // Satellite hybrid: OSM semi-transparent (roads+places) + Esri roads + Esri places + CartoDB labels
     if (activeLayer === "satellite") {
       const hybridLayers: { url: string; sub: string | null; opacity: number }[] = [
-        { url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", sub: "abc", opacity: 0.35 },
         { url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}", sub: null, opacity: 1 },
         { url: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", sub: null, opacity: 1 },
         { url: "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png", sub: "abcd", opacity: 1 },
@@ -869,8 +868,8 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
       </div>
 
       {/* Search bar — centered top, outside overflow-hidden so dropdown isn't clipped */}
-      <div ref={searchBoxRef} className="absolute top-3 left-1/2 z-[600] w-full max-w-[340px] -translate-x-1/2 px-2">
-        <div className="flex items-center gap-1.5 rounded-full border border-border bg-white/95 px-3 py-2 shadow-float backdrop-blur focus-within:ring-2 focus-within:ring-primary/40">
+      <div ref={searchBoxRef} className="absolute top-3 left-1/2 z-[600] w-full max-w-[520px] -translate-x-1/2 px-3">
+        <div className="flex items-center gap-2 rounded-full border border-border bg-white/95 px-4 py-2.5 shadow-float backdrop-blur focus-within:ring-2 focus-within:ring-primary/40">
           {searchLoading
             ? <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             : <Search className="h-4 w-4 shrink-0 text-muted-foreground" />}
@@ -1201,43 +1200,42 @@ export function HomePage() {
 
           {/* Floating LIVE UPDATES card — right */}
           {showFeed && (
-            <aside className="pointer-events-none absolute right-4 top-16 z-[450] hidden w-[300px] md:block">
-              <div className="pointer-events-auto flex max-h-[440px] flex-col overflow-hidden rounded-2xl border border-border bg-white/95 shadow-float backdrop-blur">
-                <div className="flex items-center justify-between border-b border-border/70 px-3 py-2">
-                  <div className="flex items-center gap-1.5">
+            <aside className="pointer-events-none absolute right-4 top-16 z-[450] hidden w-[230px] md:block">
+              <div className="pointer-events-auto flex max-h-[380px] flex-col overflow-hidden rounded-xl border border-border bg-white/95 shadow-float backdrop-blur">
+                <div className="flex items-center justify-between border-b border-border/60 px-2.5 py-1.5">
+                  <div className="flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-xs font-semibold text-foreground">Live updates</span>
+                    <span className="text-[11px] font-semibold text-foreground">Live</span>
                     <span className="text-[10px] text-muted-foreground">· {filteredReports.length}</span>
                   </div>
-                  <button onClick={() => setShowFeed(false)} className="rounded-full p-1 text-muted-foreground hover:bg-secondary">
-                    <X className="h-3.5 w-3.5" />
+                  <button onClick={() => setShowFeed(false)} className="rounded-full p-0.5 text-muted-foreground hover:bg-secondary">
+                    <X className="h-3 w-3" />
                   </button>
                 </div>
-                <div className="flex-1 space-y-2 overflow-y-auto p-2.5">
+                <div className="flex-1 space-y-1 overflow-y-auto p-1.5">
                   {status !== "live" && filteredReports.length === 0 ? (
-                    <div className="space-y-1.5 p-1 animate-pulse">
-                      {[1,2,3].map(i => <div key={i} className="h-16 bg-secondary rounded-xl" />)}
+                    <div className="space-y-1 p-1 animate-pulse">
+                      {[1,2,3].map(i => <div key={i} className="h-12 bg-secondary rounded-lg" />)}
                     </div>
                   ) : filteredReports.length === 0 ? (
-                    <div className="py-8 text-center text-[11px] text-muted-foreground">No incidents match these filters.</div>
+                    <div className="py-6 text-center text-[10px] text-muted-foreground">No incidents match filters.</div>
                   ) : filteredReports.slice(0, 20).map(r => (
                     <article key={r.id} onClick={() => {
                       setDetailReport(r);
                       if (r.lat && r.lon) setFlyTo([r.lat, r.lon]);
-                    }} className={`cursor-pointer rounded-xl border border-border/80 p-2 transition hover:bg-secondary/50 ${flashId === r.id ? "bg-primary/5" : ""}`}>
-                      <div className="flex items-center gap-2">
+                    }} className={`cursor-pointer rounded-lg border border-border/60 p-1.5 transition hover:bg-secondary/50 ${flashId === r.id ? "bg-primary/5" : ""}`}>
+                      <div className="flex items-center gap-1.5">
                         <img
                           src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${r.id}`}
                           alt=""
-                          className="h-7 w-7 rounded-full border border-border bg-secondary"
+                          className="h-6 w-6 shrink-0 rounded-full border border-border bg-secondary"
                         />
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[11px] font-semibold text-foreground">Community member</div>
-                          <div className="truncate text-[10px] text-muted-foreground">{r.district}{r.place ? ` · ${r.place}` : ""}</div>
+                          <div className="truncate text-[10px] font-semibold text-foreground">{r.district}{r.place ? ` · ${r.place}` : ""}</div>
+                          <div className="truncate text-[9px] text-muted-foreground">{formatReportTime(r.created_at)}</div>
                         </div>
-                        <span className="shrink-0 text-[10px] text-muted-foreground">{formatReportTime(r.created_at)}</span>
                       </div>
-                      <p className="mt-1.5 text-[11px] leading-relaxed text-foreground/90 line-clamp-2">{r.message}</p>
+                      <p className="mt-1 text-[10px] leading-snug text-foreground/80 line-clamp-2">{r.message}</p>
                     </article>
                   ))}
                 </div>
