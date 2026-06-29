@@ -919,8 +919,41 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
 
     L.control.attribution({ prefix: false, position: "bottomright" }).addTo(map);
 
-    layerRef.current = L.layerGroup().addTo(map);
+    layerRef.current = L.markerClusterGroup({
+      maxClusterRadius: 60,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      animate: true,
+      animateAddingMarkers: false,
+      removeOutsideVisibleBounds: true,
+      disableClusteringAtZoom: 16,
+      iconCreateFunction: (cluster: any) => {
+        const count = cluster.getChildCount();
+        const marks = cluster.getAllChildMarkers();
+        const sevs: string[] = marks.map((m: any) => m.options.lkSeverity as string);
+        const topCol = sevs.includes("critical") ? "#ef4444"
+          : sevs.includes("warn") ? "#f59e0b" : "#10b981";
+        const sz = count < 10 ? 30 : count < 50 ? 38 : count < 200 ? 46 : 54;
+        const fs = Math.max(10, Math.min(14, Math.round(sz / 2.6)));
+        return L.divIcon({
+          className: "lk-cluster",
+          html: `<div style="width:${sz}px;height:${sz}px;background:${topCol};font-size:${fs}px">${count > 999 ? "999+" : count}</div>`,
+          iconSize: [sz, sz],
+          iconAnchor: [sz / 2, sz / 2],
+        });
+      },
+    }).addTo(map);
     mapRef.current = map;
+
+    const applyZoomClass = () => {
+      const z = map.getZoom();
+      const c = map.getContainer();
+      c.classList.remove("lk-z-lo", "lk-z-mid", "lk-z-hi", "lk-z-max");
+      c.classList.add(z <= 8 ? "lk-z-lo" : z <= 12 ? "lk-z-mid" : z <= 15 ? "lk-z-hi" : "lk-z-max");
+    };
+    applyZoomClass();
+    map.on("zoomend", applyZoomClass);
 
     map.on("click", (e: any) => {
       if (!onMapPickRef.current) return;
@@ -991,16 +1024,13 @@ function LiveMap({ reports, flyTo, resetView, onMapPick, onSelectReport, pickRes
       const isPulse = r.severity === "critical";
       const icon = L.divIcon({
         className: "",
-        html: `<div style="position:relative;width:34px;height:34px;">
-          ${isPulse ? `<span style="position:absolute;inset:-4px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid ${col};animation:pulse-ring 1.8s ease-out infinite;opacity:0.5;pointer-events:none;"></span>` : ""}
-          <div style="width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${col};display:grid;place-items:center;box-shadow:0 2px 8px ${col}60;">
-            <span style="color:white;font-weight:700;font-size:14px;transform:rotate(45deg);display:block;">!</span>
-          </div>
-        </div>`,
-        iconSize: [34, 34], iconAnchor: [17, 34], popupAnchor: [0, -38],
+        html: `<div class="lk-m-wrap">${isPulse ? `<div class="lk-m-pulse" style="background:${col}"></div>` : ""}<div class="lk-dot" style="background:${col}"></div></div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -14],
       });
 
-      const marker = L.marker([r.lat, r.lon], { icon });
+      const marker = L.marker([r.lat, r.lon], { icon, lkSeverity: r.severity } as any);
 
       // Create popup container and React root once per marker
       const container = document.createElement("div");

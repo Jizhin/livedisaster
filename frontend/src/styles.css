@@ -246,6 +246,67 @@
 }
 .leaflet-tooltip.lk-place-label::before { border-top-color: white; }
 
+/* ─── Adaptive Dot Markers ─── */
+.lk-m-wrap {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+}
+.lk-dot {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: var(--lk-sz, 10px);
+  height: var(--lk-sz, 10px);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.06);
+  transition: width 0.2s ease, height 0.2s ease, transform 0.15s ease;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.lk-dot:hover {
+  transform: translate(-50%, -50%) scale(1.6);
+}
+.lk-m-pulse {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.5;
+  animation: lk-pulse-out 1.8s ease-out infinite;
+}
+@keyframes lk-pulse-out {
+  0%   { transform: translate(-50%,-50%) scale(1);   opacity: 0.55; }
+  100% { transform: translate(-50%,-50%) scale(2.8); opacity: 0; }
+}
+/* Zoom-adaptive size tokens — set on the map container via JS */
+.leaflet-container.lk-z-lo  { --lk-sz: 6px;  }
+.leaflet-container.lk-z-mid { --lk-sz: 8px;  }
+.leaflet-container.lk-z-hi  { --lk-sz: 10px; }
+.leaflet-container.lk-z-max { --lk-sz: 13px; }
+/* Cluster bubbles */
+.lk-cluster div {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  border: 3px solid white;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.22);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.lk-cluster:hover div {
+  transform: scale(1.12);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.28);
+}
+
 /* ═══════════════════════════════════════════════════════════════
    EXISTING lkp-* STYLES (unchanged below this line)
    ═══════════════════════════════════════════════════════════════ */
