@@ -855,6 +855,7 @@ export function HomePage() {
   const [showFeed, setShowFeed] = useState(true);
 
   const [reportFlowOpen, setReportFlowOpen] = useState(false);
+  const [heroMessage, setHeroMessage] = useState("");
   const [mapPickPlace, setMapPickPlace] = useState<Place | null>(null);
   const [mapPickLoading, setMapPickLoading] = useState(false);
   const [mapPickReset, setMapPickReset] = useState(0);
@@ -910,8 +911,11 @@ export function HomePage() {
     setReportFlowOpen(true);
   }
 
+  function openReportFlow() { setReportFlowOpen(true); }
+
   function closeReportModal() {
     setReportFlowOpen(false);
+    setHeroMessage("");
     setMapPickPlace(null);
     setMapPickReset(n => n + 1);
   }
@@ -956,13 +960,14 @@ export function HomePage() {
             </div>
             <input
               type="text"
+              value={heroMessage}
+              onChange={e => setHeroMessage(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && heroMessage.trim() && openReportFlow()}
               placeholder="What's happening near you?"
-              readOnly
-              onClick={() => setReportFlowOpen(true)}
-              className="min-w-0 flex-1 cursor-pointer bg-transparent px-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent px-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
             />
             <button
-              onClick={() => setReportFlowOpen(true)}
+              onClick={openReportFlow}
               className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-foreground px-3 py-2 text-xs font-semibold text-background hover:bg-foreground/90 sm:px-4 sm:text-sm"
             >
               <Camera className="h-4 w-4" /> <span className="hidden sm:inline">Report</span>
@@ -973,7 +978,7 @@ export function HomePage() {
             {["🌊 Flood", "⚡ Power cut", "🔥 Fire", "🌪 Storm", "🚧 Road", "🩺 Medical"].map((tag) => (
               <button
                 key={tag}
-                onClick={() => setReportFlowOpen(true)}
+                onClick={openReportFlow}
                 className="rounded-full border border-border bg-white px-2.5 py-0.5 text-[11px] font-medium text-foreground transition hover:border-foreground hover:bg-foreground hover:text-background"
               >
                 {tag}
@@ -1264,7 +1269,7 @@ export function HomePage() {
         <WelcomeModal dataReady={status === "live" && alertStatus !== "loading"} t={t} onDismiss={dismissWelcome} />
       )}
       {reportFlowOpen && (
-        <ReportFlowModal onClose={closeReportModal} onReported={refresh} initialPlace={mapPickPlace ?? undefined} />
+        <ReportFlowModal onClose={closeReportModal} onReported={refresh} initialPlace={mapPickPlace ?? undefined} initialMessage={heroMessage || undefined} />
       )}
       {districtFocus && (
         <DistrictModal
@@ -1279,8 +1284,8 @@ export function HomePage() {
 }
 
 /* ─── Report Flow Modal ──────────────────────────────────────── */
-function ReportFlowModal({ onClose, onReported, initialPlace }: {
-  onClose: () => void; onReported: () => void; initialPlace?: Place;
+function ReportFlowModal({ onClose, onReported, initialPlace, initialMessage }: {
+  onClose: () => void; onReported: () => void; initialPlace?: Place; initialMessage?: string;
 }) {
   const [step, setStep] = useState<"location" | "form">(initialPlace ? "form" : "location");
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(initialPlace ?? null);
@@ -1291,7 +1296,7 @@ function ReportFlowModal({ onClose, onReported, initialPlace }: {
         className="relative flex h-[min(580px,calc(100dvh-env(safe-area-inset-bottom)))] sm:h-[min(560px,calc(100dvh-2rem))] w-full sm:max-w-sm flex-col overflow-hidden rounded-t-[2rem] sm:rounded-[2rem] border border-border bg-card shadow-float">
         {step === "location"
           ? <LocationPickerStep onSelect={handlePlaceSelected} onClose={onClose} />
-          : selectedPlace ? <ReportFormStep place={selectedPlace} onBack={() => setStep("location")} onClose={onClose} onReported={onReported} /> : null}
+          : selectedPlace ? <ReportFormStep place={selectedPlace} onBack={() => setStep("location")} onClose={onClose} onReported={onReported} initialMessage={initialMessage} /> : null}
       </div>
     </div>
   );
@@ -1365,11 +1370,11 @@ function LocationPickerStep({ onSelect, onClose }: { onSelect: (p: Place) => voi
   );
 }
 
-function ReportFormStep({ place, onBack, onClose, onReported }: { place: Place; onBack: () => void; onClose: () => void; onReported: () => void }) {
+function ReportFormStep({ place, onBack, onClose, onReported, initialMessage }: { place: Place; onBack: () => void; onClose: () => void; onReported: () => void; initialMessage?: string }) {
   const { t } = useLanguage();
   const [severity, setSeverity] = useState<Severity>("warn");
   const [category, setCategory] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialMessage ?? "");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
