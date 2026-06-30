@@ -246,6 +246,15 @@
 }
 .leaflet-tooltip.lk-place-label::before { border-top-color: white; }
 
+/* ─── Google Translate — suppress default UI chrome ─── */
+.goog-te-banner-frame.skiptranslate { display: none !important; }
+body { top: 0 !important; }
+.goog-te-balloon-frame { display: none !important; }
+#goog-gt-tt { display: none !important; }
+.goog-text-highlight { background: none !important; box-shadow: none !important; }
+.VIpgJd-ZVi9od-l4eHX-hSRGPd { display: none !important; }
+.goog-te-spinner-pos { display: none !important; }
+
 /* ─── Adaptive Dot Markers ─── */
 .lk-m-wrap {
   position: relative;

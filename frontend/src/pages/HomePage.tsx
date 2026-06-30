@@ -504,11 +504,152 @@ function ConnectingBanner() {
   );
 }
 
+/* ─── Language Switcher ─────────────────────────────────────── */
+const LANGS = [
+  { code: "en",    native: "English",    label: "English" },
+  { code: "ml",    native: "മലയാളം",     label: "Malayalam" },
+  { code: "hi",    native: "हिन्दी",      label: "Hindi" },
+  { code: "ta",    native: "தமிழ்",       label: "Tamil" },
+  { code: "te",    native: "తెలుగు",      label: "Telugu" },
+  { code: "kn",    native: "ಕನ್ನಡ",       label: "Kannada" },
+  { code: "bn",    native: "বাংলা",       label: "Bengali" },
+  { code: "ur",    native: "اردو",        label: "Urdu" },
+  { code: "ar",    native: "العربية",     label: "Arabic" },
+  { code: "fr",    native: "Français",   label: "French" },
+  { code: "de",    native: "Deutsch",    label: "German" },
+  { code: "es",    native: "Español",    label: "Spanish" },
+  { code: "pt",    native: "Português",  label: "Portuguese" },
+  { code: "ru",    native: "Русский",    label: "Russian" },
+  { code: "zh-CN", native: "中文",       label: "Chinese" },
+  { code: "ja",    native: "日本語",     label: "Japanese" },
+  { code: "ko",    native: "한국어",     label: "Korean" },
+] as const;
+
+function LanguageSwitcher() {
+  const [open, setOpen] = useState(false);
+  const [current, setCurrent] = useState("en");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const m = document.cookie.match(/googtrans=\/en\/([^;]+)/);
+    if (m) setCurrent(decodeURIComponent(m[1]));
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  function translate(code: string) {
+    setCurrent(code);
+    setOpen(false);
+    if (code === "en") {
+      const exp = new Date(0).toUTCString();
+      document.cookie = `googtrans=; path=/; expires=${exp}`;
+      document.cookie = `googtrans=; path=/; domain=.${location.hostname}; expires=${exp}`;
+      window.location.reload();
+      return;
+    }
+    function trySet(attempt = 0) {
+      const sel = document.querySelector(".goog-te-combo") as HTMLSelectElement | null;
+      if (sel) {
+        sel.value = code;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+      } else if (attempt < 20) {
+        setTimeout(() => trySet(attempt + 1), 300);
+      }
+    }
+    trySet();
+  }
+
+  const activeLang = LANGS.find(l => l.code === current) ?? LANGS[0];
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(v => !v)}
+        title={`Language: ${activeLang.label}`}
+        className={`h-9 w-9 rounded-full flex items-center justify-center text-base transition-colors ${open ? "bg-secondary text-foreground" : "hover:bg-secondary text-muted-foreground"}`}>
+        🌐
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl border border-border bg-card shadow-float z-50 overflow-hidden float-in">
+          <div className="px-3 py-2 border-b border-border/60">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Translate page</p>
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {LANGS.map(lang => (
+              <button key={lang.code} onClick={() => translate(lang.code)}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors text-left ${current === lang.code ? "bg-primary/10 font-semibold" : "hover:bg-secondary"}`}>
+                <span className="flex-1 text-foreground">{lang.native}</span>
+                <span className="text-[10px] text-muted-foreground shrink-0">{lang.label}</span>
+                {current === lang.code && <span className="text-primary text-xs shrink-0">✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Notification Bell ─────────────────────────────────────── */
+function NotificationBell({ flashId, reports }: { flashId: string | null; reports: Report[] }) {
+  const [permission, setPermission] = useState<NotificationPermission>("default");
+  const [enabled, setEnabled] = useState(false);
+  const prevFlashRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof Notification !== "undefined") setPermission(Notification.permission);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled || !flashId || flashId === prevFlashRef.current) return;
+    prevFlashRef.current = flashId;
+    const r = reports.find(x => x.id === flashId);
+    if (!r) return;
+    try {
+      new Notification(`🚨 New report — ${r.district}`, {
+        body: r.message || "New community report submitted",
+        icon: "/favicon.svg",
+        tag: String(flashId),
+      });
+    } catch {}
+  }, [flashId, enabled, reports]);
+
+  async function toggle() {
+    if (permission === "denied") return;
+    if (permission === "default") {
+      const p = await Notification.requestPermission();
+      setPermission(p);
+      if (p === "granted") setEnabled(true);
+      return;
+    }
+    setEnabled(v => !v);
+  }
+
+  const blocked = permission === "denied";
+  return (
+    <button onClick={toggle}
+      title={blocked ? "Notifications blocked — allow in browser settings" : enabled ? "Notifications on · click to disable" : "Enable new-report notifications"}
+      className={`relative h-9 w-9 rounded-full flex items-center justify-center text-base transition-colors
+        ${blocked ? "opacity-40 cursor-not-allowed text-muted-foreground" : enabled ? "bg-primary/10 text-primary hover:bg-primary/15" : "hover:bg-secondary text-muted-foreground"}`}>
+      🔔
+      {enabled && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary border-2 border-background" />}
+    </button>
+  );
+}
+
 /* ─── Site Nav ──────────────────────────────────────────────── */
-function SiteNav({ onReport, reportsCount, status }: {
+function SiteNav({ onReport, reportsCount, status, flashId, reports }: {
   onReport: () => void;
   reportsCount: number;
   status: "connecting" | "live" | "offline";
+  flashId: string | null;
+  reports: Report[];
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur-md">
@@ -538,8 +679,8 @@ function SiteNav({ onReport, reportsCount, status }: {
             <span className={`h-1.5 w-1.5 rounded-full ${status === "live" ? "bg-success animate-pulse" : status === "offline" ? "bg-destructive" : "bg-muted-foreground animate-pulse"}`} />
             {status === "live" ? `LIVE · ${reportsCount}` : status === "offline" ? "OFFLINE" : "CONNECTING"}
           </span>
-          <button className="h-9 w-9 rounded-full hover:bg-secondary flex items-center justify-center text-muted-foreground text-base transition-colors" title="Language">🌐</button>
-          <button className="h-9 w-9 rounded-full hover:bg-secondary flex items-center justify-center text-muted-foreground text-base transition-colors" title="Alerts">🔔</button>
+          <LanguageSwitcher />
+          <NotificationBell flashId={flashId} reports={reports} />
           <button onClick={onReport} className="inline-flex items-center gap-1.5 rounded-full bg-foreground text-background px-4 py-2 text-sm font-semibold shadow-soft hover:opacity-90 transition-opacity">
             <span className="text-base leading-none">+</span> Report
           </button>
@@ -1393,7 +1534,7 @@ export function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <SiteNav onReport={() => setReportFlowOpen(true)} reportsCount={reports.length} status={status} />
+      <SiteNav onReport={() => setReportFlowOpen(true)} reportsCount={reports.length} status={status} flashId={flashId} reports={reports} />
 
       {/* Connecting banner — motivational ticker while API is warming up */}
       {waking && loadingPhase === "hidden" && <ConnectingBanner />}
