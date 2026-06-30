@@ -596,60 +596,11 @@ function LanguageSwitcher() {
   );
 }
 
-/* ─── Notification Bell ─────────────────────────────────────── */
-function NotificationBell({ flashId, reports }: { flashId: string | null; reports: Report[] }) {
-  const [permission, setPermission] = useState<NotificationPermission>("default");
-  const [enabled, setEnabled] = useState(false);
-  const prevFlashRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (typeof Notification !== "undefined") setPermission(Notification.permission);
-  }, []);
-
-  useEffect(() => {
-    if (!enabled || !flashId || flashId === prevFlashRef.current) return;
-    prevFlashRef.current = flashId;
-    const r = reports.find(x => x.id === flashId);
-    if (!r) return;
-    try {
-      new Notification(`🚨 New report — ${r.district}`, {
-        body: r.message || "New community report submitted",
-        icon: "/favicon.svg",
-        tag: String(flashId),
-      });
-    } catch {}
-  }, [flashId, enabled, reports]);
-
-  async function toggle() {
-    if (permission === "denied") return;
-    if (permission === "default") {
-      const p = await Notification.requestPermission();
-      setPermission(p);
-      if (p === "granted") setEnabled(true);
-      return;
-    }
-    setEnabled(v => !v);
-  }
-
-  const blocked = permission === "denied";
-  return (
-    <button onClick={toggle}
-      title={blocked ? "Notifications blocked — allow in browser settings" : enabled ? "Notifications on · click to disable" : "Enable new-report notifications"}
-      className={`relative h-9 w-9 rounded-full flex items-center justify-center text-base transition-colors
-        ${blocked ? "opacity-40 cursor-not-allowed text-muted-foreground" : enabled ? "bg-primary/10 text-primary hover:bg-primary/15" : "hover:bg-secondary text-muted-foreground"}`}>
-      🔔
-      {enabled && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary border-2 border-background" />}
-    </button>
-  );
-}
-
 /* ─── Site Nav ──────────────────────────────────────────────── */
-function SiteNav({ onReport, reportsCount, status, flashId, reports }: {
+function SiteNav({ onReport, reportsCount, status }: {
   onReport: () => void;
   reportsCount: number;
   status: "connecting" | "live" | "offline";
-  flashId: string | null;
-  reports: Report[];
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur-md">
@@ -680,7 +631,6 @@ function SiteNav({ onReport, reportsCount, status, flashId, reports }: {
             {status === "live" ? `LIVE · ${reportsCount}` : status === "offline" ? "OFFLINE" : "CONNECTING"}
           </span>
           <LanguageSwitcher />
-          <NotificationBell flashId={flashId} reports={reports} />
           <button onClick={onReport} className="inline-flex items-center gap-1.5 rounded-full bg-foreground text-background px-4 py-2 text-sm font-semibold shadow-soft hover:opacity-90 transition-opacity">
             <span className="text-base leading-none">+</span> Report
           </button>
@@ -1534,7 +1484,7 @@ export function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <SiteNav onReport={() => setReportFlowOpen(true)} reportsCount={reports.length} status={status} flashId={flashId} reports={reports} />
+      <SiteNav onReport={() => setReportFlowOpen(true)} reportsCount={reports.length} status={status} />
 
       {/* Connecting banner — motivational ticker while API is warming up */}
       {waking && loadingPhase === "hidden" && <ConnectingBanner />}
