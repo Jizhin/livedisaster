@@ -407,24 +407,26 @@ function LiveTicker() {
 }
 
 /* ─── Loading Screen ────────────────────────────────────────── */
-const LOADING_MSG_KEYS = [
-  { h: "loadMsg1h", s: "loadMsg1s" }, { h: "loadMsg2h", s: "loadMsg2s" },
-  { h: "loadMsg3h", s: "loadMsg3s" }, { h: "loadMsg4h", s: "loadMsg4s" },
-  { h: "loadMsg5h", s: "loadMsg5s" }, { h: "loadMsg6h", s: "loadMsg6s" },
+const LOADING_MSGS = [
+  { h: "See something? Tell your neighbors.", s: "Real-time reports from locals — before official news reaches you." },
+  { h: "Every report saves lives.", s: "Floods, road closures, outages — reported by the people who see them first." },
+  { h: "Your community is watching.", s: "Thousands of people report what they see, so you always know what's happening nearby." },
+  { h: "Safety starts with awareness.", s: "No algorithm. No delay. Just your neighbors, keeping each other informed." },
+  { h: "The world's safety net.", s: "Community-powered disaster awareness, from every corner of the globe." },
+  { h: "Where there are eyes, there is safety.", s: "Real people. Real reports. Real time. Connecting you to the live feed." },
 ] as const;
 
-function LoadingScreen({ fading, waking }: { fading: boolean; waking: boolean }) {
-  const { t } = useLanguage();
+function LoadingScreen({ fading }: { fading: boolean }) {
   const [idx, setIdx] = useState(0);
   const [vis, setVis] = useState(true);
   useEffect(() => {
     const id = setInterval(() => {
       setVis(false);
-      setTimeout(() => { setIdx(i => (i + 1) % LOADING_MSG_KEYS.length); setVis(true); }, 350);
-    }, 2400);
+      setTimeout(() => { setIdx(i => (i + 1) % LOADING_MSGS.length); setVis(true); }, 350);
+    }, 2800);
     return () => clearInterval(id);
   }, []);
-  const keys = LOADING_MSG_KEYS[idx];
+  const msg = LOADING_MSGS[idx];
   return (
     <div className={`fixed inset-0 z-[9000] flex flex-col items-center justify-center bg-foreground px-8 transition-opacity duration-700 ${fading ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
       <div className="relative flex w-full max-w-xs flex-col items-center text-center">
@@ -440,26 +442,17 @@ function LoadingScreen({ fading, waking }: { fading: boolean; waking: boolean })
             <span key={i} className="rounded-full bg-primary" style={{ width: i===2?"0.625rem":"0.375rem", height: i===2?"0.625rem":"0.375rem", opacity: i===2?1:0.4, animation:`live-pulse 1.6s ease-out ${i*0.15}s infinite` }} />
           ))}
         </div>
-        {waking ? (
-          <div className="min-h-[5rem]">
-            <p className="font-display text-[18px] font-bold leading-snug text-amber-300">Server is waking up…</p>
-            <p className="mt-2.5 text-sm leading-relaxed text-white/60">
-              The server was idle and is starting back up.<br />This takes about 30–60 seconds on Render's free tier.
-            </p>
-          </div>
-        ) : (
-          <div className="min-h-[5rem] transition-opacity duration-300" style={{ opacity: vis ? 1 : 0 }}>
-            <p className="font-display text-[18px] font-bold leading-snug text-white">{t[keys.h as keyof typeof t] as string}</p>
-            <p className="mt-2.5 text-sm leading-relaxed text-white/60">{t[keys.s as keyof typeof t] as string}</p>
-          </div>
-        )}
+        <div className="min-h-[5rem] transition-opacity duration-300" style={{ opacity: vis ? 1 : 0 }}>
+          <p className="font-display text-[18px] font-bold leading-snug text-white">{msg.h}</p>
+          <p className="mt-2.5 text-sm leading-relaxed text-white/60">{msg.s}</p>
+        </div>
         <div className="mt-8 h-1 w-48 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full rounded-full bg-primary" style={{ animation: "loading-bar 2.4s ease-in-out infinite" }} />
+          <div className="h-full rounded-full bg-primary" style={{ animation: "loading-bar 2.8s ease-in-out infinite" }} />
         </div>
       </div>
       <div className="absolute bottom-10 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-white/40">
-        <span className={waking ? "h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" : "live-dot"} />
-        {waking ? "Retrying connection…" : t.welcomeLoading}
+        <span className="live-dot" />
+        Connecting to live network…
       </div>
       <style>{`@keyframes loading-bar { 0%{width:0%;margin-left:0%} 50%{width:60%;margin-left:20%} 100%{width:0%;margin-left:100%} }`}</style>
     </div>
@@ -1803,7 +1796,7 @@ export function HomePage() {
       )}
       {detailReport && <StandaloneDetailModal report={detailReport} onClose={() => setDetailReport(null)} />}
       {showAllReports && <AllReportsModal reports={filteredReports} onClose={() => setShowAllReports(false)} onSelect={r => setDetailReport(r)} />}
-      {loadingPhase !== "hidden" && <LoadingScreen fading={loadingPhase === "fading"} waking={waking} />}
+      {loadingPhase !== "hidden" && <LoadingScreen fading={loadingPhase === "fading"} />}
     </div>
   );
 }
