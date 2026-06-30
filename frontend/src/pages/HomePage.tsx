@@ -597,15 +597,16 @@ function SiteNav({ onReport, reportsCount, status }: {
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 w-full max-w-[1400px] items-center gap-4 px-4 md:px-6">
-        <a href="/" className="flex items-center gap-2.5 shrink-0">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-soft grid place-items-center shrink-0">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5">
+      {/* Main row */}
+      <div className="mx-auto flex h-14 w-full max-w-[1400px] items-center gap-3 px-4 md:h-16 md:px-6">
+        <a href="/" className="flex items-center gap-2 shrink-0">
+          <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-soft grid place-items-center shrink-0 md:h-9 md:w-9">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4 md:h-5 md:w-5">
               <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
             </svg>
           </div>
           <div className="leading-tight">
-            <div className="font-display font-bold text-base tracking-tight text-foreground">DisasterWatch</div>
+            <div className="font-display font-bold text-sm tracking-tight text-foreground md:text-base">DisasterWatch</div>
             <div className="hidden sm:block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Crowdsourced disaster watch</div>
           </div>
         </a>
@@ -623,10 +624,27 @@ function SiteNav({ onReport, reportsCount, status }: {
             <span className={`h-1.5 w-1.5 rounded-full ${status === "live" ? "bg-success animate-pulse" : status === "offline" ? "bg-destructive" : "bg-muted-foreground animate-pulse"}`} />
             {status === "live" ? `LIVE · ${reportsCount}` : status === "offline" ? "OFFLINE" : "CONNECTING"}
           </span>
+          {/* Live count pill — mobile only */}
+          <span className={`inline-flex sm:hidden items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${status === "live" ? "border-success/30 bg-success/10 text-success" : "border-muted-foreground/30 bg-muted text-muted-foreground"}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${status === "live" ? "bg-success animate-pulse" : "bg-muted-foreground"}`} />
+            {status === "live" ? reportsCount : "…"}
+          </span>
           <LanguageSwitcher />
-          <button onClick={onReport} className="inline-flex items-center gap-1.5 rounded-full bg-foreground text-background px-4 py-2 text-sm font-semibold shadow-soft hover:opacity-90 transition-opacity">
-            <span className="text-base leading-none">+</span> Report
+          <button onClick={onReport} className="inline-flex items-center gap-1 rounded-full bg-foreground text-background px-3 py-1.5 text-sm font-semibold shadow-soft hover:opacity-90 transition-opacity md:gap-1.5 md:px-4 md:py-2">
+            <span className="text-base leading-none">+</span>
+            <span className="hidden sm:inline">Report</span>
           </button>
+        </div>
+      </div>
+
+      {/* Mobile nav strip — horizontal scroll */}
+      <div className="md:hidden overflow-x-auto border-t border-border/40" style={{ scrollbarWidth: "none" }}>
+        <div className="flex w-max gap-0.5 px-3 py-1.5">
+          {[["#map","🗺️ Live map"],["#feed","📋 Reports"],["#alerts","🚨 Alerts"],["#how","❓ How it works"]].map(([href, label]) => (
+            <a key={href} href={href} className="shrink-0 rounded-full px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-secondary whitespace-nowrap transition-colors">
+              {label}
+            </a>
+          ))}
         </div>
       </div>
     </header>
@@ -1504,8 +1522,8 @@ export function HomePage() {
       <LiveTicker />
 
       {/* ── MAP ─────────────────────────────────────────────── */}
-      <section id="map" className="mx-auto w-full max-w-[1400px] px-4 pb-10 md:px-6">
-        <div className="relative h-[640px] w-full overflow-visible">
+      <section id="map" className="mx-auto w-full max-w-[1400px] px-4 pb-6 md:pb-10 md:px-6">
+        <div className="relative h-[340px] sm:h-[480px] md:h-[640px] w-full overflow-visible">
           <LiveMap
             reports={filteredReports}
             flyTo={flyTo}
@@ -1602,7 +1620,7 @@ export function HomePage() {
             </aside>
           )}
 
-          {/* Floating LIVE UPDATES card — right */}
+          {/* Floating LIVE UPDATES — desktop right panel */}
           {showFeed && (
             <aside className="pointer-events-none absolute right-4 top-16 z-[450] hidden w-[230px] md:block">
               <div className="pointer-events-auto flex max-h-[380px] flex-col overflow-hidden rounded-xl border border-border bg-white/95 shadow-float backdrop-blur">
@@ -1624,15 +1642,11 @@ export function HomePage() {
                   ) : filteredReports.length === 0 ? (
                     <div className="py-6 text-center text-[10px] text-muted-foreground">No incidents match filters.</div>
                   ) : filteredReports.slice(0, 20).map(r => (
-                    <article key={r.id} onClick={() => {
-                      if (r.lat && r.lon) setFlyTo([r.lat, r.lon]);
-                    }} className={`cursor-pointer rounded-lg border border-border/60 p-1.5 transition hover:bg-secondary/50 ${flashId === r.id ? "bg-primary/5" : ""}`}>
+                    <article key={r.id} onClick={() => { if (r.lat && r.lon) setFlyTo([r.lat, r.lon]); }}
+                      className={`cursor-pointer rounded-lg border border-border/60 p-1.5 transition hover:bg-secondary/50 ${flashId === r.id ? "bg-primary/5" : ""}`}>
                       <div className="flex items-center gap-1.5">
-                        <img
-                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${r.id}`}
-                          alt=""
-                          className="h-6 w-6 shrink-0 rounded-full border border-border bg-secondary"
-                        />
+                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${r.id}`} alt=""
+                          className="h-6 w-6 shrink-0 rounded-full border border-border bg-secondary" />
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[10px] font-semibold text-foreground">{r.district}{r.place ? ` · ${r.place}` : ""}</div>
                           <div className="truncate text-[9px] text-muted-foreground">{formatReportTime(r.created_at)}</div>
@@ -1644,6 +1658,51 @@ export function HomePage() {
                 </div>
               </div>
             </aside>
+          )}
+
+          {/* LIVE UPDATES — mobile bottom sheet */}
+          {showFeed && createPortal(
+            <div className="md:hidden fixed inset-0 z-[800] flex flex-col justify-end" onClick={() => setShowFeed(false)}>
+              <div className="bg-card rounded-t-2xl border-t border-x border-border shadow-float max-h-[60dvh] flex flex-col float-in"
+                onClick={e => e.stopPropagation()}>
+                {/* Handle */}
+                <div className="flex justify-center pt-2 pb-1 shrink-0">
+                  <div className="h-1 w-10 rounded-full bg-border" />
+                </div>
+                <div className="flex items-center justify-between px-4 py-2 border-b border-border/60 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-sm font-bold text-foreground">Live updates</span>
+                    <span className="rounded-full bg-foreground px-2 text-[10px] font-bold text-background">{filteredReports.length}</span>
+                  </div>
+                  <button onClick={() => setShowFeed(false)} className="rounded-full p-1 text-muted-foreground hover:bg-secondary">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                  {filteredReports.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">No incidents match current filters.</div>
+                  ) : filteredReports.slice(0, 30).map(r => (
+                    <article key={r.id} onClick={() => { setShowFeed(false); if (r.lat && r.lon) setFlyTo([r.lat, r.lon]); }}
+                      className={`cursor-pointer rounded-xl border border-border/60 p-3 transition hover:bg-secondary/50 ${flashId === r.id ? "bg-primary/5 border-primary/30" : ""}`}>
+                      <div className="flex items-center gap-2">
+                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${r.id}`} alt=""
+                          className="h-8 w-8 shrink-0 rounded-full border border-border bg-secondary" />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-xs font-semibold text-foreground">{r.district}{r.place ? ` · ${r.place}` : ""}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${SEV[r.severity]?.dot ?? ""}`} />
+                            <span className="text-[10px] text-muted-foreground">{formatReportTime(r.created_at)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="mt-1.5 text-xs leading-snug text-foreground/80 line-clamp-2">{r.message}</p>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </div>,
+            document.body
           )}
 
           {mapPickLoading && (
@@ -1668,7 +1727,7 @@ export function HomePage() {
         </div>
         <div className="mt-5">
         {status !== "live" ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[1,2,3,4,5,6,7,8].map(i => (
               <div key={i} className="rounded-xl border border-border bg-card overflow-hidden animate-pulse">
                 <div className="h-20 bg-secondary" />
@@ -1691,7 +1750,7 @@ export function HomePage() {
             </button>
           </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 items-stretch">
             {filteredReports.slice(0, 8).map(r => (
               <IncidentCard key={r.id} report={r} flash={flashId === r.id} onSelect={() => setDetailReport(r)} />
             ))}
@@ -2041,9 +2100,13 @@ function StandaloneDetailModal({ report, onClose }: { report: Report; onClose: (
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-        {/* Compact modal card */}
-        <div className="relative w-full max-w-sm max-h-[80dvh] flex flex-col overflow-hidden rounded-2xl bg-card shadow-float float-in" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 z-[9000] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
+        {/* Compact modal card — bottom sheet on mobile, centered on sm+ */}
+        <div className="relative w-full sm:max-w-sm max-h-[85dvh] flex flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl bg-card shadow-float float-in" onClick={e => e.stopPropagation()}>
+          {/* Drag handle visible on mobile */}
+          <div className="sm:hidden flex justify-center pt-2 pb-0 shrink-0">
+            <div className="h-1 w-10 rounded-full bg-border" />
+          </div>
           {/* Severity bar */}
           <div className={`h-1 w-full shrink-0 ${sev.bar}`} />
 
