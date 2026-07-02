@@ -283,22 +283,31 @@ function useMapPins() {
 
     async function fetchPins() {
       try {
+        // Try dedicated lightweight endpoint first
         const res = await fetch(`${API_BASE}/reports/map`);
-        if (!res.ok) return;
-        const raw: ApiMapPin[] = await res.json();
+        if (res.ok) {
+          const raw: ApiMapPin[] = await res.json();
+          if (!active) return;
+          setPins(raw.map(r => ({
+            id: String(r.id),
+            district: r.district_name ?? "",
+            place: r.locality ?? null,
+            lat: r.latitude,
+            lon: r.longitude,
+            created_at: r.created_at,
+            message: r.content,
+            severity: (r.severity as Severity) ?? "warn",
+            category: r.category,
+            image_url: null,
+          })));
+          return;
+        }
+        // Fallback: use feed endpoint with high limit (e.g. during backend deploy)
+        const fallback = await fetch(`${API_BASE}/reports/feed?limit=2000&offset=0`);
+        if (!fallback.ok || !active) return;
+        const page: ApiFeedPage = await fallback.json();
         if (!active) return;
-        setPins(raw.map(r => ({
-          id: String(r.id),
-          district: r.district_name ?? "",
-          place: r.locality ?? null,
-          lat: r.latitude,
-          lon: r.longitude,
-          created_at: r.created_at,
-          message: r.content,
-          severity: (r.severity as Severity) ?? "warn",
-          category: r.category,
-          image_url: null,
-        })));
+        setPins(page.items.map(mapApiReport));
       } catch { /* ignore */ }
     }
 

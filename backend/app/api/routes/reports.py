@@ -20,7 +20,7 @@ def reports_map_pins(db: DbSession) -> list[ReportMapPin]:
 @router.get("/reports/feed", response_model=ReportFeedPage)
 def reports_feed(
     db: DbSession,
-    limit: int = Query(default=24, ge=1, le=100),
+    limit: int = Query(default=24, ge=1, le=5000),
     offset: int = Query(default=0, ge=0),
 ) -> ReportFeedPage:
     """Paginated community feed with total count."""
