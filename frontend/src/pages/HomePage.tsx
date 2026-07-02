@@ -1637,7 +1637,7 @@ export function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <SiteNav onReport={() => setReportFlowOpen(true)} reportsCount={reports.length} status={status} />
+      <SiteNav onReport={() => setReportFlowOpen(true)} reportsCount={feedTotal} status={status} />
 
       {/* Connecting banner — motivational ticker while API is warming up */}
       {waking && loadingPhase === "hidden" && <ConnectingBanner />}
@@ -1646,7 +1646,7 @@ export function HomePage() {
       <section className="relative mx-auto w-full max-w-[860px] px-4 pt-4 pb-2 md:px-6 md:pt-6 text-center">
         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-white/70 px-3 py-1 text-[11px] font-medium text-foreground shadow-soft backdrop-blur">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          {reports.length > 0 ? `${reports.length} live reports worldwide` : "Community powered disaster watch"}
+          {feedTotal > 0 ? `${feedTotal} live reports worldwide` : "Community powered disaster watch"}
         </div>
 
         <h1 className="mx-auto mt-3 max-w-2xl font-display text-3xl font-bold leading-[1.05] tracking-tight text-foreground md:text-5xl">
