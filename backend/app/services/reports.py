@@ -40,12 +40,12 @@ def recent_reports(db: Session, limit: int = 6) -> list[ReportRead]:
     return _serialize_reports_batch(db, report_crud.list_latest(db, min(limit, 50)))
 
 
-def feed_all_reports(db: Session, limit: int = 40) -> list[ReportRead]:
+def feed_all_reports(db: Session, limit: int = 500) -> list[ReportRead]:
     global _feed_cache
     now = time.monotonic()
     if _feed_cache is not None and now - _feed_cache[0] < _FEED_TTL:
         return _feed_cache[1]
-    rows = report_crud.list_latest(db, min(limit, 50))
+    rows = report_crud.list_latest(db, limit)
     data = _serialize_reports_batch(db, rows)
     _feed_cache = (now, data)
     return data

@@ -12,7 +12,7 @@ def recent_reports(db: DbSession, limit: int = Query(default=6, le=50)) -> list[
 
 
 @router.get("/reports/feed", response_model=list[ReportRead])
-def reports_feed(db: DbSession, limit: int = Query(default=40, le=50)) -> list[ReportRead]:
+def reports_feed(db: DbSession, limit: int = Query(default=500, le=2000)) -> list[ReportRead]:
     """Live feed of most recent community reports across all districts."""
     return report_service.feed_all_reports(db, limit)
 
