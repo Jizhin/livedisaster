@@ -301,7 +301,7 @@ function useMapPins() {
 
     async function fetchPins() {
       try {
-        const res = await fetch(`${API_BASE}/reports/feed?limit=5000&offset=0`);
+        const res = await fetch(`${API_BASE}/reports/feed?limit=2000&offset=0`);
         if (!res.ok || !active) return;
         const data = await res.json();
         if (!active) return;
