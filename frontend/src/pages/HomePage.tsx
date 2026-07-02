@@ -715,8 +715,7 @@ function IncidentCard({ report, compact = false, flash = false, onSelect }: {
         </div>
         <div className="mt-1.5 flex items-center justify-between border-t border-border/60 pt-1.5">
           <div className="flex items-center gap-1 min-w-0">
-            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${report.id}`} alt=""
-              className="h-5 w-5 shrink-0 rounded-full border border-border bg-secondary object-cover" />
+            <div className={`h-5 w-5 shrink-0 rounded-full ${SEV[report.severity]?.dot ?? "bg-border"} flex items-center justify-center text-[8px]`}>👤</div>
             <div className="truncate text-[9px] font-semibold text-foreground">Community member</div>
           </div>
           <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
@@ -1407,7 +1406,7 @@ function WelcomeModal({ dataReady, t, onDismiss }: { dataReady: boolean; t: Retu
 export function HomePage() {
   const { t } = useLanguage();
   useKeepAlive();
-  const { reports, status, waking, flashId, refresh } = useLiveReports(500);
+  const { reports, status, waking, flashId, refresh } = useLiveReports(2000);
   const { alerts, status: alertStatus } = useKeralaAlerts();
   const gdacsAlerts = useGDACS();
 
@@ -1559,9 +1558,6 @@ export function HomePage() {
             >
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Live updates
-              <span className="ml-0.5 rounded-full bg-foreground px-1.5 text-[10px] text-background">
-                {filteredReports.length}
-              </span>
             </button>
           </div>
 
@@ -1627,8 +1623,7 @@ export function HomePage() {
                 <div className="flex items-center justify-between border-b border-border/60 px-2.5 py-1.5">
                   <div className="flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[11px] font-semibold text-foreground">Live</span>
-                    <span className="text-[10px] text-muted-foreground">· {filteredReports.length}</span>
+                    <span className="text-[11px] font-semibold text-foreground">Live updates</span>
                   </div>
                   <button onClick={() => setShowFeed(false)} className="rounded-full p-0.5 text-muted-foreground hover:bg-secondary">
                     <X className="h-3 w-3" />
@@ -1645,8 +1640,7 @@ export function HomePage() {
                     <article key={r.id} onClick={() => { if (r.lat && r.lon) setFlyTo([r.lat, r.lon]); }}
                       className={`cursor-pointer rounded-lg border border-border/60 p-1.5 transition hover:bg-secondary/50 ${flashId === r.id ? "bg-primary/5" : ""}`}>
                       <div className="flex items-center gap-1.5">
-                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${r.id}`} alt=""
-                          className="h-6 w-6 shrink-0 rounded-full border border-border bg-secondary" />
+                        <div className={`h-6 w-6 shrink-0 rounded-full ${SEV[r.severity]?.dot ?? "bg-border"} flex items-center justify-center text-[9px]`}>👤</div>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-[10px] font-semibold text-foreground">{r.district}{r.place ? ` · ${r.place}` : ""}</div>
                           <div className="truncate text-[9px] text-muted-foreground">{formatReportTime(r.created_at)}</div>
@@ -1673,7 +1667,6 @@ export function HomePage() {
                   <div className="flex items-center gap-2">
                     <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="text-sm font-bold text-foreground">Live updates</span>
-                    <span className="rounded-full bg-foreground px-2 text-[10px] font-bold text-background">{filteredReports.length}</span>
                   </div>
                   <button onClick={() => setShowFeed(false)} className="rounded-full p-1 text-muted-foreground hover:bg-secondary">
                     <X className="h-4 w-4" />
@@ -1686,8 +1679,7 @@ export function HomePage() {
                     <article key={r.id} onClick={() => { setShowFeed(false); if (r.lat && r.lon) setFlyTo([r.lat, r.lon]); }}
                       className={`cursor-pointer rounded-xl border border-border/60 p-3 transition hover:bg-secondary/50 ${flashId === r.id ? "bg-primary/5 border-primary/30" : ""}`}>
                       <div className="flex items-center gap-2">
-                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${r.id}`} alt=""
-                          className="h-8 w-8 shrink-0 rounded-full border border-border bg-secondary" />
+                        <div className={`h-8 w-8 shrink-0 rounded-full ${SEV[r.severity]?.dot ?? "bg-border"} flex items-center justify-center text-[11px]`}>👤</div>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-xs font-semibold text-foreground">{r.district}{r.place ? ` · ${r.place}` : ""}</div>
                           <div className="flex items-center gap-1.5 mt-0.5">
