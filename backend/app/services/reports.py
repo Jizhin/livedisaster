@@ -12,6 +12,7 @@ from app.schemas.verification import VerificationCreate, VerificationCounts
 
 _feed_cache: tuple[float, list[ReportRead]] | None = None
 _FEED_TTL = 20  # seconds — matches frontend poll interval
+_FEED_MAX = 5000  # safety ceiling; cache always stores full dataset
 
 
 def _serialize_report(db: Session, report: Report) -> ReportRead:
@@ -40,15 +41,16 @@ def recent_reports(db: Session, limit: int = 6) -> list[ReportRead]:
     return _serialize_reports_batch(db, report_crud.list_latest(db, min(limit, 50)))
 
 
-def feed_all_reports(db: Session, limit: int = 500) -> list[ReportRead]:
+def feed_all_reports(db: Session, limit: int = _FEED_MAX) -> list[ReportRead]:
     global _feed_cache
     now = time.monotonic()
     if _feed_cache is not None and now - _feed_cache[0] < _FEED_TTL:
-        return _feed_cache[1]
-    rows = report_crud.list_latest(db, limit)
+        data = _feed_cache[1]
+        return data if limit >= len(data) else data[:limit]
+    rows = report_crud.list_latest(db, _FEED_MAX)
     data = _serialize_reports_batch(db, rows)
     _feed_cache = (now, data)
-    return data
+    return data if limit >= len(data) else data[:limit]
 
 
 def invalidate_feed_cache() -> None:

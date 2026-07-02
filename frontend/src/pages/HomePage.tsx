@@ -729,22 +729,38 @@ function IncidentCard({ report, compact = false, flash = false, onSelect }: {
 }
 
 /* ─── All Reports Modal ──────────────────────────────────────── */
+const ALL_REPORTS_PAGE = 24;
 function AllReportsModal({ reports, onClose, onSelect }: { reports: Report[]; onClose: () => void; onSelect: (r: Report) => void }) {
+  const [visible, setVisible] = useState(ALL_REPORTS_PAGE);
+  const shown = reports.slice(0, visible);
+  const remaining = reports.length - visible;
   return (
-    <div className="fixed inset-0 z-[8500] flex items-center justify-center bg-foreground/40 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="relative flex w-full max-w-3xl max-h-[82dvh] flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-float float-in" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-border/60 px-6 py-4 shrink-0">
-          <h2 className="font-display text-lg font-bold text-foreground">All reports <span className="text-muted-foreground font-normal text-base">({reports.length})</span></h2>
+    <div className="fixed inset-0 z-[8500] flex items-end sm:items-center justify-center bg-foreground/40 backdrop-blur-sm p-0 sm:p-4" onClick={onClose}>
+      <div className="relative flex w-full sm:max-w-3xl max-h-[88dvh] flex-col overflow-hidden rounded-t-[2rem] sm:rounded-[2rem] border border-border bg-card shadow-float float-in" onClick={e => e.stopPropagation()}>
+        <div className="sm:hidden flex justify-center pt-2 shrink-0"><div className="h-1 w-10 rounded-full bg-border" /></div>
+        <div className="flex items-center justify-between border-b border-border/60 px-5 py-3 shrink-0">
+          <h2 className="font-display text-base font-bold text-foreground">
+            Community reports <span className="text-muted-foreground font-normal text-sm">· {reports.length} total</span>
+          </h2>
           <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-secondary text-muted-foreground hover:bg-border transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
         <div className="overflow-y-auto p-4">
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            {reports.map(r => (
+          <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
+            {shown.map(r => (
               <IncidentCard key={r.id} report={r} compact onSelect={() => { onSelect(r); onClose(); }} />
             ))}
           </div>
+          {remaining > 0 && (
+            <div className="mt-5 text-center">
+              <button
+                onClick={() => setVisible(v => v + ALL_REPORTS_PAGE)}
+                className="rounded-full border border-border bg-secondary px-6 py-2.5 text-sm font-semibold text-foreground hover:bg-border transition-colors">
+                Show {Math.min(remaining, ALL_REPORTS_PAGE)} more <span className="text-muted-foreground font-normal">({remaining} remaining)</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
