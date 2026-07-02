@@ -53,7 +53,7 @@ type ApiReport = {
   id: number; district_name: string | null; district_slug: string | null;
   locality: string | null; latitude: number | null; longitude: number | null;
   created_at: string; content: string; severity: string; category: string | null;
-  country: string | null; images: Array<{ file_path: string }>;
+  country: string | null; state: string | null; images: Array<{ file_path: string }>;
 };
 
 type ApiMapPin = {
@@ -283,35 +283,12 @@ function useMapPins() {
 
     async function fetchPins() {
       try {
-        // Try dedicated lightweight endpoint first
-        const res = await fetch(`${API_BASE}/reports/map`);
-        if (res.ok) {
-          const raw: ApiMapPin[] = await res.json();
-          if (!active) return;
-          // Only use if it returned data; otherwise fall through to feed fallback
-          if (raw.length > 0) {
-            setPins(raw.map(r => ({
-              id: String(r.id),
-              district: r.district_name ?? "",
-              place: r.locality ?? null,
-              lat: r.latitude,
-              lon: r.longitude,
-              created_at: r.created_at,
-              message: r.content,
-              severity: (r.severity as Severity) ?? "warn",
-              category: r.category,
-              image_url: null,
-            })));
-            return;
-          }
-        }
-        // Fallback: feed with high limit (covers 404 on /reports/map, empty result,
-        // or older backend still returning flat array instead of paginated object)
-        const fallback = await fetch(`${API_BASE}/reports/feed?limit=2000&offset=0`);
-        if (!fallback.ok || !active) return;
-        const data = await fallback.json();
+        // Fetch all reports for the map — accept both flat-array (old backend)
+        // and paginated {items,total} (new backend) response formats
+        const res = await fetch(`${API_BASE}/reports/feed?limit=5000&offset=0`);
+        if (!res.ok || !active) return;
+        const data = await res.json();
         if (!active) return;
-        // Accept both old flat-array format and new paginated {items,total} format
         const items: ApiReport[] = Array.isArray(data) ? data : (data.items ?? []);
         setPins(items.map(mapApiReport));
       } catch { /* ignore */ }
