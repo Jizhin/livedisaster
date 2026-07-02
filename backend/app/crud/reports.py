@@ -31,6 +31,39 @@ def list_latest(db: Session, limit: int = 6) -> list[Report]:
     return list(db.scalars(query).unique())
 
 
+def list_page(db: Session, limit: int, offset: int) -> list[Report]:
+    query = _approved_reports().order_by(Report.created_at.desc()).limit(limit).offset(offset)
+    return list(db.scalars(query).unique())
+
+
+def count_all(db: Session) -> int:
+    return db.scalar(
+        select(func.count(Report.id))
+        .where(Report.is_approved.is_(True))
+        .where(Report.source_type == "community")
+    ) or 0
+
+
+def list_all_map_data(db: Session) -> list:
+    """Single raw-SQL query for map pins — no ORM relations, no counts."""
+    from app.models.district import District
+    rows = db.execute(
+        select(
+            Report.id, Report.latitude, Report.longitude,
+            Report.severity, Report.category, Report.locality,
+            Report.created_at, Report.content,
+            District.name.label("district_name"),
+        )
+        .join(District, Report.district_id == District.id)
+        .where(Report.is_approved.is_(True))
+        .where(Report.source_type == "community")
+        .where(Report.latitude.isnot(None))
+        .where(Report.longitude.isnot(None))
+        .order_by(Report.created_at.desc())
+    )
+    return rows.all()
+
+
 def get(db: Session, report_id: int) -> Report | None:
     query = (
         _approved_reports()

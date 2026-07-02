@@ -7,12 +7,15 @@ from app.crud import reports as report_crud
 from app.crud import verifications as verification_crud
 from app.models.report import Report
 from app.schemas.comment import CommentCreate
-from app.schemas.report import ReportCreate, ReportCreateGlobal, ReportDetail, ReportRead
+from app.schemas.report import ReportCreate, ReportCreateGlobal, ReportDetail, ReportFeedPage, ReportMapPin, ReportRead
 from app.schemas.verification import VerificationCreate, VerificationCounts
 
 _feed_cache: tuple[float, list[ReportRead]] | None = None
 _FEED_TTL = 20  # seconds — matches frontend poll interval
 _FEED_MAX = 5000  # safety ceiling; cache always stores full dataset
+
+_map_cache: tuple[float, list[ReportMapPin]] | None = None
+_MAP_TTL = 30  # map pins change less often; slightly longer TTL
 
 
 def _serialize_report(db: Session, report: Report) -> ReportRead:
@@ -54,8 +57,40 @@ def feed_all_reports(db: Session, limit: int = _FEED_MAX) -> list[ReportRead]:
 
 
 def invalidate_feed_cache() -> None:
-    global _feed_cache
+    global _feed_cache, _map_cache
     _feed_cache = None
+    _map_cache = None
+
+
+def map_pins(db: Session) -> list[ReportMapPin]:
+    global _map_cache
+    now = time.monotonic()
+    if _map_cache is not None and now - _map_cache[0] < _MAP_TTL:
+        return _map_cache[1]
+    rows = report_crud.list_all_map_data(db)
+    data = [
+        ReportMapPin(
+            id=r.id,
+            latitude=r.latitude,
+            longitude=r.longitude,
+            severity=r.severity or "warn",
+            category=r.category,
+            district_name=r.district_name,
+            locality=r.locality,
+            created_at=r.created_at,
+            content=(r.content or "")[:150],
+        )
+        for r in rows
+    ]
+    _map_cache = (now, data)
+    return data
+
+
+def feed_page(db: Session, limit: int = 24, offset: int = 0) -> ReportFeedPage:
+    total = report_crud.count_all(db)
+    rows = report_crud.list_page(db, limit, offset)
+    items = _serialize_reports_batch(db, rows)
+    return ReportFeedPage(items=items, total=total, offset=offset, limit=limit)
 
 
 def district_feed(db: Session, district_slug: str, sort: str = "newest", date_filter: str = "today") -> list[ReportRead]:

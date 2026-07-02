@@ -56,6 +56,14 @@ type ApiReport = {
   country: string | null; images: Array<{ file_path: string }>;
 };
 
+type ApiMapPin = {
+  id: number; latitude: number | null; longitude: number | null;
+  severity: string; category: string | null;
+  district_name: string | null; locality: string | null;
+  created_at: string; content: string;
+};
+type ApiFeedPage = { items: ApiReport[]; total: number; offset: number; limit: number };
+
 type ApiComment = { id: number; author_name: string; content: string; created_at: string };
 type ApiReportDetail = ApiReport & {
   confirmed_count?: number; incorrect_count?: number; resolved_count?: number;
@@ -197,8 +205,9 @@ function useReportDetail(reportId: string | null) {
   return { data, loading };
 }
 
-function useLiveReports(limit = 50) {
+function useFeedReports(limit = 24) {
   const [reports, setReports] = useState<Report[]>([]);
+  const [total, setTotal] = useState(0);
   const [status, setStatus] = useState<"connecting" | "live" | "offline">("connecting");
   const [waking, setWaking] = useState(false);
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -213,18 +222,17 @@ function useLiveReports(limit = 50) {
     let attempt = 0;
     liveRef.current = false;
 
-    // Show "waking up" hint after 3s if still not live
     const wakingTimer = setTimeout(() => {
       if (active && !liveRef.current) setWaking(true);
     }, 3000);
 
     async function fetchOnce(): Promise<boolean> {
       try {
-        const res = await fetch(`${API_BASE}/reports/feed?limit=${limit}`);
+        const res = await fetch(`${API_BASE}/reports/feed?limit=${limit}&offset=0`);
         if (!res.ok) throw new Error(`${res.status}`);
-        const raw: ApiReport[] = await res.json();
+        const page: ApiFeedPage = await res.json();
         if (!active) return false;
-        const mapped = raw.map(mapApiReport);
+        const mapped = page.items.map(mapApiReport);
         const newOnes = mapped.filter(r => !prevIdsRef.current.has(r.id));
         if (newOnes.length > 0 && prevIdsRef.current.size > 0) {
           setFlashId(newOnes[0].id);
@@ -232,6 +240,7 @@ function useLiveReports(limit = 50) {
         }
         prevIdsRef.current = new Set(mapped.map(r => r.id));
         setReports(mapped);
+        setTotal(page.total);
         setStatus("live");
         setWaking(false);
         liveRef.current = true;
@@ -247,7 +256,6 @@ function useLiveReports(limit = 50) {
       const ok = await fetchOnce();
       if (!ok && active) {
         attempt++;
-        // 5s → 10s → 15s → 20s → 30s max backoff
         const delay = Math.min(5000 * attempt, 30000);
         retryTimer = setTimeout(fetchWithRetry, delay);
       }
@@ -264,7 +272,42 @@ function useLiveReports(limit = 50) {
     };
   }, [limit, refreshKey]);
 
-  return { reports, status, waking, flashId, refresh };
+  return { reports, total, status, waking, flashId, refresh };
+}
+
+function useMapPins() {
+  const [pins, setPins] = useState<Report[]>([]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function fetchPins() {
+      try {
+        const res = await fetch(`${API_BASE}/reports/map`);
+        if (!res.ok) return;
+        const raw: ApiMapPin[] = await res.json();
+        if (!active) return;
+        setPins(raw.map(r => ({
+          id: String(r.id),
+          district: r.district_name ?? "",
+          place: r.locality ?? null,
+          lat: r.latitude,
+          lon: r.longitude,
+          created_at: r.created_at,
+          message: r.content,
+          severity: (r.severity as Severity) ?? "warn",
+          category: r.category,
+          image_url: null,
+        })));
+      } catch { /* ignore */ }
+    }
+
+    fetchPins();
+    const interval = setInterval(fetchPins, 30000);
+    return () => { active = false; clearInterval(interval); };
+  }, []);
+
+  return pins;
 }
 
 // Ping /health every 10 min so Render never hits 15-min inactivity sleep
@@ -730,36 +773,71 @@ function IncidentCard({ report, compact = false, flash = false, onSelect }: {
 
 /* ─── All Reports Modal ──────────────────────────────────────── */
 const ALL_REPORTS_PAGE = 24;
-function AllReportsModal({ reports, onClose, onSelect }: { reports: Report[]; onClose: () => void; onSelect: (r: Report) => void }) {
-  const [visible, setVisible] = useState(ALL_REPORTS_PAGE);
-  const shown = reports.slice(0, visible);
-  const remaining = reports.length - visible;
+function AllReportsModal({ onClose, onSelect }: { onClose: () => void; onSelect: (r: Report) => void }) {
+  const [items, setItems] = useState<Report[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  async function loadMore(fromOffset: number) {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/reports/feed?limit=${ALL_REPORTS_PAGE}&offset=${fromOffset}`);
+      if (!res.ok) return;
+      const page: ApiFeedPage = await res.json();
+      const newItems = page.items.map(mapApiReport);
+      setItems(prev => fromOffset === 0 ? newItems : [...prev, ...newItems]);
+      setTotal(page.total);
+      setOffset(fromOffset + ALL_REPORTS_PAGE);
+    } finally { setLoading(false); }
+  }
+
+  useEffect(() => { loadMore(0); }, []);
+
+  const remaining = total - items.length;
+
   return (
     <div className="fixed inset-0 z-[8500] flex items-end sm:items-center justify-center bg-foreground/40 backdrop-blur-sm p-0 sm:p-4" onClick={onClose}>
       <div className="relative flex w-full sm:max-w-3xl max-h-[88dvh] flex-col overflow-hidden rounded-t-[2rem] sm:rounded-[2rem] border border-border bg-card shadow-float float-in" onClick={e => e.stopPropagation()}>
         <div className="sm:hidden flex justify-center pt-2 shrink-0"><div className="h-1 w-10 rounded-full bg-border" /></div>
         <div className="flex items-center justify-between border-b border-border/60 px-5 py-3 shrink-0">
           <h2 className="font-display text-base font-bold text-foreground">
-            Community reports <span className="text-muted-foreground font-normal text-sm">· {reports.length} total</span>
+            Community reports {total > 0 && <span className="text-muted-foreground font-normal text-sm">· {total} total</span>}
           </h2>
           <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full bg-secondary text-muted-foreground hover:bg-border transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
         <div className="overflow-y-auto p-4">
-          <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
-            {shown.map(r => (
-              <IncidentCard key={r.id} report={r} compact onSelect={() => { onSelect(r); onClose(); }} />
-            ))}
-          </div>
-          {remaining > 0 && (
+          {items.length === 0 && loading ? (
+            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3 animate-pulse">
+              {[...Array(ALL_REPORTS_PAGE)].map((_, i) => (
+                <div key={i} className="rounded-xl border border-border bg-card overflow-hidden">
+                  <div className="h-20 bg-secondary" />
+                  <div className="p-3 space-y-2">
+                    <div className="h-3 bg-secondary rounded w-3/4" />
+                    <div className="h-3 bg-secondary rounded w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
+              {items.map(r => (
+                <IncidentCard key={r.id} report={r} compact onSelect={() => { onSelect(r); onClose(); }} />
+              ))}
+            </div>
+          )}
+          {remaining > 0 && !loading && (
             <div className="mt-5 text-center">
-              <button
-                onClick={() => setVisible(v => v + ALL_REPORTS_PAGE)}
+              <button onClick={() => loadMore(offset)}
                 className="rounded-full border border-border bg-secondary px-6 py-2.5 text-sm font-semibold text-foreground hover:bg-border transition-colors">
-                Show {Math.min(remaining, ALL_REPORTS_PAGE)} more <span className="text-muted-foreground font-normal">({remaining} remaining)</span>
+                Show more <span className="text-muted-foreground font-normal">({remaining} remaining)</span>
               </button>
             </div>
+          )}
+          {loading && items.length > 0 && (
+            <div className="mt-4 text-center text-sm text-muted-foreground animate-pulse">Loading…</div>
           )}
         </div>
       </div>
@@ -1422,7 +1500,8 @@ function WelcomeModal({ dataReady, t, onDismiss }: { dataReady: boolean; t: Retu
 export function HomePage() {
   const { t } = useLanguage();
   useKeepAlive();
-  const { reports, status, waking, flashId, refresh } = useLiveReports(2000);
+  const { reports, total: feedTotal, status, waking, flashId, refresh } = useFeedReports(24);
+  const mapPins = useMapPins();
   const { alerts, status: alertStatus } = useKeralaAlerts();
   const gdacsAlerts = useGDACS();
 
@@ -1457,17 +1536,22 @@ export function HomePage() {
     }
   }, [loadingPhase, loadingMinPassed, status]);
 
-  const categories = useMemo(() => Array.from(new Set(reports.map(r => r.category).filter(Boolean) as string[])), [reports]);
+  const categories = useMemo(() => Array.from(new Set(mapPins.map(r => r.category).filter(Boolean) as string[])), [mapPins]);
+
+  // Map uses all lightweight pins (separate endpoint); feed is the paginated 24-record page
+  const mapFilteredPins = useMemo(() => mapPins.filter(r =>
+    activeSeverities.has(r.severity as Severity) && (!activeCategory || r.category === activeCategory)
+  ), [mapPins, activeSeverities, activeCategory]);
 
   const filteredReports = useMemo(() => reports.filter(r =>
     activeSeverities.has(r.severity) && (!activeCategory || r.category === activeCategory)
   ), [reports, activeSeverities, activeCategory]);
 
   const stats = useMemo(() => ({
-    active: reports.filter(r => r.severity !== "safe").length,
-    critical: reports.filter(r => r.severity === "critical").length,
-    today: reports.filter(r => new Date(r.created_at).toDateString() === new Date().toDateString()).length,
-  }), [reports]);
+    active: mapPins.filter(r => r.severity !== "safe").length,
+    critical: mapPins.filter(r => r.severity === "critical").length,
+    today: mapPins.filter(r => new Date(r.created_at).toDateString() === new Date().toDateString()).length,
+  }), [mapPins]);
 
   function toggleSeverity(s: Severity) {
     setActiveSeverities(prev => {
@@ -1540,7 +1624,7 @@ export function HomePage() {
       <section id="map" className="mx-auto w-full max-w-[1400px] px-4 pb-6 md:pb-10 md:px-6">
         <div className="relative h-[340px] sm:h-[480px] md:h-[640px] w-full overflow-visible">
           <LiveMap
-            reports={filteredReports}
+            reports={mapFilteredPins}
             flyTo={flyTo}
             resetView={mapResetView}
             onMapPick={handleMapPick}
@@ -1626,7 +1710,7 @@ export function HomePage() {
                   </div>
                 )}
                 <div className="mt-3 text-[10px] text-muted-foreground">
-                  Showing <span className="font-semibold text-foreground">{filteredReports.length}</span> of {reports.length}.
+                  <span className="font-semibold text-foreground">{mapFilteredPins.length}</span> pins on map · <span className="font-semibold text-foreground">{feedTotal}</span> total reports.
                 </div>
               </div>
             </aside>
@@ -1764,11 +1848,11 @@ export function HomePage() {
             ))}
           </div>
         )}
-        {filteredReports.length > 6 && (
+        {feedTotal > 8 && (
           <div className="mt-6 text-center">
             <button onClick={() => setShowAllReports(true)}
               className="rounded-full border border-border bg-white/70 backdrop-blur px-6 py-2.5 text-sm font-medium text-foreground hover:bg-secondary transition-colors">
-              View all {filteredReports.length} reports
+              View all {feedTotal} reports
             </button>
           </div>
         )}
@@ -1862,7 +1946,7 @@ export function HomePage() {
         />
       )}
       {detailReport && <StandaloneDetailModal report={detailReport} onClose={() => setDetailReport(null)} />}
-      {showAllReports && <AllReportsModal reports={filteredReports} onClose={() => setShowAllReports(false)} onSelect={r => setDetailReport(r)} />}
+      {showAllReports && <AllReportsModal onClose={() => setShowAllReports(false)} onSelect={r => setDetailReport(r)} />}
       {loadingPhase !== "hidden" && <LoadingScreen fading={loadingPhase === "fading"} />}
     </div>
   );

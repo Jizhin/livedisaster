@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import Field
+from pydantic import BaseModel, Field
 from app.models.report import ReportStatus
 from app.schemas.common import ImageRead, ORMModel
 from app.schemas.comment import CommentRead
@@ -68,4 +68,23 @@ class ReportCreateGlobal(ORMModel):
 class ReportModeration(ORMModel):
     is_approved: bool
     status: ReportStatus | None = None
+
+
+class ReportMapPin(BaseModel):
+    id: int
+    latitude: float | None = None
+    longitude: float | None = None
+    severity: str = "warn"
+    category: str | None = None
+    district_name: str | None = None
+    locality: str | None = None
+    created_at: datetime
+    content: str = ""
+
+
+class ReportFeedPage(BaseModel):
+    items: list[ReportRead]
+    total: int
+    offset: int
+    limit: int
 

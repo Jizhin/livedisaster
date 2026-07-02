@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query
 from app.api.deps import DbSession
-from app.schemas.report import ReportCreate, ReportCreateGlobal, ReportDetail, ReportRead
+from app.schemas.report import ReportCreate, ReportCreateGlobal, ReportDetail, ReportFeedPage, ReportMapPin, ReportRead
 from app.services import reports as report_service
 
 router = APIRouter()
@@ -11,10 +11,20 @@ def recent_reports(db: DbSession, limit: int = Query(default=6, le=50)) -> list[
     return report_service.recent_reports(db, limit)
 
 
-@router.get("/reports/feed", response_model=list[ReportRead])
-def reports_feed(db: DbSession, limit: int = Query(default=500, le=2000)) -> list[ReportRead]:
-    """Live feed of most recent community reports across all districts."""
-    return report_service.feed_all_reports(db, limit)
+@router.get("/reports/map", response_model=list[ReportMapPin])
+def reports_map_pins(db: DbSession) -> list[ReportMapPin]:
+    """Lightweight: all approved pins with only map-essential fields. No counts, no images."""
+    return report_service.map_pins(db)
+
+
+@router.get("/reports/feed", response_model=ReportFeedPage)
+def reports_feed(
+    db: DbSession,
+    limit: int = Query(default=24, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> ReportFeedPage:
+    """Paginated community feed with total count."""
+    return report_service.feed_page(db, limit, offset)
 
 
 @router.post("/reports", response_model=ReportRead, status_code=201)
