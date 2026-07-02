@@ -192,6 +192,24 @@ async function reverseGeocode(lat: number, lon: number): Promise<Place | null> {
   } catch { return null; }
 }
 
+// Cache Photon geocoding results across refetches (session-scoped)
+const _geocodeCache = new Map<string, { lat: number; lon: number } | null>();
+
+async function geocodeQuery(query: string): Promise<{ lat: number; lon: number } | null> {
+  if (_geocodeCache.has(query)) return _geocodeCache.get(query) ?? null;
+  try {
+    const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`);
+    if (!res.ok) { _geocodeCache.set(query, null); return null; }
+    const data: { features: PhotonFeature[] } = await res.json();
+    const f = data.features?.[0];
+    if (!f) { _geocodeCache.set(query, null); return null; }
+    const [lon, lat] = f.geometry.coordinates;
+    const coords = { lat, lon };
+    _geocodeCache.set(query, coords);
+    return coords;
+  } catch { return null; }
+}
+
 function useReportDetail(reportId: string | null) {
   const [data, setData] = useState<ApiReportDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -283,14 +301,47 @@ function useMapPins() {
 
     async function fetchPins() {
       try {
-        // Fetch all reports for the map — accept both flat-array (old backend)
-        // and paginated {items,total} (new backend) response formats
         const res = await fetch(`${API_BASE}/reports/feed?limit=5000&offset=0`);
         if (!res.ok || !active) return;
         const data = await res.json();
         if (!active) return;
         const items: ApiReport[] = Array.isArray(data) ? data : (data.items ?? []);
-        setPins(items.map(mapApiReport));
+
+        // Split: reports with real GPS vs those needing geocoding
+        const withCoords: Report[] = [];
+        const withoutCoords: ApiReport[] = [];
+        for (const r of items) {
+          if (r.latitude != null && r.longitude != null) {
+            withCoords.push(mapApiReport(r));
+          } else {
+            withoutCoords.push(r);
+          }
+        }
+
+        // Group reports-without-coords by unique location query string
+        const locationGroups = new Map<string, ApiReport[]>();
+        for (const r of withoutCoords) {
+          const key = [r.locality, r.state, r.country].filter(Boolean).join(", ");
+          if (!key) continue;
+          if (!locationGroups.has(key)) locationGroups.set(key, []);
+          locationGroups.get(key)!.push(r);
+        }
+
+        // Geocode each unique location via Photon (cached across refetches)
+        const approxPins: Report[] = [];
+        for (const [locationKey, group] of locationGroups) {
+          if (!active) break;
+          const coords = await geocodeQuery(locationKey);
+          if (!coords) continue;
+          for (const r of group) {
+            // Deterministic jitter per report ID so pins don't move on re-fetch
+            const latJ = (((r.id * 1664525 + 1013904223) & 0x7fffffff) / 0x7fffffff - 0.5) * 0.25;
+            const lonJ = (((r.id * 214013 + 2531011) & 0x7fffffff) / 0x7fffffff - 0.5) * 0.25;
+            approxPins.push({ ...mapApiReport(r), lat: coords.lat + latJ, lon: coords.lon + lonJ });
+          }
+        }
+
+        if (active) setPins([...withCoords, ...approxPins]);
       } catch { /* ignore */ }
     }
 
