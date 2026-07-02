@@ -288,26 +288,32 @@ function useMapPins() {
         if (res.ok) {
           const raw: ApiMapPin[] = await res.json();
           if (!active) return;
-          setPins(raw.map(r => ({
-            id: String(r.id),
-            district: r.district_name ?? "",
-            place: r.locality ?? null,
-            lat: r.latitude,
-            lon: r.longitude,
-            created_at: r.created_at,
-            message: r.content,
-            severity: (r.severity as Severity) ?? "warn",
-            category: r.category,
-            image_url: null,
-          })));
-          return;
+          // Only use if it returned data; otherwise fall through to feed fallback
+          if (raw.length > 0) {
+            setPins(raw.map(r => ({
+              id: String(r.id),
+              district: r.district_name ?? "",
+              place: r.locality ?? null,
+              lat: r.latitude,
+              lon: r.longitude,
+              created_at: r.created_at,
+              message: r.content,
+              severity: (r.severity as Severity) ?? "warn",
+              category: r.category,
+              image_url: null,
+            })));
+            return;
+          }
         }
-        // Fallback: use feed endpoint with high limit (e.g. during backend deploy)
+        // Fallback: feed with high limit (covers 404 on /reports/map, empty result,
+        // or older backend still returning flat array instead of paginated object)
         const fallback = await fetch(`${API_BASE}/reports/feed?limit=2000&offset=0`);
         if (!fallback.ok || !active) return;
-        const page: ApiFeedPage = await fallback.json();
+        const data = await fallback.json();
         if (!active) return;
-        setPins(page.items.map(mapApiReport));
+        // Accept both old flat-array format and new paginated {items,total} format
+        const items: ApiReport[] = Array.isArray(data) ? data : (data.items ?? []);
+        setPins(items.map(mapApiReport));
       } catch { /* ignore */ }
     }
 
